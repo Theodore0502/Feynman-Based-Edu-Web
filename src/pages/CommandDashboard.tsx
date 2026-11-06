@@ -1,6 +1,6 @@
 /**
  * File: src/pages/CommandDashboard.tsx
- * Mục đích: [Trang 3] Command Dashboard - Trung tâm điều hành học tập, thống kê điểm Clarity trung bình, chuỗi ngày học và danh sách các phiên giảng gần nhất.
+ * Mục đích: [Trang 3] Command Dashboard - Trung tâm điều hành học tập, thống kê điểm Clarity trung bình, chuỗi ngày học và danh sách các phiên giảng gần nhất kết nối trực tiếp với Supabase.
  * Thành phần chính:
  *   - CommandDashboard: Chỉ số tổng quan, ClarityMeter, danh sách phiên học và thẻ Feynman Mastery Card xem nhanh.
  * Props/Inputs: Không có.
@@ -12,6 +12,7 @@ import { ClarityMeter } from "@/components/shared/ClarityMeter";
 import { MasteryCardPreview } from "@/components/shared/MasteryCardPreview";
 import { useModalStore } from "@/hooks/useModalStore";
 import { getPersonaById } from "@/config/personas.config";
+import { SupabaseService } from "@/lib/services/supabase-service";
 import type { FeynmanSession, VaultRecord } from "@/types/session.types";
 import { 
   Mic, 
@@ -19,7 +20,8 @@ import {
   Flame, 
   BookOpen, 
   ArrowUpRight, 
-  ChevronRight
+  ChevronRight,
+  Database
 } from "lucide-react";
 
 export const CommandDashboard: React.FC = () => {
@@ -28,35 +30,16 @@ export const CommandDashboard: React.FC = () => {
   const [vaultItems, setVaultItems] = useState<VaultRecord[]>([]);
 
   useEffect(() => {
-    fetch("/api/sessions")
-      .then((res) => res.json())
-      .then((data) => {
-        setSessions(data.sessions || []);
-        setVaultItems(data.vaultItems || []);
-      })
-      .catch(() => {
-        // Mock fallback if running without backend server
-        setSessions([
-          {
-            id: "ses-1",
-            topic: "Cơ chế Docker Container",
-            personaId: "child_10yo",
-            difficulty: "MEDIUM",
-            status: "COMPLETED",
-            clarityScore: 84,
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: "ses-2",
-            topic: "Lạm phát & Sức mua",
-            personaId: "non_tech",
-            difficulty: "MEDIUM",
-            status: "ACTIVE",
-            clarityScore: 72,
-            createdAt: new Date().toISOString(),
-          },
-        ]);
-      });
+    // Tải dữ liệu từ Supabase Cloud
+    async function loadData() {
+      const [fetchedSessions, fetchedVault] = await Promise.all([
+        SupabaseService.getSessions(10),
+        SupabaseService.getVaultItems(),
+      ]);
+      setSessions(fetchedSessions);
+      setVaultItems(fetchedVault);
+    }
+    loadData();
   }, []);
 
   const sampleReport = {
@@ -77,8 +60,8 @@ export const CommandDashboard: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div className="max-w-xl space-y-3">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E5ECFB] text-[#5066A1] text-xs font-bold border border-[#D3E0FA]">
-              <Sparkles className="w-3.5 h-3.5 text-[#7286D3]" />
-              <span>Feynman Stage Sẵn Sàng</span>
+              <Database className="w-3.5 h-3.5 text-[#7286D3]" />
+              <span>Đã Đồng Bộ Supabase Cloud</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
               Hôm nay bạn muốn làm chủ khái niệm nào?
@@ -118,7 +101,7 @@ export const CommandDashboard: React.FC = () => {
             <Mic className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-2xl font-black text-slate-800">{sessions.length || 8}</span>
+            <span className="text-2xl font-black text-slate-800">{sessions.length}</span>
             <p className="text-xs text-slate-500 font-semibold">Phiên Đã Giảng</p>
           </div>
         </div>
@@ -138,7 +121,7 @@ export const CommandDashboard: React.FC = () => {
             <BookOpen className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-2xl font-black text-slate-800">{vaultItems.length || 24}</span>
+            <span className="text-2xl font-black text-slate-800">{vaultItems.length}</span>
             <p className="text-xs text-slate-500 font-semibold">Thuật Ngữ Trong Vault</p>
           </div>
         </div>
@@ -150,8 +133,8 @@ export const CommandDashboard: React.FC = () => {
         <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-[#E8EEF8] shadow-subtle space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-bold text-slate-800">Các Phiên Giảng Gần Đây</h3>
-              <p className="text-xs text-slate-500">Lịch sử rèn luyện phản xạ bình dân hóa</p>
+              <h3 className="text-base font-bold text-slate-800">Các Phiên Giảng Gần Đây (Supabase)</h3>
+              <p className="text-xs text-slate-500">Lịch sử rèn luyện phản xạ bình dân hóa lưu trữ trên đám mây</p>
             </div>
             <Link
               to="/stage/new"
@@ -199,7 +182,7 @@ export const CommandDashboard: React.FC = () => {
                       </td>
                       <td className="py-3 px-3 text-right">
                         <Link
-                          to={ses.status === "COMPLETED" ? `/stage/${ses.id}/report` : `/stage/${ses.id}`}
+                          to={ses.status === "COMPLETED" ? `/stage/${ses.id}/report?topic=${encodeURIComponent(ses.topic)}` : `/stage/${ses.id}?topic=${encodeURIComponent(ses.topic)}&persona=${ses.personaId}`}
                           className="inline-flex items-center gap-1 font-bold text-[#7286D3] hover:underline"
                         >
                           <span>{ses.status === "COMPLETED" ? "Báo cáo" : "Vào phòng"}</span>
@@ -228,4 +211,3 @@ export const CommandDashboard: React.FC = () => {
 };
 
 export default CommandDashboard;
-

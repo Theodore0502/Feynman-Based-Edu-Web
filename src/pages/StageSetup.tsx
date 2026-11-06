@@ -1,6 +1,6 @@
 /**
  * File: src/pages/StageSetup.tsx
- * Mục đích: [Trang 4] Stage Setup - Thiết lập phiên giảng mới, chọn chủ đề bài giảng, Persona người nghe AI và độ khó.
+ * Mục đích: [Trang 4] Stage Setup - Thiết lập phiên giảng mới, chọn chủ đề bài giảng, Persona người nghe AI và độ khó, lưu trực tiếp vào Supabase.
  * Thành phần chính:
  *   - StageSetup: Form khởi tạo phiên giảng dạy kế thừa Preset Topics và Persona Avatar Cards.
  * Props/Inputs: Không có.
@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import { DEFAULT_PERSONAS } from "@/config/personas.config";
 import { PRESET_TOPICS } from "@/config/topics-presets.config";
 import { PersonaAvatarCard } from "@/components/shared/PersonaAvatarCard";
+import { SupabaseService } from "@/lib/services/supabase-service";
 import { ArrowRight, Sparkles } from "lucide-react";
 
 export const StageSetup: React.FC = () => {
@@ -18,12 +19,23 @@ export const StageSetup: React.FC = () => {
   const [topic, setTopic] = useState("");
   const [selectedPersonaId, setSelectedPersonaId] = useState(DEFAULT_PERSONAS[0].id);
   const [difficulty, setDifficulty] = useState<"EASY" | "MEDIUM" | "HARD">("MEDIUM");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleCreateSession = (e: React.FormEvent) => {
+  const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!topic.trim()) return;
-    const generatedId = `ses_${Date.now()}`;
-    navigate(`/stage/${generatedId}?topic=${encodeURIComponent(topic)}&persona=${selectedPersonaId}&diff=${difficulty}`);
+
+    setIsSubmitting(true);
+    try {
+      const createdSession = await SupabaseService.createSession(topic.trim(), selectedPersonaId, difficulty);
+      navigate(`/stage/${createdSession.id}?topic=${encodeURIComponent(topic)}&persona=${selectedPersonaId}&diff=${difficulty}`);
+    } catch (err) {
+      console.error("Create session error:", err);
+      const fallbackId = `ses_${Date.now()}`;
+      navigate(`/stage/${fallbackId}?topic=${encodeURIComponent(topic)}&persona=${selectedPersonaId}&diff=${difficulty}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -32,7 +44,7 @@ export const StageSetup: React.FC = () => {
       <div className="text-center space-y-2">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EEF2FC] text-[#5066A1] text-xs font-bold border border-[#D5E1FA]">
           <Sparkles className="w-3.5 h-3.5 text-[#7286D3]" />
-          <span>Bước 1: Thiết Lập Phòng Giảng Feynman</span>
+          <span>Bước 1: Thiết Lập Phòng Giảng Feynman (Supabase Synced)</span>
         </div>
         <h2 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
           Bạn chuẩn bị giảng giải về điều gì?
@@ -131,10 +143,10 @@ export const StageSetup: React.FC = () => {
         <div className="pt-2">
           <button
             type="submit"
-            disabled={!topic.trim()}
+            disabled={isSubmitting || !topic.trim()}
             className="w-full py-4 rounded-3xl bg-[#7286D3] hover:bg-[#5066A1] text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-card transition-all disabled:opacity-50 cursor-pointer"
           >
-            <span>Bắt Đầu Giảng Giải Trên Sân Khấu Feynman</span>
+            <span>{isSubmitting ? "Đang Đồng Bộ Supabase..." : "Bắt Đầu Giảng Giải Trên Sân Khấu Feynman"}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -144,4 +156,3 @@ export const StageSetup: React.FC = () => {
 };
 
 export default StageSetup;
-

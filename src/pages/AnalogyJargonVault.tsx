@@ -1,55 +1,30 @@
 /**
  * File: src/pages/AnalogyJargonVault.tsx
- * Mục đích: [Trang 9] Analogy & Jargon Vault - Kho lưu trữ các thuật ngữ chuyên ngành đã được người học bình dân hóa thành công cùng các phép ẩn dụ sinh động.
+ * Mục đích: [Trang 9] Analogy & Jargon Vault - Kho lưu trữ các thuật ngữ chuyên ngành đã được người học bình dân hóa thành công cùng các phép ẩn dụ sinh động, đồng bộ trực tiếp với Supabase.
  * Thành phần chính:
- *   - AnalogyJargonVault: Bảng tra cứu, tìm kiếm và xuất kho ẩn dụ cá nhân.
+ *   - AnalogyJargonVault: Bảng tra cứu, tìm kiếm và xuất kho ẩn dụ cá nhân từ Supabase.
  * Props/Inputs: Không có.
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { SupabaseService } from "@/lib/services/supabase-service";
 import type { VaultRecord } from "@/types/session.types";
-import { Search, Copy, Check, Quote } from "lucide-react";
+import { Search, Copy, Check, Quote, Database } from "lucide-react";
 
 export const AnalogyJargonVault: React.FC = () => {
+  const [items, setItems] = useState<VaultRecord[]>([]);
   const [search, setSearch] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const fallbackItems: VaultRecord[] = [
-    {
-      id: "v-1",
-      term: "Container (Docker)",
-      plainExplanation: "Một chiếc hộp chứa đầy đủ ứng dụng và mọi đồ đạc cần thiết để chạy ở bất kỳ máy tính nào mà không bị lỗi thiếu file.",
-      analogyUsed: "Căn hộ chung cư xây sẵn đầy đủ tiện nghi, chỉ việc xách vali vào ở.",
-      topic: "Cơ chế Docker",
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: "v-2",
-      term: "Lạm phát (Inflation)",
-      plainExplanation: "Hiện tượng đồng tiền bị giảm sức mua, khiến cùng một số tiền nhưng mua được ít hàng hóa hơn trước.",
-      analogyUsed: "Cuộc đấu giá chỉ có 5 ổ bánh mì nhưng ai tham gia cũng được phát thêm gấp đôi tiền xu.",
-      topic: "Lạm phát",
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: "v-3",
-      term: "Kháng thể (Antibody)",
-      plainExplanation: "Lực lượng bảo vệ đặc nhiệm của cơ thể được huấn luyện để nhận dạng và vô hiệu hóa kẻ đột nhập.",
-      analogyUsed: "Đội tuần tra bảo vệ cầm theo ảnh phác thảo truy nã kẻ trộm.",
-      topic: "Vaccine mRNA",
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: "v-4",
-      term: "Hàng đợi (Queue - FIFO)",
-      plainExplanation: "Cơ chế xếp hàng công bằng, ai đến trước thì được xử lý trước.",
-      analogyUsed: "Xếp hàng mua vé xem phim tại rạp.",
-      topic: "Cấu trúc dữ liệu",
-      createdAt: new Date().toISOString(),
-    },
-  ];
+  useEffect(() => {
+    async function fetchVault() {
+      const data = await SupabaseService.getVaultItems();
+      setItems(data);
+    }
+    fetchVault();
+  }, []);
 
-  const filteredItems = fallbackItems.filter(
+  const filteredItems = items.filter(
     (item) =>
       item.term.toLowerCase().includes(search.toLowerCase()) ||
       item.plainExplanation.toLowerCase().includes(search.toLowerCase()) ||
@@ -67,6 +42,10 @@ export const AnalogyJargonVault: React.FC = () => {
       {/* Header & Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E5ECFB] text-[#5066A1] text-xs font-bold border border-[#D3E0FA] mb-1">
+            <Database className="w-3.5 h-3.5 text-[#7286D3]" />
+            <span>Supabase Cloud Vault</span>
+          </div>
           <h3 className="text-xl font-black text-slate-800">Kho Ẩn Dụ & Thuật Ngữ (Vault)</h3>
           <p className="text-xs text-slate-500">Tài sản trí tuệ bạn đã đúc kết và vượt qua thẩm định của AI</p>
         </div>
@@ -127,4 +106,3 @@ export const AnalogyJargonVault: React.FC = () => {
 };
 
 export default AnalogyJargonVault;
-

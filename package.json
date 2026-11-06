@@ -13,6 +13,7 @@
     "@ai-sdk/google": "^0.0.52",
     "@ai-sdk/openai": "^0.0.66",
     "@prisma/client": "^5.21.1",
+    "@supabase/supabase-js": "^2.119.0",
     "ai": "^3.4.15",
     "clsx": "^2.1.1",
     "lucide-react": "^0.453.0",

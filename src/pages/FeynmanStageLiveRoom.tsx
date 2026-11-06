@@ -1,12 +1,12 @@
 /**
  * File: src/pages/FeynmanStageLiveRoom.tsx
- * Mục đích: [Trang 5] The Feynman Stage (Live Room) - Nơi người học thực hành giảng giải theo thời gian thực cho AI Persona bằng giọng nói hoặc văn bản.
+ * Mục đích: [Trang 5] The Feynman Stage (Live Room) - Nơi người học thực hành giảng giải theo thời gian thực cho AI Persona bằng giọng nói hoặc văn bản, đồng bộ trực tiếp với Supabase.
  * Thành phần chính:
- *   - FeynmanStageLiveRoom: Tích hợp ChatTranscript, VoiceRecorderButton, RealtimeAnalyzerPanel và LogicFlowMiniMap.
+ *   - FeynmanStageLiveRoom: Tích hợp ChatTranscript, VoiceRecorderButton, RealtimeAnalyzerPanel, LogicFlowMiniMap và SupabaseService.
  * Props/Inputs: Không có.
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
 import { getPersonaById } from "@/config/personas.config";
 import { ChatTranscript } from "@/components/stage/ChatTranscript";
@@ -14,6 +14,7 @@ import { RealtimeAnalyzerPanel } from "@/components/stage/RealtimeAnalyzerPanel"
 import { LogicFlowMiniMap } from "@/components/stage/LogicFlowMiniMap";
 import { VoiceRecorderButton } from "@/components/shared/VoiceRecorderButton";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { SupabaseService } from "@/lib/services/supabase-service";
 import type { ChatMessage } from "@/types/session.types";
 import type { AnalyticalResult } from "@/types/agent.types";
 import { Send, ArrowLeft } from "lucide-react";
@@ -27,8 +28,8 @@ export const FeynmanStageLiveRoom: React.FC = () => {
   const initialTopic = searchParams.get("topic") || "Cơ chế Docker Container";
   const initialPersona = searchParams.get("persona") || "child_10yo";
 
-  const [topic, setTopic] = useState(initialTopic);
-  const [personaId, setPersonaId] = useState(initialPersona);
+  const [topic] = useState(initialTopic);
+  const [personaId] = useState(initialPersona);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -47,11 +48,25 @@ export const FeynmanStageLiveRoom: React.FC = () => {
     const userText = input.trim();
     setInput("");
 
+    const hasJargons = userText.toLowerCase().includes("kernel") || userText.toLowerCase().includes("container") || userText.toLowerCase().includes("lạm phát");
+    const currentClarity = hasJargons ? 65 : 85;
+
+    const mockAnalysis: AnalyticalResult = {
+      jargonDetected: hasJargons ? [{ term: "Kernel / Container", isExplainedSimply: false, reason: "Từ học thuật kỹ thuật chưa được ví von đời thường" }] : [],
+      logicGaps: [],
+      currentClarityScore: currentClarity,
+      detectedAnalogy: userText.includes("như") || userText.includes("giống") ? "Phép so sánh đời thường" : null,
+      isReadyToComplete: messages.length >= 3,
+    };
+
+    setLatestAnalysis(mockAnalysis);
+
     const newMsg: ChatMessage = {
       id: `usr-${Date.now()}`,
       sessionId,
       role: "user",
       content: userText,
+      analysisMetadata: mockAnalysis,
       createdAt: new Date().toISOString(),
     };
 
@@ -59,39 +74,52 @@ export const FeynmanStageLiveRoom: React.FC = () => {
     setMessages(updatedMessages);
     setIsStreaming(true);
 
-    // AI Socrates response simulation / stream
+    // Lưu User message vào Supabase
+    SupabaseService.addMessage(sessionId, "user", userText, mockAnalysis);
+
+    // AI Socrates response simulation
     setTimeout(() => {
-      const hasJargons = userText.toLowerCase().includes("kernel") || userText.toLowerCase().includes("container") || userText.toLowerCase().includes("lạm phát");
-      const currentClarity = hasJargons ? 65 : 85;
-
-      const mockAnalysis: AnalyticalResult = {
-        jargonDetected: hasJargons ? [{ term: "Kernel / Container", isExplainedSimply: false, reason: "Từ học thuật kỹ thuật chưa được ví von đời thường" }] : [],
-        logicGaps: [],
-        currentClarityScore: currentClarity,
-        detectedAnalogy: userText.includes("như") || userText.includes("giống") ? "Phép so sánh đời thường" : null,
-        isReadyToComplete: updatedMessages.length >= 4,
-      };
-
-      setLatestAnalysis(mockAnalysis);
-      newMsg.analysisMetadata = mockAnalysis;
+      const assistantText = hasJargons
+        ? `Ủa chú ơi, "Kernel" với "Container" là cái gì trong đời thực vậy ạ? Có giống như cái hộp đựng bút của con không chú?`
+        : `A con hiểu rồi! Giống như xây nhà có sẵn bàn ghế phải không ạ? Thế nếu có người muốn đổi bàn ghế khác thì sao chú?`;
 
       const assistantMsg: ChatMessage = {
         id: `ast-${Date.now()}`,
         sessionId,
         role: "assistant",
-        content: hasJargons
-          ? `Ủa chú ơi, "Kernel" với "Container" là cái gì trong đời thực vậy ạ? Có giống như cái hộp đựng bút của con không chú?`
-          : `A con hiểu rồi! Giống như xây nhà có sẵn bàn ghế phải không ạ? Thế nếu có người muốn đổi bàn ghế khác thì sao chú?`,
+        content: assistantText,
         createdAt: new Date().toISOString(),
       };
 
       setMessages([...updatedMessages, assistantMsg]);
       setIsStreaming(false);
+
+      // Lưu Assistant message vào Supabase
+      SupabaseService.addMessage(sessionId, "assistant", assistantText);
     }, 800);
   };
 
-  const handleFinishSession = () => {
-    navigate(`/stage/${sessionId}/report?topic=${encodeURIComponent(topic)}&score=${latestAnalysis?.currentClarityScore || 85}`);
+  const handleFinishSession = async () => {
+    const score = latestAnalysis?.currentClarityScore || 85;
+    // Lưu báo cáo vào Supabase
+    await SupabaseService.saveEvaluationReport(
+      sessionId,
+      score,
+      88,
+      "Docker giống như căn hộ chung cư xây sẵn đầy đủ tiện nghi, chỉ việc dọn vào ở.",
+      ["Cơ chế cách ly Namespace", "Cgroup kiểm soát tài nguyên"],
+      "Giải thích rất lưu loát và gạt bỏ được các thuật ngữ trừu tượng."
+    );
+
+    // Lưu thuật ngữ vào Vault
+    await SupabaseService.addVaultItem(
+      topic,
+      "Đã giải thích bình dân hóa vượt qua kiểm định của người nghe.",
+      "Ẩn dụ trực quan sinh động",
+      topic
+    );
+
+    navigate(`/stage/${sessionId}/report?topic=${encodeURIComponent(topic)}&score=${score}`);
   };
 
   return (
@@ -176,4 +204,3 @@ export const FeynmanStageLiveRoom: React.FC = () => {
 };
 
 export default FeynmanStageLiveRoom;
-
