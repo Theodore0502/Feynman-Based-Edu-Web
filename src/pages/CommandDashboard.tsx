@@ -1,0 +1,231 @@
+/**
+ * File: src/pages/CommandDashboard.tsx
+ * Mục đích: [Trang 3] Command Dashboard - Trung tâm điều hành học tập, thống kê điểm Clarity trung bình, chuỗi ngày học và danh sách các phiên giảng gần nhất.
+ * Thành phần chính:
+ *   - CommandDashboard: Chỉ số tổng quan, ClarityMeter, danh sách phiên học và thẻ Feynman Mastery Card xem nhanh.
+ * Props/Inputs: Không có.
+ */
+
+import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { ClarityMeter } from "@/components/shared/ClarityMeter";
+import { MasteryCardPreview } from "@/components/shared/MasteryCardPreview";
+import { useModalStore } from "@/hooks/useModalStore";
+import { getPersonaById } from "@/config/personas.config";
+import type { FeynmanSession, VaultRecord } from "@/types/session.types";
+import { 
+  Mic, 
+  Sparkles, 
+  Flame, 
+  BookOpen, 
+  ArrowUpRight, 
+  ChevronRight
+} from "lucide-react";
+
+export const CommandDashboard: React.FC = () => {
+  const { openModal } = useModalStore();
+  const [sessions, setSessions] = useState<FeynmanSession[]>([]);
+  const [vaultItems, setVaultItems] = useState<VaultRecord[]>([]);
+
+  useEffect(() => {
+    fetch("/api/sessions")
+      .then((res) => res.json())
+      .then((data) => {
+        setSessions(data.sessions || []);
+        setVaultItems(data.vaultItems || []);
+      })
+      .catch(() => {
+        // Mock fallback if running without backend server
+        setSessions([
+          {
+            id: "ses-1",
+            topic: "Cơ chế Docker Container",
+            personaId: "child_10yo",
+            difficulty: "MEDIUM",
+            status: "COMPLETED",
+            clarityScore: 84,
+            createdAt: new Date().toISOString(),
+          },
+          {
+            id: "ses-2",
+            topic: "Lạm phát & Sức mua",
+            personaId: "non_tech",
+            difficulty: "MEDIUM",
+            status: "ACTIVE",
+            clarityScore: 72,
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+      });
+  }, []);
+
+  const sampleReport = {
+    id: "rep-sample",
+    sessionId: "ses-sample",
+    clarityScore: 84,
+    logicCompleteness: 88,
+    bestAnalogy: "Docker giống như căn hộ chung cư xây sẵn, còn máy ảo giống mua cả khu đất tự xây móng.",
+    knowledgeGaps: ["Cơ chế cách ly Namespace", "Cgroup kiểm soát tài nguyên"],
+    summaryFeedback: "Giải thích rất hóm hỉnh và bình dân hóa chuẩn xác. Đã vượt qua kiểm tra của Bé Bo!",
+    createdAt: new Date().toISOString(),
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Hero Welcome Action Banner */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-[#F0F4FC] via-[#F6F3FC] to-[#FCF4F7] border border-[#E2EAFD] rounded-3xl p-6 sm:p-8 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+          <div className="max-w-xl space-y-3">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E5ECFB] text-[#5066A1] text-xs font-bold border border-[#D3E0FA]">
+              <Sparkles className="w-3.5 h-3.5 text-[#7286D3]" />
+              <span>Feynman Stage Sẵn Sàng</span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
+              Hôm nay bạn muốn làm chủ khái niệm nào?
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              Hãy chọn một chủ đề kỹ thuật hoặc trừu tượng và bắt đầu giảng giải cho AI. Hệ thống sẽ bóc tách các lỗ hổng kiến thức của bạn theo thời gian thực.
+            </p>
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <Link
+                to="/stage/new"
+                className="px-5 py-2.5 rounded-2xl bg-[#7286D3] hover:bg-[#5066A1] text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+              >
+                <Mic className="w-4 h-4" />
+                <span>Bắt Đầu Phiên Giảng Mới</span>
+              </Link>
+              <button
+                onClick={() => openModal("QUICK_DRILL")}
+                className="px-5 py-2.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-200/80 shadow-xs transition-all cursor-pointer"
+              >
+                Thử Thách Nhanh 60s
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Clarity Gauge */}
+          <div className="shrink-0 bg-white/90 backdrop-blur-md p-5 rounded-3xl border border-[#E2EAFD] shadow-xs flex flex-col items-center">
+            <ClarityMeter score={82} variant="circle" />
+            <span className="text-[11px] text-slate-500 font-semibold mt-2">Điểm Mạch Lạc Tuần Này</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Grid: 3 Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="p-5 rounded-3xl bg-white border border-[#E8EEF8] shadow-subtle flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#EEF2FC] text-[#5066A1] flex items-center justify-center shrink-0">
+            <Mic className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-2xl font-black text-slate-800">{sessions.length || 8}</span>
+            <p className="text-xs text-slate-500 font-semibold">Phiên Đã Giảng</p>
+          </div>
+        </div>
+
+        <div className="p-5 rounded-3xl bg-white border border-[#E8EEF8] shadow-subtle flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#FFF8EE] text-[#E68A00] flex items-center justify-center shrink-0">
+            <Flame className="w-6 h-6 fill-[#FFA929] text-[#FFA929]" />
+          </div>
+          <div>
+            <span className="text-2xl font-black text-slate-800">14 Ngày</span>
+            <p className="text-xs text-slate-500 font-semibold">Chuỗi Rèn Luyện (Streak)</p>
+          </div>
+        </div>
+
+        <div className="p-5 rounded-3xl bg-white border border-[#E8EEF8] shadow-subtle flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#E8F8F5] text-[#1E7E50] flex items-center justify-center shrink-0">
+            <BookOpen className="w-6 h-6" />
+          </div>
+          <div>
+            <span className="text-2xl font-black text-slate-800">{vaultItems.length || 24}</span>
+            <p className="text-xs text-slate-500 font-semibold">Thuật Ngữ Trong Vault</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Grid: Recent Sessions Table + Sample Feynman Mastery Card */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: Recent Sessions (2 cols) */}
+        <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-[#E8EEF8] shadow-subtle space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-bold text-slate-800">Các Phiên Giảng Gần Đây</h3>
+              <p className="text-xs text-slate-500">Lịch sử rèn luyện phản xạ bình dân hóa</p>
+            </div>
+            <Link
+              to="/stage/new"
+              className="text-xs font-bold text-[#7286D3] hover:text-[#5066A1] flex items-center gap-1"
+            >
+              <span>Tạo mới</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  <th className="py-3 px-3">Chủ đề</th>
+                  <th className="py-3 px-3">Người nghe (Persona)</th>
+                  <th className="py-3 px-3">Độ rõ ràng</th>
+                  <th className="py-3 px-3">Trạng thái</th>
+                  <th className="py-3 px-3 text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {sessions.map((ses) => {
+                  const persona = getPersonaById(ses.personaId);
+                  return (
+                    <tr key={ses.id} className="hover:bg-[#F8FAFD] transition-colors">
+                      <td className="py-3 px-3 font-bold text-slate-800">{ses.topic}</td>
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-2">
+                          <img src={persona.avatar} alt="P" className="w-6 h-6 rounded-full object-cover" />
+                          <span className="font-semibold text-slate-700">{persona.name}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 font-bold text-[#5066A1]">
+                        {ses.clarityScore > 0 ? `${ses.clarityScore}%` : "Chưa chấm"}
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                          ses.status === "COMPLETED"
+                            ? "bg-[#E8F8F0] text-[#1E7E50]"
+                            : "bg-[#EEF2FC] text-[#5066A1]"
+                        }`}>
+                          {ses.status === "COMPLETED" ? "Đã xong" : "Đang học"}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <Link
+                          to={ses.status === "COMPLETED" ? `/stage/${ses.id}/report` : `/stage/${ses.id}`}
+                          className="inline-flex items-center gap-1 font-bold text-[#7286D3] hover:underline"
+                        >
+                          <span>{ses.status === "COMPLETED" ? "Báo cáo" : "Vào phòng"}</span>
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Right: Featured Feynman Mastery Card Preview */}
+        <div className="space-y-4">
+          <MasteryCardPreview
+            topic="Cơ chế Docker Container"
+            report={sampleReport}
+            onShare={() => openModal("SHARE_MASTERY", { topic: "Docker Container", score: 84 })}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CommandDashboard;
+

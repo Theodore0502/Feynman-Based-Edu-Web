@@ -1,0 +1,67 @@
+// File: prisma/schema.prisma
+// Mục đích: Định nghĩa schema Cơ sở dữ liệu cho Feynman Technique Stage với Prisma ORM
+// Bảng tạo mới: User, Session, Message, EvaluationReport, VaultItem
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  fieldOfStudy String    @default("General") // IT, Kinh tế, Y khoa, K-12
+  streakCount  Int       @default(0)
+  createdAt    DateTime  @default(now())
+}
+
+model Session {
+  id           String            @id @default(cuid())
+  topic        String
+  personaId    String            // child_10yo, non_tech, farmer, expert...
+  difficulty   String            @default("MEDIUM") // EASY | MEDIUM | HARD
+  status       String            @default("ACTIVE") // ACTIVE | COMPLETED
+  clarityScore Int               @default(0) // 0-100
+  createdAt    DateTime          @default(now())
+  messages     Message[]
+  report       EvaluationReport?
+}
+
+model Message {
+  id               String   @id @default(cuid())
+  sessionId        String
+  role             String   // user | assistant
+  content          String
+  analysisMetadata String?  // JSON string: jargonDetected, logicGaps, turnClarity
+  createdAt        DateTime @default(now())
+
+  session          Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model EvaluationReport {
+  id                String   @id @default(cuid())
+  sessionId         String   @unique
+  clarityScore      Int      // 0-100
+  logicCompleteness Int      // 0-100
+  bestAnalogy       String?
+  knowledgeGaps     String   // JSON array of strings
+  summaryFeedback   String
+  createdAt         DateTime @default(now())
+
+  session           Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model VaultItem {
+  id               String   @id @default(cuid())
+  term             String
+  plainExplanation String
+  analogyUsed      String?
+  topic            String
+  createdAt        DateTime @default(now())
+}
+
