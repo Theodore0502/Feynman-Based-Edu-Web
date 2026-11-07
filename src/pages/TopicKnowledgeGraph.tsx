@@ -1063,64 +1063,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Bottom Left Legend Box */}
-      <div className="absolute bottom-4 left-4 z-20 bg-white/95 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-lg space-y-2.5 max-w-xs text-[11px] text-slate-700">
-        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block pb-1 border-b border-slate-100">
-          Chú Giải Trạng Thái & 5 Cấp Node
-        </span>
 
-        {/* 5 Cấp Node */}
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="w-3.5 h-3.5 rounded-full bg-blue-600 border border-white shadow-sm flex items-center justify-center text-[7px] text-white font-bold">
-              1
-            </span>
-            <span>Cấp 1: Nhóm Ngành (Domain Hub)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3.5 h-3.5 rounded-full bg-white border-2 border-blue-500 shadow-sm flex items-center justify-center text-[7px] text-blue-600 font-bold">
-              2
-            </span>
-            <span>Cấp 2: Ngành Chuyên Môn (Field)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-3.5 h-3.5 rounded-md bg-emerald-500 shadow-sm flex items-center justify-center text-[7px] text-white font-bold">
-              3
-            </span>
-            <span>Cấp 3: Môn Học (Subject Hub)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-white border border-slate-500 flex items-center justify-center text-[5px] text-slate-600 font-bold">
-              •
-            </span>
-            <span>Cấp 4: Nhóm Kiến Thức (Topic Group)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.7)]" />
-            <span>Cấp 5: Vi Khái Niệm (Micro-concept Leaves)</span>
-          </div>
-        </div>
-
-        {/* Trạng thái màu sắc */}
-        <div className="pt-1.5 border-t border-slate-100 space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" />
-            <span className="font-semibold text-emerald-700">Đã thông thạo (Clarity ≥ 80)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm" />
-            <span className="font-semibold text-amber-700">Đang học dở (Active)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.7)] animate-pulse" />
-            <span className="font-semibold text-red-600">Lỗ hổng (Cần ôn lại / Giảng lại)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-white border border-slate-400" />
-            <span className="text-slate-500">Chưa học (Hollow ring / Standby)</span>
-          </div>
-        </div>
-      </div>
 
       {/* 4. Slide-over Concept Details Drawer */}
       {isDrawerOpen && selectedNode && (
