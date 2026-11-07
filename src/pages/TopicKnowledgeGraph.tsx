@@ -716,7 +716,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
         rimLabels.forEach((lbl) => {
           const lx = (ORBIT_0_R - 13) * Math.cos(lbl.angle);
           const ly = (ORBIT_0_R - 13) * Math.sin(lbl.angle);
-          ctx.font = `bold ${7.5 / globalScale}px monospace`;
+          ctx.font = `bold ${7.5 / globalScale}px 'Lato', sans-serif`;
           ctx.fillStyle = "#5A6678";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
@@ -799,13 +799,13 @@ export const TopicKnowledgeGraph: React.FC = () => {
         ctx.shadowBlur = 0;
 
         // Subtitle & Core Name (Aligned cleanly to the right of x=0)
-        ctx.font = `bold ${6 / globalScale}px sans-serif`;
+        ctx.font = `bold ${6 / globalScale}px 'Lato', sans-serif`;
         ctx.fillStyle = isActive ? "#ffffff" : "#8299E0";
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
         ctx.fillText("ELISE MATRIX", x + 8 / globalScale, y - 6 / globalScale);
 
-        ctx.font = `900 ${8 / globalScale}px sans-serif`;
+        ctx.font = `900 ${8 / globalScale}px 'Lato', sans-serif`;
         ctx.fillStyle = isActive ? "#ffffff" : "#5A6678";
         ctx.fillText("FEYNMAN", x + 8 / globalScale, y + 5 / globalScale);
 
@@ -834,14 +834,14 @@ export const TopicKnowledgeGraph: React.FC = () => {
         ctx.shadowBlur = 0;
 
         // Domain Symbol Icon
-        ctx.font = `bold ${11 / globalScale}px sans-serif`;
+        ctx.font = `bold ${11 / globalScale}px 'Lato', sans-serif`;
         ctx.fillStyle = isActive ? "#ffffff" : "#5A6678";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(node.shortLabel || "∑", x, y);
 
         // Tooltip / Title text below domain hub
-        ctx.font = `bold ${8.5 / globalScale}px sans-serif`;
+        ctx.font = `bold ${8.5 / globalScale}px 'Lato', sans-serif`;
         ctx.fillStyle = isActive ? "#8299E0" : "#5A6678";
         ctx.fillText(node.name, x, y + r + 11 / globalScale);
 
@@ -870,7 +870,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
         ctx.shadowBlur = 0;
 
         // Abbreviation
-        ctx.font = `900 ${7 / globalScale}px sans-serif`;
+        ctx.font = `900 ${7 / globalScale}px 'Lato', sans-serif`;
         ctx.fillStyle = isActive ? "#ffffff" : "#5A6678";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -907,7 +907,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
         ctx.fill();
 
         // Subject Name beside node
-        ctx.font = isActive ? `bold ${8 / globalScale}px sans-serif` : `600 ${7.5 / globalScale}px sans-serif`;
+        ctx.font = isActive ? `bold ${8 / globalScale}px 'Lato', sans-serif` : `600 ${7.5 / globalScale}px 'Lato', sans-serif`;
         ctx.fillStyle = isActive ? "#8299E0" : "#5A6678";
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
@@ -936,7 +936,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
         ctx.stroke();
         ctx.shadowBlur = 0;
 
-        ctx.font = `bold ${5.5 / globalScale}px sans-serif`;
+        ctx.font = `bold ${5.5 / globalScale}px 'Lato', sans-serif`;
         ctx.fillStyle = isActive ? "#ffffff" : "#5A6678";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
