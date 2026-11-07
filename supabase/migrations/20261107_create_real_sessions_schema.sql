@@ -142,3 +142,4 @@ CREATE POLICY "Cho phép update evaluation_reports"
 -- ==============================================================================
 CREATE OR REPLACE VIEW public.learning_sessions AS
 SELECT * FROM public.sessions;
+
