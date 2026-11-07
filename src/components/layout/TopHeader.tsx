@@ -50,31 +50,28 @@ export const TopHeader: React.FC<TopHeaderProps> = () => {
     navigate("/auth");
   };
 
-  // Tạo chuỗi Breadcrumbs động theo URL
+  // Tạo chuỗi Breadcrumbs động theo đúng mục Sidebar người dùng click
   const getBreadcrumbs = () => {
     const parts: { label: string; href?: string; active?: boolean }[] = [];
 
     if (pathname === "/dashboard" || pathname === "/") {
-      parts.push({ label: "Không Gian", href: "/dashboard" });
-      parts.push({ label: "Tổng Quan", active: true });
+      parts.push({ label: "Tổng quan", active: true });
     } else if (pathname.startsWith("/lectures")) {
       const segments = pathname.split("/").filter(Boolean);
-      // Cấp 1 (Nhóm ngành): Kho Bài Giảng
-      if (segments.length === 1) {
-        parts.push({ label: "Kho Bài Giảng", active: true });
-      } else if (segments.length === 2) {
-        // Cấp 2 (Môn học): Kho Bài Giảng > [Tên Nhóm Ngành]
+      parts.push({
+        label: "Bài giảng",
+        href: segments.length > 1 ? "/lectures" : undefined,
+        active: segments.length === 1,
+      });
+      if (segments.length === 2) {
         const domain = getDomainBySlug(segments[1]);
-        parts.push({ label: "Kho Bài Giảng", href: "/lectures" });
         parts.push({
           label: domain ? domain.name : "Nhóm Ngành",
           active: true,
         });
       } else if (segments.length >= 3) {
-        // Cấp 3 (Bài giảng trong môn): Kho Bài Giảng > [Tên Nhóm Ngành] > [Tên Môn Học]
         const domain = getDomainBySlug(segments[1]);
         const subject = getSubjectBySlug(segments[2]);
-        parts.push({ label: "Kho Bài Giảng", href: "/lectures" });
         parts.push({
           label: domain ? domain.name : "Nhóm Ngành",
           href: `/lectures/${segments[1]}`,
@@ -84,60 +81,39 @@ export const TopHeader: React.FC<TopHeaderProps> = () => {
           active: true,
         });
       }
+    } else if (pathname.startsWith("/study")) {
+      parts.push({ label: "Bài giảng", href: "/lectures" });
+      parts.push({ label: "Soạn bài giảng", active: true });
     } else if (pathname.startsWith("/stage")) {
-      const searchParams = new URLSearchParams(location.search);
-      const domainSlug = searchParams.get("domain");
-      const subjectSlug = searchParams.get("subject");
-
-      if (domainSlug && subjectSlug) {
-        const domain = getDomainBySlug(domainSlug);
-        const subject = getSubjectBySlug(subjectSlug);
-        parts.push({ label: "Kho Bài Giảng", href: "/lectures" });
-        parts.push({
-          label: domain ? domain.name : "Nhóm Ngành",
-          href: `/lectures/${domainSlug}`,
-        });
-        parts.push({
-          label: subject ? subject.name : "Môn Học",
-          href: `/lectures/${domainSlug}/${subjectSlug}`,
-        });
-        if (pathname.includes("/report")) {
-          parts.push({ label: "Báo Cáo Feynman", active: true });
-        } else {
-          parts.push({ label: "Bục Giảng", active: true });
-        }
-      } else {
-        parts.push({ label: "Luyện Tập", href: "/stage/new" });
-        if (pathname.includes("/report")) {
-          parts.push({ label: "Báo Cáo Feynman", active: true });
-        } else {
-          parts.push({ label: "Bục Giảng Live", active: true });
-        }
+      const isRootStage = pathname === "/stage" || pathname === "/stage/new";
+      parts.push({
+        label: "Luyện tập",
+        href: isRootStage ? undefined : "/stage/new",
+        active: isRootStage,
+      });
+      if (pathname.includes("/report")) {
+        parts.push({ label: "Báo cáo Feynman", active: true });
+      } else if (!isRootStage) {
+        parts.push({ label: "Bục giảng Live", active: true });
       }
     } else if (pathname === "/personas") {
-      parts.push({ label: "Khán Giả", href: "/personas" });
-      parts.push({ label: "Thư Viện AI", active: true });
+      parts.push({ label: "Thư viện AI", active: true });
     } else if (pathname === "/topics") {
-      parts.push({ label: "Tri Thức", href: "/topics" });
-      parts.push({ label: "Bản Đồ Kiến Thức", active: true });
+      parts.push({ label: "Bản đồ kiến thức", active: true });
     } else if (pathname === "/vault") {
-      parts.push({ label: "Ghi Nhớ", href: "/vault" });
-      parts.push({ label: "Sổ Tay Thuật Ngữ", active: true });
+      parts.push({ label: "Sổ tay", active: true });
     } else if (pathname === "/about") {
-      parts.push({ label: "Giới Thiệu", href: "/about" });
-      parts.push({ label: "Triết Lý Elise", active: true });
+      parts.push({ label: "Giới thiệu", active: true });
     } else if (pathname === "/settings") {
-      parts.push({ label: "Hệ Thống", href: "/settings" });
-      parts.push({ label: "Cài Đặt", active: true });
+      parts.push({ label: "Cài đặt", active: true });
     } else if (pathname.startsWith("/admin")) {
-      parts.push({ label: "Quản Trị", href: "/admin/rubrics" });
-      if (pathname.includes("rubrics")) parts.push({ label: "Tiêu Chí Rubric", active: true });
-      else if (pathname.includes("audits")) parts.push({ label: "Kiểm Duyệt", active: true });
-      else if (pathname.includes("curriculum")) parts.push({ label: "Kho Tri Thức", active: true });
-      else if (pathname.includes("ai-config")) parts.push({ label: "Cài Đặt AI", active: true });
+      if (pathname.includes("rubrics")) parts.push({ label: "Cấu hình Rubric", active: true });
+      else if (pathname.includes("audits")) parts.push({ label: "Kiểm duyệt", active: true });
+      else if (pathname.includes("curriculum")) parts.push({ label: "Kho tri thức", active: true });
+      else if (pathname.includes("ai-config")) parts.push({ label: "Cài đặt AI", active: true });
+      else parts.push({ label: "Quản trị", active: true });
     } else {
-      parts.push({ label: "Không Gian", href: "/dashboard" });
-      parts.push({ label: "Chi Tiết", active: true });
+      parts.push({ label: "Tổng quan", active: true });
     }
 
     return parts;
