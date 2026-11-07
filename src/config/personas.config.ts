@@ -17,6 +17,7 @@ export interface PersonaDefinition {
   accentColor: string;
   bgGradient: string;
   badgeText: string;
+  hobbies?: string;
   description: string;
   worldview: string; // Lăng kính hiểu biết của nhân vật
   socraticStyle: string;
@@ -40,10 +41,11 @@ export const DEFAULT_PERSONAS: PersonaDefinition[] = [
     name: "Bé Bắp",
     title: "Cậu bé 10 tuổi tò mò (Chuẩn ELI5)",
     age: "10 tuổi",
-    avatar: "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=200&q=80",
+    avatar: "/images/be-bap.jpg",
     accentColor: "#F79D9D",
     bgGradient: "from-[#FFEAEA] to-[#FFF5F5]",
     badgeText: "Cấp độ: Bình dân hóa tuyệt đối",
+    hobbies: "Thích xếp hình Lego, siêu nhân và truyện tranh Doremon.",
     description: "Thích xếp hình Lego, siêu nhân và truyện tranh Doremon. Hoàn toàn không biết từ đao to búa lớn.",
     worldview: "Chỉ hiểu những thứ sờ được, thấy được như đồ chơi, que kem, sân bóng và gia đình.",
     socraticStyle: "Hỏi 'Tại sao?' liên tục và thắc mắc ngay khi nghe từ lạ.",
@@ -64,6 +66,7 @@ QUY TẮC CỐT LÕI:
     accentColor: "#8EA7E9",
     bgGradient: "from-[#EEF2FC] to-[#F8FAFF]",
     badgeText: "Cấp độ: Người học trái ngành",
+    hobbies: "Tâm lý con người, cà phê văn phòng, mua sắm online và yoga.",
     description: "Rất giỏi tâm lý con người và văn phòng nhưng mù tịt về kỹ thuật phức tạp.",
     worldview: "Hiểu cuộc sống qua quy trình công sở, tuyển dụng, giao tiếp đồng nghiệp và mua sắm online.",
     socraticStyle: "Đòi hỏi người nói phải đưa ra ví dụ thực tế liên quan đến đời sống hàng ngày.",
@@ -82,6 +85,7 @@ QUY TẮC CỐT LÕI:
     accentColor: "#76D7C4",
     bgGradient: "from-[#E8F8F5] to-[#F4FCFA]",
     badgeText: "Cấp độ: Thực nghiệm mộc mạc",
+    hobbies: "Uống trà sớm, nuôi gà thả vườn, nghe đờn ca tài tử và ngắm vườn cây trái.",
     description: "Cả đời gắn bó ruộng vườn sông nước, thích những thứ mộc mạc và trực quan.",
     worldview: "Hiểu vạn vật qua cây lúa, con kênh, mùa nước nổi, phân bón và thời tiết.",
     socraticStyle: "Hỏi bằng ngôn từ dân dã Nam Bộ, đòi hỏi giải thích cơ chế như tưới tiêu đồng ruộng.",
@@ -100,8 +104,9 @@ QUY TẮC CỐT LÕI:
     accentColor: "#F8C471",
     bgGradient: "from-[#FEF9E7] to-[#FFFDF9]",
     badgeText: "Cấp độ: Phản biện sắc bén",
+    hobbies: "Đọc báo cáo tài chính, chơi golf cuối tuần và săn tìm startup triển vọng.",
     description: "Chỉ quan tâm đến bản chất vấn đề, giá trị cốt lõi và ghé mắt nhìn thấu những chỗ che giấu thuật ngữ.",
-    worldview: "Hiểu vạn vật qua chi phí, hiệu quả, quy mô và quan hệ nhân quả rõ ràng.",
+    worldview: "Hiểu vạn vật qua chi phí cơ hội, hiệu quả, quy mô và quan hệ nhân quả rõ ràng.",
     socraticStyle: "Vặn vẹo thẳng vào lỗ hổng logic, cắt ngang khi nghe người nói tung hỏa mù thuật ngữ.",
     systemPrompt: `Bạn là Shark Tuấn, một nhà đầu tư sắc sảo và thực tế.
 QUY TẮC CỐT LÕI:
