@@ -90,15 +90,15 @@ export const CommandDashboard: React.FC = () => {
           <div className="absolute inset-0 bg-gradient-to-r from-white/50 via-white/30 to-white/50 backdrop-blur-[0.5px]" />
         </div>
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
-          {/* Lớp blur trắng ở dưới các chữ để nhìn rõ chữ 100% */}
-          <div className="max-w-xl space-y-3 p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+          {/* Khối 1 (Trái): Card nội dung chính & nút hành động */}
+          <div className="max-w-xl lg:max-w-lg xl:max-w-xl space-y-3 p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs shrink-0">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E5ECFB]/90 text-[#5066A1] text-xs font-bold border border-[#D3E0FA]">
               <Database className="w-3.5 h-3.5 text-[#7286D3]" />
               <span>Đã Đồng Bộ Supabase Cloud</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
-              Hôm nay bạn muốn làm chủ khái niệm nào?
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight leading-snug">
+              Hôm nay bạn muốn làm chủ <span className="whitespace-nowrap">khái niệm nào?</span>
             </h2>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
               Hãy chọn một chủ đề kỹ thuật hoặc trừu tượng và bắt đầu giảng giải cho AI. Hệ thống sẽ bóc tách các lỗ hổng kiến thức của bạn theo thời gian thực.
@@ -127,22 +127,21 @@ export const CommandDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Section: Linh vật nổi bay cạnh thanh tiến độ */}
-          <div className="flex items-center justify-center md:justify-end gap-2 sm:gap-6 self-center md:self-auto shrink-0 relative">
-            {/* Mascot Linh Vật Cú Theodore bay nổi to rõ & sinh động */}
-            <div className="relative group transition-transform duration-300 hover:scale-105 shrink-0">
+          {/* Khối 2 (Giữa): Linh vật Cú Theodore bay nổi sinh động ở không gian trung tâm */}
+          <div className="flex items-center justify-center flex-1 my-1 lg:my-0 relative">
+            <div className="relative group transition-transform duration-300 hover:scale-105">
               <img
                 src="/images/theodore-mascot.png"
                 alt="Linh vật Theodore"
-                className="w-36 h-36 sm:w-48 sm:h-48 md:w-56 md:h-56 lg:w-64 lg:h-64 object-contain filter drop-shadow-[0_16px_32px_rgba(114,134,211,0.32)] animate-float select-none pointer-events-none"
+                className="w-40 h-40 sm:w-52 sm:h-52 lg:w-60 lg:h-60 xl:w-64 xl:h-64 object-contain filter drop-shadow-[0_16px_32px_rgba(114,134,211,0.32)] animate-float select-none pointer-events-none"
               />
             </div>
+          </div>
 
-            {/* Quick Clarity Gauge (Lớp blur trắng) */}
-            <div className="shrink-0 bg-white/80 backdrop-blur-md p-5 rounded-3xl border border-white/80 shadow-xs flex flex-col items-center">
-              <ClarityMeter score={82} variant="circle" />
-              <span className="text-[11px] text-slate-500 font-semibold mt-2">Độ Thấu Suốt Tuần Này</span>
-            </div>
+          {/* Khối 3 (Phải): Thẻ đo độ thấu suốt (Clarity Gauge) */}
+          <div className="shrink-0 bg-white/80 backdrop-blur-md p-5 rounded-3xl border border-white/80 shadow-xs flex flex-col items-center self-center lg:self-auto">
+            <ClarityMeter score={82} variant="circle" />
+            <span className="text-[11px] text-slate-500 font-semibold mt-2">Độ Thấu Suốt Tuần Này</span>
           </div>
         </div>
       </div>
