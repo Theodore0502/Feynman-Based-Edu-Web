@@ -128,13 +128,13 @@ export const CommandDashboard: React.FC = () => {
           </div>
 
           {/* Right Section: Linh vật nổi bay cạnh thanh tiến độ */}
-          <div className="flex items-center justify-center md:justify-end gap-3 sm:gap-6 self-center md:self-auto shrink-0 relative">
-            {/* Mascot Linh Vật Cú Theodore bay nổi sinh động */}
+          <div className="flex items-center justify-center md:justify-end gap-2 sm:gap-6 self-center md:self-auto shrink-0 relative">
+            {/* Mascot Linh Vật Cú Theodore bay nổi to rõ & sinh động */}
             <div className="relative group transition-transform duration-300 hover:scale-105 shrink-0">
               <img
                 src="/images/theodore-mascot.png"
                 alt="Linh vật Theodore"
-                className="w-28 h-28 sm:w-36 sm:h-36 md:w-40 md:h-40 lg:w-44 lg:h-44 object-contain filter drop-shadow-[0_12px_24px_rgba(114,134,211,0.28)] animate-float select-none pointer-events-none"
+                className="w-36 h-36 sm:w-48 sm:h-48 md:w-56 md:h-56 lg:w-64 lg:h-64 object-contain filter drop-shadow-[0_16px_32px_rgba(114,134,211,0.32)] animate-float select-none pointer-events-none"
               />
             </div>
 
