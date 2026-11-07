@@ -157,8 +157,8 @@ export const AuthAndOnboarding: React.FC = () => {
         <div className="bg-white w-full max-w-[420px] rounded-3xl p-5 sm:p-6 border border-[#E2EAFD] shadow-card space-y-3.5 my-auto transition-all duration-500">
           {/* Logo & Headline */}
           <div className="text-center space-y-1">
-            <div className="w-11 h-11 mx-auto flex items-center justify-center p-1 rounded-2xl bg-gradient-to-tr from-[#8EA7E9]/30 to-[#FFB4B4]/30 border border-purple-200 shadow-xs">
-              <EliseCatMascot size={36} />
+            <div className="w-12 h-12 mx-auto flex items-center justify-center p-0.5 rounded-2xl bg-gradient-to-tr from-[#8EA7E9]/30 to-[#FFB4B4]/30 border border-purple-200 shadow-xs">
+              <EliseCatMascot size={42} />
             </div>
             <h2 className="text-lg sm:text-xl font-black text-slate-800 tracking-tight transition-all duration-200">
               {activeTab === "LOGIN" ? "Đăng Nhập Elise" : "Đăng Ký Tài Khoản"}

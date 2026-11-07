@@ -150,11 +150,11 @@ export const TopHeader: React.FC<TopHeaderProps> = () => {
     <header className="relative z-40 bg-white/95 backdrop-blur-md rounded-2xl border border-[#E8EEF8] shadow-xs px-3.5 sm:px-4 py-2 flex items-center justify-between gap-3 mb-6 transition-all">
       {/* 1. Left: Mascot Brand + Single-line Breadcrumbs */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-        {/* Linh vật Mèo Elise */}
+        {/* Linh vật Cú Thông Thái */}
         <Link
           to="/about"
           className="flex items-center gap-2 group shrink-0"
-          title="Linh vật Mèo Elise - Khám phá triết lý học tập"
+          title="Linh vật Cú Thông Thái - Khám phá triết lý học tập"
         >
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#7286D3] via-[#8EA7E9] to-[#FFB4B4] p-0.5 flex items-center justify-center shadow-2xs transition-transform group-hover:scale-105">
             <EliseCatMascot className="w-full h-full" />

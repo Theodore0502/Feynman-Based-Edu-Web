@@ -63,8 +63,8 @@ export const AppSidebar: React.FC = () => {
     <aside className="w-64 bg-white/90 backdrop-blur-md border-r border-[#E8EEF8] flex flex-col justify-between p-6 shrink-0 h-screen sticky top-0 overflow-y-auto scrollbar-none z-30">
       {/* Brand Logo & Name */}
       <div>
-        <Link to="/about" className="flex items-center gap-3 px-2 mb-6 group" title="Elise - Khám phá triết lý học tập">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#7286D3] via-[#8EA7E9] to-[#FFB4B4] p-1 flex items-center justify-center shadow-xs transition-transform group-hover:scale-105 shrink-0">
+        <Link to="/about" className="flex items-center gap-3 px-2 mb-6 group" title="Khám phá triết lý học tập">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#7286D3] via-[#8EA7E9] to-[#FFB4B4] p-0.5 flex items-center justify-center shadow-xs transition-transform group-hover:scale-105 shrink-0">
             <EliseCatMascot className="w-full h-full" />
           </div>
           <span className="font-black text-2xl tracking-tight text-slate-800">
