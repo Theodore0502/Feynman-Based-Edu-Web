@@ -694,10 +694,10 @@ export const TopicKnowledgeGraph: React.FC = () => {
 
       if (orbit.isRim) {
         // Glowing Segmented Core Arc Rim
-        ctx.strokeStyle = "#3b82f6";
+        ctx.strokeStyle = "#8299E0";
         ctx.lineWidth = 2.5 / globalScale;
         ctx.setLineDash([40 / globalScale, 8 / globalScale, 80 / globalScale, 8 / globalScale]);
-        ctx.shadowColor = "rgba(59, 130, 246, 0.35)";
+        ctx.shadowColor = "rgba(130, 153, 224, 0.35)";
         ctx.shadowBlur = 8 / globalScale;
         ctx.stroke();
 
@@ -717,15 +717,15 @@ export const TopicKnowledgeGraph: React.FC = () => {
           const lx = (ORBIT_0_R - 13) * Math.cos(lbl.angle);
           const ly = (ORBIT_0_R - 13) * Math.sin(lbl.angle);
           ctx.font = `bold ${7.5 / globalScale}px monospace`;
-          ctx.fillStyle = "#64748b";
+          ctx.fillStyle = "#5A6678";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillText(lbl.text, lx, ly);
         });
       } else {
         // Subtle guide orbits
-        ctx.strokeStyle = "rgba(148, 163, 184, 0.3)";
-        ctx.lineWidth = 0.7 / globalScale;
+        ctx.strokeStyle = "rgba(130, 153, 224, 0.35)";
+        ctx.lineWidth = 0.8 / globalScale;
         ctx.setLineDash([5 / globalScale, 5 / globalScale]);
         ctx.shadowBlur = 0;
         ctx.stroke();
@@ -738,7 +738,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
       ctx.beginPath();
       ctx.moveTo(ORBIT_0_R * Math.cos(ang), ORBIT_0_R * Math.sin(ang));
       ctx.lineTo((ORBIT_5_R + 20) * Math.cos(ang), (ORBIT_5_R + 20) * Math.sin(ang));
-      ctx.strokeStyle = "rgba(203, 213, 225, 0.35)";
+      ctx.strokeStyle = "rgba(130, 153, 224, 0.25)";
       ctx.lineWidth = 0.6 / globalScale;
       ctx.setLineDash([4 / globalScale, 6 / globalScale]);
       ctx.stroke();
@@ -747,11 +747,13 @@ export const TopicKnowledgeGraph: React.FC = () => {
     ctx.restore();
   }, []);
 
-  // Custom Node Canvas Renderer
+  // Custom Node Canvas Renderer: White fill, #8299E0 border, #5A6678 text
+  // On hover or select: #8299E0 fill, white border, white text
   const renderNodeCanvasObject = useCallback(
     (node: RadialGraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const isSelected = selectedNode?.id === node.id;
       const isHovered = hoveredNode?.id === node.id;
+      const isActive = isSelected || isHovered;
       const x = node.x ?? 0;
       const y = node.y ?? 0;
 
@@ -768,7 +770,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
       if (hasActiveFilter && !isMatch) {
         ctx.globalAlpha = 0.14;
       } else if (hasActiveFilter && isMatch && node.level >= 1) {
-        ctx.shadowColor = node.color || "#2563eb";
+        ctx.shadowColor = "#8299E0";
         ctx.shadowBlur = (isSelected ? 16 : 8) / globalScale;
       }
 
@@ -781,25 +783,30 @@ export const TopicKnowledgeGraph: React.FC = () => {
         // Draw exact semi-circle pointing rightward from x=0
         ctx.arc(x, y, r, -Math.PI / 2, Math.PI / 2);
         ctx.closePath();
-        ctx.fillStyle = "#ffffff";
-        ctx.shadowColor = "rgba(59, 130, 246, 0.25)";
-        ctx.shadowBlur = 10 / globalScale;
+        ctx.fillStyle = isActive ? "#8299E0" : "#ffffff";
+        if (isActive) {
+          ctx.shadowColor = "rgba(130, 153, 224, 0.4)";
+          ctx.shadowBlur = 12 / globalScale;
+        } else {
+          ctx.shadowColor = "rgba(130, 153, 224, 0.2)";
+          ctx.shadowBlur = 8 / globalScale;
+        }
         ctx.fill();
 
-        ctx.strokeStyle = "#2563eb";
+        ctx.strokeStyle = isActive ? "#ffffff" : "#8299E0";
         ctx.lineWidth = 2.5 / globalScale;
         ctx.stroke();
         ctx.shadowBlur = 0;
 
         // Subtitle & Core Name (Aligned cleanly to the right of x=0)
         ctx.font = `bold ${6 / globalScale}px sans-serif`;
-        ctx.fillStyle = "#3b82f6";
+        ctx.fillStyle = isActive ? "#ffffff" : "#8299E0";
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
         ctx.fillText("ELISE MATRIX", x + 8 / globalScale, y - 6 / globalScale);
 
         ctx.font = `900 ${8 / globalScale}px sans-serif`;
-        ctx.fillStyle = "#0f172a";
+        ctx.fillStyle = isActive ? "#ffffff" : "#5A6678";
         ctx.fillText("FEYNMAN", x + 8 / globalScale, y + 5 / globalScale);
 
         ctx.restore();
@@ -810,30 +817,32 @@ export const TopicKnowledgeGraph: React.FC = () => {
       // LEVEL 1: DOMAIN HUBS (Nhóm Ngành)
       // ==========================================
       if (node.level === 1) {
-        const r = isHovered || isSelected ? 22 : (node.r ?? 20);
+        const r = isActive ? 22 : (node.r ?? 20);
 
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
-        ctx.fillStyle = node.color || "#2563eb";
-        ctx.shadowColor = `${node.color}55`;
-        ctx.shadowBlur = (isSelected ? 14 : 7) / globalScale;
+        ctx.fillStyle = isActive ? "#8299E0" : "#ffffff";
+        if (isActive) {
+          ctx.shadowColor = "rgba(130, 153, 224, 0.45)";
+          ctx.shadowBlur = (isSelected ? 14 : 8) / globalScale;
+        }
         ctx.fill();
 
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2 / globalScale;
+        ctx.strokeStyle = isActive ? "#ffffff" : "#8299E0";
+        ctx.lineWidth = (isActive ? 2.5 : 2) / globalScale;
         ctx.stroke();
         ctx.shadowBlur = 0;
 
         // Domain Symbol Icon
         ctx.font = `bold ${11 / globalScale}px sans-serif`;
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = isActive ? "#ffffff" : "#5A6678";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(node.shortLabel || "∑", x, y);
 
-        // Tooltip text below domain hub
+        // Tooltip / Title text below domain hub
         ctx.font = `bold ${8.5 / globalScale}px sans-serif`;
-        ctx.fillStyle = "#1e293b";
+        ctx.fillStyle = isActive ? "#8299E0" : "#5A6678";
         ctx.fillText(node.name, x, y + r + 11 / globalScale);
 
         ctx.restore();
@@ -844,23 +853,25 @@ export const TopicKnowledgeGraph: React.FC = () => {
       // LEVEL 2: FIELD NODES (Ngành Chuyên Môn)
       // ==========================================
       if (node.level === 2) {
-        const r = isHovered || isSelected ? 15 : (node.r ?? 13);
+        const r = isActive ? 15 : (node.r ?? 13);
 
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = isActive ? "#8299E0" : "#ffffff";
+        if (isActive) {
+          ctx.shadowColor = "rgba(130, 153, 224, 0.4)";
+          ctx.shadowBlur = 8 / globalScale;
+        }
         ctx.fill();
 
-        ctx.strokeStyle = node.color || "#3b82f6";
-        ctx.lineWidth = (isSelected ? 2.8 : 2) / globalScale;
-        ctx.shadowColor = `${node.color}40`;
-        ctx.shadowBlur = (isSelected ? 8 : 3) / globalScale;
+        ctx.strokeStyle = isActive ? "#ffffff" : "#8299E0";
+        ctx.lineWidth = (isActive ? 2.4 : 1.8) / globalScale;
         ctx.stroke();
         ctx.shadowBlur = 0;
 
         // Abbreviation
         ctx.font = `900 ${7 / globalScale}px sans-serif`;
-        ctx.fillStyle = "#1e293b";
+        ctx.fillStyle = isActive ? "#ffffff" : "#5A6678";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(node.shortLabel || "", x, y);
@@ -870,60 +881,34 @@ export const TopicKnowledgeGraph: React.FC = () => {
       }
 
       // ==========================================
-      // LEVEL 3: SUBJECT NODES (Môn Học - Hubs Tỏa Nhánh)
+      // LEVEL 3: SUBJECT NODES (Môn Học)
       // ==========================================
       if (node.level === 3) {
-        const r = isHovered || isSelected ? 13 : (node.r ?? 11);
-
-        let fill = "#ffffff";
-        let stroke = "#94a3b8";
-        let textColor = "#1e293b";
-        let glowColor = "transparent";
-
-        if (node.status === "GAP") {
-          fill = "#ef4444";
-          stroke = "#b91c1c";
-          textColor = "#ffffff";
-          glowColor = "rgba(239, 68, 68, 0.45)";
-        } else if (node.status === "MASTERED") {
-          fill = "#10b981";
-          stroke = "#047857";
-          textColor = "#ffffff";
-          glowColor = "rgba(16, 185, 129, 0.3)";
-        } else if (node.status === "ACTIVE") {
-          fill = "#f59e0b";
-          stroke = "#b45309";
-          textColor = "#ffffff";
-          glowColor = "rgba(245, 158, 11, 0.35)";
-        } else {
-          fill = "#ffffff";
-          stroke = "#94a3b8";
-          textColor = "#475569";
-        }
+        const r = isActive ? 13 : (node.r ?? 11);
 
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
-        ctx.fillStyle = fill;
-        if (glowColor !== "transparent") {
-          ctx.shadowColor = glowColor;
+        ctx.fillStyle = isActive ? "#8299E0" : "#ffffff";
+        if (isActive) {
+          ctx.shadowColor = "rgba(130, 153, 224, 0.45)";
           ctx.shadowBlur = 10 / globalScale;
         }
         ctx.fill();
 
-        ctx.strokeStyle = stroke;
-        ctx.lineWidth = (isSelected ? 2.5 : 1.8) / globalScale;
+        ctx.strokeStyle = isActive ? "#ffffff" : "#8299E0";
+        ctx.lineWidth = (isActive ? 2.2 : 1.8) / globalScale;
         ctx.stroke();
         ctx.shadowBlur = 0;
 
         // Inner indicator dot
         ctx.beginPath();
         ctx.arc(x, y, 2.5 / globalScale, 0, 2 * Math.PI);
-        ctx.fillStyle = textColor;
+        ctx.fillStyle = isActive ? "#ffffff" : "#8299E0";
         ctx.fill();
 
-        // Subject Name Pill beside node
-        ctx.font = `600 ${7.5 / globalScale}px sans-serif`;
-        ctx.fillStyle = "#334155";
+        // Subject Name beside node
+        ctx.font = isActive ? `bold ${8 / globalScale}px sans-serif` : `600 ${7.5 / globalScale}px sans-serif`;
+        ctx.fillStyle = isActive ? "#8299E0" : "#5A6678";
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
         ctx.fillText(node.name, x + r + 5 / globalScale, y);
@@ -936,18 +921,23 @@ export const TopicKnowledgeGraph: React.FC = () => {
       // LEVEL 4: TOPIC GROUP NODES (Nhóm Kiến Thức)
       // ==========================================
       if (node.level === 4) {
-        const r = node.r ?? 6;
+        const r = isActive ? 7 : (node.r ?? 6);
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
-        ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = isActive ? "#8299E0" : "#ffffff";
+        if (isActive) {
+          ctx.shadowColor = "rgba(130, 153, 224, 0.4)";
+          ctx.shadowBlur = 6 / globalScale;
+        }
         ctx.fill();
 
-        ctx.strokeStyle = isSelected ? "#2563eb" : "#64748b";
-        ctx.lineWidth = 1.3 / globalScale;
+        ctx.strokeStyle = isActive ? "#ffffff" : "#8299E0";
+        ctx.lineWidth = (isActive ? 1.8 : 1.3) / globalScale;
         ctx.stroke();
+        ctx.shadowBlur = 0;
 
         ctx.font = `bold ${5.5 / globalScale}px sans-serif`;
-        ctx.fillStyle = "#475569";
+        ctx.fillStyle = isActive ? "#ffffff" : "#5A6678";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(node.shortLabel || "", x, y);
@@ -957,47 +947,24 @@ export const TopicKnowledgeGraph: React.FC = () => {
       }
 
       // ==========================================
-      // LEVEL 5: MICRO-CONCEPT LEAVES (Chấm Tri Thức Li Ti)
+      // LEVEL 5: MICRO-CONCEPT LEAVES (Chấm Tri Thức)
       // ==========================================
       if (node.level === 5) {
-        const r = isHovered || isSelected ? 5.5 : (node.r ?? 3.5);
+        const r = isActive ? 5.5 : (node.r ?? 3.5);
 
-        if (node.status === "GAP") {
-          ctx.beginPath();
-          ctx.arc(x, y, r, 0, 2 * Math.PI);
-          ctx.fillStyle = "#ef4444";
-          ctx.shadowColor = "rgba(239, 68, 68, 0.6)";
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, 2 * Math.PI);
+        ctx.fillStyle = isActive ? "#8299E0" : "#ffffff";
+        if (isActive) {
+          ctx.shadowColor = "rgba(130, 153, 224, 0.5)";
           ctx.shadowBlur = 8 / globalScale;
-          ctx.fill();
-
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 1 / globalScale;
-          ctx.stroke();
-          ctx.shadowBlur = 0;
-        } else if (node.status === "MASTERED") {
-          ctx.beginPath();
-          ctx.arc(x, y, r, 0, 2 * Math.PI);
-          ctx.fillStyle = "#10b981";
-          ctx.fill();
-
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 0.8 / globalScale;
-          ctx.stroke();
-        } else if (node.status === "ACTIVE") {
-          ctx.beginPath();
-          ctx.arc(x, y, r, 0, 2 * Math.PI);
-          ctx.fillStyle = "#f59e0b";
-          ctx.fill();
-        } else {
-          ctx.beginPath();
-          ctx.arc(x, y, r, 0, 2 * Math.PI);
-          ctx.fillStyle = "#ffffff";
-          ctx.fill();
-
-          ctx.strokeStyle = "#94a3b8";
-          ctx.lineWidth = 1 / globalScale;
-          ctx.stroke();
         }
+        ctx.fill();
+
+        ctx.strokeStyle = isActive ? "#ffffff" : "#8299E0";
+        ctx.lineWidth = (isActive ? 1.6 : 1) / globalScale;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
 
         ctx.restore();
         return;
@@ -1005,10 +972,10 @@ export const TopicKnowledgeGraph: React.FC = () => {
 
       ctx.restore();
     },
-    [selectedNode, hoveredNode]
+    [selectedNode, hoveredNode, filterState, isNodeHighlighted]
   );
 
-  // Link Canvas Renderer: Fiber-optic Radial Bézier Splines (Bó sợi uốn cong)
+  // Link Canvas Renderer: Horizontal Tangent Curves with dashed/solid #8299E0
   const renderLinkCanvasObject = useCallback(
     (link: RadialGraphLink, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const source = link.source as RadialGraphNode;
@@ -1028,6 +995,10 @@ export const TopicKnowledgeGraph: React.FC = () => {
       const isConnectedToSelected =
         selectedNode != null &&
         (source.id === selectedNode.id || target.id === selectedNode.id);
+      const isConnectedToHovered =
+        hoveredNode != null &&
+        (source.id === hoveredNode.id || target.id === hoveredNode.id);
+      const isConnected = isConnectedToSelected || isConnectedToHovered;
 
       const isSourceMatch = isNodeHighlighted(source);
       const isTargetMatch = isNodeHighlighted(target);
@@ -1037,18 +1008,15 @@ export const TopicKnowledgeGraph: React.FC = () => {
         filterState.keyword.length > 0 ||
         filterState.selectedTopicId != null;
 
-      // Radial coordinates
-      const r1 = Math.sqrt(source.x * source.x + source.y * source.y);
-      const theta1 = Math.atan2(source.y, source.x);
-      const r2 = Math.sqrt(target.x * target.x + target.y * target.y);
-      const theta2 = Math.atan2(target.y, target.x);
-
-      // Fiber-optic Bézier control points (radial tangents)
-      const dr = Math.abs(r2 - r1) * 0.48;
-      const cp1x = source.x + Math.cos(theta1) * dr;
-      const cp1y = source.y + Math.sin(theta1) * dr;
-      const cp2x = target.x - Math.cos(theta2) * dr;
-      const cp2y = target.y - Math.sin(theta2) * dr;
+      // Horizontal Bézier Curve:
+      // Line leaves source horizontally (cp1y = source.y) and enters target horizontally (cp2y = target.y)
+      // smoothly curving in the middle, straight when horizontal
+      const dx = target.x - source.x;
+      const cpDist = Math.max(12, Math.abs(dx) * 0.52);
+      const cp1x = source.x + cpDist;
+      const cp1y = source.y;
+      const cp2x = target.x - cpDist;
+      const cp2y = target.y;
 
       ctx.save();
 
@@ -1060,29 +1028,25 @@ export const TopicKnowledgeGraph: React.FC = () => {
       ctx.moveTo(source.x, source.y);
       ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, target.x, target.y);
 
-      if (isConnectedToSelected) {
-        ctx.strokeStyle = "#2563eb";
+      if (isConnected) {
+        // Hover/Selected state: nét liền màu #8299E0
+        ctx.strokeStyle = "#8299E0";
         ctx.lineWidth = 2.2 / globalScale;
-        ctx.shadowColor = "rgba(37, 99, 235, 0.35)";
-        ctx.shadowBlur = 5 / globalScale;
-      } else if (target.status === "GAP") {
-        ctx.strokeStyle = "rgba(239, 68, 68, 0.7)";
-        ctx.lineWidth = 1.3 / globalScale;
-      } else if (target.status === "ACTIVE") {
-        ctx.strokeStyle = "rgba(245, 158, 11, 0.55)";
-        ctx.lineWidth = 1.1 / globalScale;
-      } else if (link.isPrereq) {
-        ctx.strokeStyle = "rgba(99, 102, 241, 0.4)";
-        ctx.lineWidth = 1.1 / globalScale;
+        ctx.setLineDash([]);
+        ctx.shadowColor = "rgba(130, 153, 224, 0.45)";
+        ctx.shadowBlur = 6 / globalScale;
       } else {
-        ctx.strokeStyle = "rgba(148, 163, 184, 0.28)";
-        ctx.lineWidth = 0.7 / globalScale;
+        // Normal state: nét cắt khúc màu #8299E0
+        ctx.strokeStyle = "rgba(130, 153, 224, 0.75)";
+        ctx.lineWidth = 1 / globalScale;
+        ctx.setLineDash([4 / globalScale, 4 / globalScale]);
+        ctx.shadowBlur = 0;
       }
 
       ctx.stroke();
       ctx.restore();
     },
-    [selectedNode]
+    [selectedNode, hoveredNode, filterState, isNodeHighlighted]
   );
 
   return (
