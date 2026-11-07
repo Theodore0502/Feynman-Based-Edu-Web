@@ -71,7 +71,7 @@ export const PersonaAvatarCard: React.FC<PersonaAvatarCardProps> = ({
   return (
     <div
       onClick={onSelect}
-      className={`rounded-3xl p-5 cursor-pointer transition-all duration-300 relative overflow-hidden border flex flex-col justify-between h-full group ${
+      className={`rounded-3xl p-5 cursor-pointer transition-all duration-300 relative overflow-hidden border flex flex-col h-full group ${
         isSelected
           ? "bg-white border-[#7286D3] ring-2 ring-[#7286D3]/20 shadow-card"
           : "bg-white hover:border-[#B5B2E8] border-slate-200/80 shadow-subtle hover:-translate-y-1 hover:shadow-card"
@@ -125,17 +125,17 @@ export const PersonaAvatarCard: React.FC<PersonaAvatarCardProps> = ({
             <span className="text-slate-600">{hobbiesText}</span>
           </p>
         </div>
-      </div>
 
-      {/* 4. Lăng kính (Hiển thị đầy đủ full text, chiều cao card tự động co giãn đồng bộ) */}
-      <div className="mt-4 pt-3.5 border-t border-slate-100 space-y-1 text-xs">
-        <div className="flex items-center gap-1.5 font-bold text-slate-700">
-          <Sparkles className="w-3.5 h-3.5 text-[#8EA7E9] shrink-0" />
-          <span>Lăng kính:</span>
+        {/* 4. Lăng kính (Dịch lên, cách sở thích 1 khoảng bằng nhau trên mọi card) */}
+        <div className="pt-3 border-t border-slate-100 space-y-1 text-xs">
+          <div className="flex items-center gap-1.5 font-bold text-slate-700">
+            <Sparkles className="w-3.5 h-3.5 text-[#8EA7E9] shrink-0" />
+            <span>Lăng kính:</span>
+          </div>
+          <p className="text-slate-600 leading-relaxed">
+            {persona.worldview}
+          </p>
         </div>
-        <p className="text-slate-600 leading-relaxed">
-          {persona.worldview}
-        </p>
       </div>
     </div>
   );
