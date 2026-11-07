@@ -21,7 +21,6 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
-  RotateCw,
   Sparkles,
   BookOpen,
   ArrowRight,
@@ -30,14 +29,12 @@ import {
   X,
   Target,
   GraduationCap,
-  Compass,
 } from "lucide-react";
 import { TOPICS_CATALOG } from "@/data/academic-catalog.data";
 import { GRAPH_EDGES } from "@/data/knowledge-graph.data";
 import { CatalogTopic, GraphEdge } from "@/types/catalog.types";
 import { useStudyStore } from "@/hooks/useStudyStore";
 import TopicHierarchySearch, { SearchFilterState } from "@/components/topics/TopicHierarchySearch";
-import { cn } from "@/lib/utils";
 
 // Type definitions for Radial Dendrogram Nodes & Links
 export interface RadialGraphNode {
@@ -74,15 +71,15 @@ export interface RadialGraphLink {
   isCrossLink?: boolean;
 }
 
-// Proportional Orbit Radii (Balanced to fit comfortably inside canvas with generous spacing)
+// Proportional Orbit Radii (Balanced to fit comfortably inside any screen height)
 const ORBIT_0_R = 75;  // Core Arc Rim
-const ORBIT_1_R = 150; // Domain Hubs (Cấp 1)
-const ORBIT_2_R = 235; // Field Hubs (Cấp 2)
-const ORBIT_3_R = 330; // Subject Nodes (Cấp 3)
-const ORBIT_4_R = 415; // Topic Groups (Cấp 4)
-const ORBIT_5_R = 485; // Micro-concept Leaves (Cấp 5)
+const ORBIT_1_R = 145; // Domain Hubs (Cấp 1)
+const ORBIT_2_R = 225; // Field Hubs (Cấp 2)
+const ORBIT_3_R = 315; // Subject Nodes (Cấp 3)
+const ORBIT_4_R = 395; // Topic Groups (Cấp 4)
+const ORBIT_5_R = 465; // Micro-concept Leaves (Cấp 5)
 
-// 360-Degree Domain Angular Sectors (Distributed evenly around full 360° circle)
+// Domain Angular Sectors (Symmetrically balanced around 0 rad / horizontal center)
 const DOMAIN_CONFIG: Record<
   string,
   {
@@ -92,7 +89,7 @@ const DOMAIN_CONFIG: Record<
     color: string;
     lightColor: string;
     bgColor: string;
-    angle: number; // Base angle in radians (0, PI/2, PI, 3*PI/2)
+    angle: number;
   }
 > = {
   math: {
@@ -102,7 +99,7 @@ const DOMAIN_CONFIG: Record<
     color: "#2563eb", // Royal Blue
     lightColor: "#60a5fa",
     bgColor: "#eff6ff",
-    angle: 0, // 0 rad (0°) - Mặt đối diện chính
+    angle: -0.76, // ~ -43° (Upper quadrant)
   },
   discrete: {
     code: "DISC",
@@ -111,7 +108,7 @@ const DOMAIN_CONFIG: Record<
     color: "#059669", // Emerald
     lightColor: "#34d399",
     bgColor: "#ecfdf5",
-    angle: Math.PI / 2, // 90°
+    angle: -0.25, // ~ -14° (Upper-mid)
   },
   cv: {
     code: "CV",
@@ -120,7 +117,7 @@ const DOMAIN_CONFIG: Record<
     color: "#7c3aed", // Violet / Purple
     lightColor: "#a78bfa",
     bgColor: "#f5f3ff",
-    angle: Math.PI, // 180°
+    angle: 0.25, // ~ +14° (Lower-mid)
   },
   cs: {
     code: "SYS",
@@ -129,7 +126,7 @@ const DOMAIN_CONFIG: Record<
     color: "#d97706", // Amber
     lightColor: "#fbbf24",
     bgColor: "#fffbeb",
-    angle: (3 * Math.PI) / 2, // 270° (-90°)
+    angle: 0.76, // ~ +43° (Lower quadrant)
   },
 };
 
@@ -145,41 +142,6 @@ export const TopicKnowledgeGraph: React.FC = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [zoomLevel, setZoomLevel] = useState<number>(0.75);
 
-  // Active Domain & 360-Degree Rotary Wheel Rotation State
-  const [activeDomainKey, setActiveDomainKey] = useState<string>("math");
-  const [rotationAngle, setRotationAngle] = useState<number>(0);
-  const targetRotationRef = useRef<number>(0);
-  const currentRotationRef = useRef<number>(0);
-
-  const rotateToDomain = useCallback((domainKey: string) => {
-    const cfg = DOMAIN_CONFIG[domainKey];
-    if (!cfg) return;
-    setActiveDomainKey(domainKey);
-    // Align domain's base angle to 0 (horizontal center)
-    targetRotationRef.current = -cfg.angle;
-  }, []);
-
-  // Smooth Rotary Lerp Loop for 360-Degree Wheel
-  useEffect(() => {
-    let animId: number;
-    const animate = () => {
-      const cur = currentRotationRef.current;
-      const target = targetRotationRef.current;
-      let diff = target - cur;
-      // Shortest circular path around 2*PI
-      while (diff < -Math.PI) diff += 2 * Math.PI;
-      while (diff > Math.PI) diff -= 2 * Math.PI;
-
-      if (Math.abs(diff) > 0.0008) {
-        currentRotationRef.current += diff * 0.10;
-        setRotationAngle(currentRotationRef.current);
-      }
-      animId = requestAnimationFrame(animate);
-    };
-    animId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animId);
-  }, []);
-
   // Hierarchical Search Filter State (Phương án C - Hybrid Search)
   const [filterState, setFilterState] = useState<SearchFilterState>({
     domainId: "ALL",
@@ -187,13 +149,6 @@ export const TopicKnowledgeGraph: React.FC = () => {
     keyword: "",
     selectedTopicId: null,
   });
-
-  // Sync rotation with search filter
-  useEffect(() => {
-    if (filterState.domainId && filterState.domainId !== "ALL" && DOMAIN_CONFIG[filterState.domainId]) {
-      rotateToDomain(filterState.domainId);
-    }
-  }, [filterState.domainId, rotateToDomain]);
 
   const isNodeHighlighted = useCallback(
     (node: RadialGraphNode): boolean => {
@@ -337,21 +292,8 @@ export const TopicKnowledgeGraph: React.FC = () => {
     return () => container.removeEventListener("wheel", onWheel);
   }, [dimensions.width, dimensions.height]);
 
-  const domainOrder = useMemo(() => ["math", "discrete", "cv", "cs"], []);
-  const handlePrevDomain = useCallback(() => {
-    const idx = domainOrder.indexOf(activeDomainKey);
-    const prevIdx = (idx - 1 + domainOrder.length) % domainOrder.length;
-    rotateToDomain(domainOrder[prevIdx]);
-  }, [activeDomainKey, domainOrder, rotateToDomain]);
-
-  const handleNextDomain = useCallback(() => {
-    const idx = domainOrder.indexOf(activeDomainKey);
-    const nextIdx = (idx + 1) % domainOrder.length;
-    rotateToDomain(domainOrder[nextIdx]);
-  }, [activeDomainKey, domainOrder, rotateToDomain]);
-
-  // Build Base 360-Degree Radial Dendrogram Dataset
-  const rawGraphData = useMemo(() => {
+  // Build Hierarchical Radial Dendrogram Dataset
+  const graphData = useMemo(() => {
     const nodes: RadialGraphNode[] = [];
     const links: RadialGraphLink[] = [];
 
@@ -371,7 +313,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
       targetAngle: 0,
     });
 
-    // 1. Level 1: Domain Hubs across 360 degrees
+    // 1. Level 1: Domain Hubs
     const domainKeys = ["math", "discrete", "cv", "cs"];
     domainKeys.forEach((dKey) => {
       const cfg = DOMAIN_CONFIG[dKey];
@@ -403,7 +345,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
       });
     });
 
-    // 2. Level 2: Field Nodes (12 fields, 3 per domain spaced across 90-degree sector)
+    // 2. Level 2: Field Nodes (12 fields, 3 per domain)
     const fieldDefinitions: Array<{
       id: string;
       domainId: string;
@@ -411,22 +353,22 @@ export const TopicKnowledgeGraph: React.FC = () => {
       shortLabel: string;
       offsetAngle: number;
     }> = [
-      // Math (base: 0 rad)
-      { id: "field-algebra", domainId: "math", name: "Đại Số Tuyến Tính", shortLabel: "ĐSTT", offsetAngle: -0.28 },
+      // Math
+      { id: "field-algebra", domainId: "math", name: "Đại Số Tuyến Tính", shortLabel: "ĐSTT", offsetAngle: -0.16 },
       { id: "field-calculus", domainId: "math", name: "Giải Tích Nhiều Biến", shortLabel: "GT", offsetAngle: 0 },
-      { id: "field-optimization", domainId: "math", name: "Tối Ưu Hóa Vi Phân", shortLabel: "TƯH", offsetAngle: 0.28 },
-      // Discrete (base: PI/2 rad)
-      { id: "field-graph-theory", domainId: "discrete", name: "Lý Thuyết Đồ Thị", shortLabel: "ĐTH", offsetAngle: -0.28 },
+      { id: "field-optimization", domainId: "math", name: "Tối Ưu Hóa Vi Phân", shortLabel: "TƯH", offsetAngle: 0.16 },
+      // Discrete
+      { id: "field-graph-theory", domainId: "discrete", name: "Lý Thuyết Đồ Thị", shortLabel: "ĐTH", offsetAngle: -0.16 },
       { id: "field-logic", domainId: "discrete", name: "Logic & Boole", shortLabel: "LOGIC", offsetAngle: 0 },
-      { id: "field-combinatorics", domainId: "discrete", name: "Tổ Hợp & Nhị Thức", shortLabel: "TỔ HỢP", offsetAngle: 0.28 },
-      // CV (base: PI rad)
-      { id: "field-neural-nets", domainId: "cv", name: "Mạng Tích Chập CNN", shortLabel: "CNN", offsetAngle: -0.28 },
+      { id: "field-combinatorics", domainId: "discrete", name: "Tổ Hợp & Nhị Thức", shortLabel: "TỔ HỢP", offsetAngle: 0.16 },
+      // CV
+      { id: "field-neural-nets", domainId: "cv", name: "Mạng Tích Chập CNN", shortLabel: "CNN", offsetAngle: -0.16 },
       { id: "field-image-proc", domainId: "cv", name: "Xử Lý & Lọc Biên", shortLabel: "LỌC", offsetAngle: 0 },
-      { id: "field-detection", domainId: "cv", name: "Nhận Diện & Detection", shortLabel: "YOLO", offsetAngle: 0.28 },
-      // CS (base: 3PI/2 rad)
-      { id: "field-os", domainId: "cs", name: "Hệ Điều Hành & Con Trỏ", shortLabel: "HĐH", offsetAngle: -0.28 },
+      { id: "field-detection", domainId: "cv", name: "Nhận Diện & Detection", shortLabel: "YOLO", offsetAngle: 0.16 },
+      // CS
+      { id: "field-os", domainId: "cs", name: "Hệ Điều Hành & Con Trỏ", shortLabel: "HĐH", offsetAngle: -0.16 },
       { id: "field-db", domainId: "cs", name: "Cơ Sở Dữ Liệu B-Tree", shortLabel: "CSDL", offsetAngle: 0 },
-      { id: "field-dist-sys", domainId: "cs", name: "Hệ Thống Phân Tán", shortLabel: "PHÂN TÁN", offsetAngle: 0.28 },
+      { id: "field-dist-sys", domainId: "cs", name: "Hệ Thống Phân Tán", shortLabel: "PHÂN TÁN", offsetAngle: 0.16 },
     ];
 
     fieldDefinitions.forEach((f) => {
@@ -511,7 +453,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
 
       subjectsToRender.forEach((sub: any, sIdx: number) => {
         const totalSubs = subjectsToRender.length;
-        const subOffset = totalSubs === 1 ? 0 : (sIdx - (totalSubs - 1) / 2) * 0.085;
+        const subOffset = totalSubs === 1 ? 0 : (sIdx - (totalSubs - 1) / 2) * 0.055;
         const subAngle = fieldAngle + subOffset;
         const x = ORBIT_3_R * Math.cos(subAngle);
         const y = ORBIT_3_R * Math.sin(subAngle);
@@ -568,7 +510,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
         // 4. Level 4: Topic Group Nodes (Cụm kiến thức)
         const numGroups = 2;
         for (let gIdx = 0; gIdx < numGroups; gIdx++) {
-          const gOffset = (gIdx - 0.5) * 0.038;
+          const gOffset = (gIdx - 0.5) * 0.026;
           const gAngle = subAngle + gOffset;
           const gx = ORBIT_4_R * Math.cos(gAngle);
           const gy = ORBIT_4_R * Math.sin(gAngle);
@@ -603,7 +545,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
           // 5. Level 5: Micro-concept Leaves (Khái niệm nhỏ li ti xếp theo chùm)
           const numConcepts = 3;
           for (let cIdx = 0; cIdx < numConcepts; cIdx++) {
-            const cOffset = (cIdx - 1) * 0.016;
+            const cOffset = (cIdx - 1) * 0.011;
             const cAngle = gAngle + cOffset;
             const cx = ORBIT_5_R * Math.cos(cAngle);
             const cy = ORBIT_5_R * Math.sin(cAngle);
@@ -674,42 +616,13 @@ export const TopicKnowledgeGraph: React.FC = () => {
     return { nodes, links };
   }, []);
 
-  // Dynamic Projected Graph Data reacting in real-time to 360-Degree Wheel rotationAngle
-  const graphData = useMemo(() => {
-    const projectedNodes = rawGraphData.nodes.map((node) => {
-      if (node.level === 0) return node;
-      const currentAngle = (node.targetAngle ?? 0) + rotationAngle;
-      const r = node.targetRadius ?? 0;
-      const x = r * Math.cos(currentAngle);
-      const y = r * Math.sin(currentAngle);
-      return {
-        ...node,
-        x,
-        y,
-        fx: x,
-        fy: y,
-      };
-    });
-
-    return {
-      nodes: projectedNodes,
-      links: rawGraphData.links,
-    };
-  }, [rawGraphData, rotationAngle]);
-
-  // Node Click handler: Select, rotate to sector, and open details
-  const handleNodeClick = useCallback(
-    (node: RadialGraphNode) => {
-      setSelectedNode(node);
-      if (node.domainId && DOMAIN_CONFIG[node.domainId] && node.domainId !== activeDomainKey) {
-        rotateToDomain(node.domainId);
-      }
-      if (node.level === 3 || node.level === 5) {
-        setIsDrawerOpen(true);
-      }
-    },
-    [activeDomainKey, rotateToDomain]
-  );
+  // Node Click handler: Select and open details, keeping the center strictly pinned
+  const handleNodeClick = useCallback((node: RadialGraphNode) => {
+    setSelectedNode(node);
+    if (node.level === 3 || node.level === 5) {
+      setIsDrawerOpen(true);
+    }
+  }, []);
 
   const handleBackgroundClick = useCallback(() => {
     setSelectedNode(null);
@@ -741,9 +654,6 @@ export const TopicKnowledgeGraph: React.FC = () => {
   // Handler when user selects a topic from search suggestions
   const handleSelectTopicFromSearch = useCallback(
     (topic: CatalogTopic) => {
-      if (topic.domainId && DOMAIN_CONFIG[topic.domainId]) {
-        rotateToDomain(topic.domainId);
-      }
       setFilterState((prev) => ({
         ...prev,
         selectedTopicId: topic.id,
@@ -760,7 +670,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
         setIsDrawerOpen(true);
       }
     },
-    [graphData.nodes, rotateToDomain]
+    [graphData.nodes]
   );
 
   // Pre-frame Render: Clean Light System Orbits & Segmented Glowing Rim
@@ -793,25 +703,6 @@ export const TopicKnowledgeGraph: React.FC = () => {
 
         ctx.shadowBlur = 0;
         ctx.setLineDash([]);
-
-        // Dynamic Sector Codes along the rim based on rotationAngle
-        Object.entries(DOMAIN_CONFIG).forEach(([key, cfg]) => {
-          let ang = (cfg.angle + rotationAngle) % (2 * Math.PI);
-          while (ang > Math.PI) ang -= 2 * Math.PI;
-          while (ang < -Math.PI) ang += 2 * Math.PI;
-
-          // Only render if visible in the front right arc [-PI/2, PI/2]
-          if (Math.abs(ang) <= Math.PI / 2 + 0.12) {
-            const lx = (ORBIT_0_R - 13) * Math.cos(ang);
-            const ly = (ORBIT_0_R - 13) * Math.sin(ang);
-            const isCurrent = key === activeDomainKey;
-            ctx.font = `bold ${(isCurrent ? 8.5 : 7.2) / globalScale}px 'Lato', sans-serif`;
-            ctx.fillStyle = isCurrent ? "#8299E0" : "#5A6678";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(cfg.code, lx, ly);
-          }
-        });
       } else {
         // Subtle guide orbits
         ctx.strokeStyle = "rgba(130, 153, 224, 0.35)";
@@ -822,36 +713,25 @@ export const TopicKnowledgeGraph: React.FC = () => {
       }
     });
 
-    // 2. Faint Radial Sector Separators (Rotating with 360-degree wheel)
-    const sectorDividers = [Math.PI / 4, (3 * Math.PI) / 4, (5 * Math.PI) / 4, (7 * Math.PI) / 4];
-    sectorDividers.forEach((div) => {
-      let divAng = (div + rotationAngle) % (2 * Math.PI);
-      while (divAng > Math.PI) divAng -= 2 * Math.PI;
-      while (divAng < -Math.PI) divAng += 2 * Math.PI;
-
-      if (Math.abs(divAng) <= Math.PI / 2) {
-        ctx.beginPath();
-        ctx.moveTo(ORBIT_0_R * Math.cos(divAng), ORBIT_0_R * Math.sin(divAng));
-        ctx.lineTo((ORBIT_5_R + 25) * Math.cos(divAng), (ORBIT_5_R + 25) * Math.sin(divAng));
-        ctx.strokeStyle = "rgba(130, 153, 224, 0.22)";
-        ctx.lineWidth = 0.6 / globalScale;
-        ctx.setLineDash([4 / globalScale, 6 / globalScale]);
-        ctx.stroke();
-      }
+    // 2. Faint Radial Sector Separators
+    const sectorAngles = [-0.5, 0, 0.5];
+    sectorAngles.forEach((ang) => {
+      ctx.beginPath();
+      ctx.moveTo(ORBIT_0_R * Math.cos(ang), ORBIT_0_R * Math.sin(ang));
+      ctx.lineTo((ORBIT_5_R + 20) * Math.cos(ang), (ORBIT_5_R + 20) * Math.sin(ang));
+      ctx.strokeStyle = "rgba(130, 153, 224, 0.25)";
+      ctx.lineWidth = 0.6 / globalScale;
+      ctx.setLineDash([4 / globalScale, 6 / globalScale]);
+      ctx.stroke();
     });
 
     ctx.restore();
-  }, [rotationAngle, activeDomainKey]);
+  }, []);
 
   // Custom Node Canvas Renderer: White fill, #8299E0 border, #5A6678 text
   // On hover or select: #8299E0 fill, white border, white text
   const renderNodeCanvasObject = useCallback(
     (node: RadialGraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
-      // Cull nodes rotating behind core (negative X realm)
-      if (node.level >= 1 && (node.x ?? 0) < -15) {
-        return;
-      }
-
       const isSelected = selectedNode?.id === node.id;
       const isHovered = hoveredNode?.id === node.id;
       const isActive = isSelected || isHovered;
@@ -1143,7 +1023,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
     [selectedNode, hoveredNode, filterState, isNodeHighlighted]
   );
 
-  // Link Canvas Renderer: Radial Tangent Fiber Curves with dashed/solid #8299E0
+  // Link Canvas Renderer: Horizontal Tangent Curves with dashed/solid #8299E0
   const renderLinkCanvasObject = useCallback(
     (link: RadialGraphLink, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const source = link.source as RadialGraphNode;
@@ -1157,11 +1037,6 @@ export const TopicKnowledgeGraph: React.FC = () => {
         target.x == null ||
         target.y == null
       ) {
-        return;
-      }
-
-      // Cull links rotating behind core (both endpoints in hidden hemisphere)
-      if ((source.level ?? 0) >= 1 && (source.x ?? 0) < -15 && (target.x ?? 0) < -15) {
         return;
       }
 
@@ -1181,28 +1056,15 @@ export const TopicKnowledgeGraph: React.FC = () => {
         filterState.keyword.length > 0 ||
         filterState.selectedTopicId != null;
 
-      // Radial Fiber Bézier Curve (Rotationally invariant around core 0,0)
-      const srcR = Math.hypot(source.x, source.y);
-      const tgtR = Math.hypot(target.x, target.y);
-
-      let cp1x: number;
-      let cp1y: number;
-      let cp2x: number;
-      let cp2y: number;
-
-      if (srcR < 2) {
-        // Source is core center (0,0)
-        cp1x = target.x * 0.35;
-        cp1y = target.y * 0.35;
-        cp2x = target.x * 0.70;
-        cp2y = target.y * 0.70;
-      } else {
-        const dr = Math.max(10, tgtR - srcR);
-        cp1x = source.x + (source.x / srcR) * dr * 0.45;
-        cp1y = source.y + (source.y / srcR) * dr * 0.45;
-        cp2x = target.x - (target.x / tgtR) * dr * 0.45;
-        cp2y = target.y - (target.y / tgtR) * dr * 0.45;
-      }
+      // Horizontal Bézier Curve:
+      // Line leaves source horizontally (cp1y = source.y) and enters target horizontally (cp2y = target.y)
+      // smoothly curving in the middle, straight when horizontal
+      const dx = target.x - source.x;
+      const cpDist = Math.max(12, Math.abs(dx) * 0.52);
+      const cp1x = source.x + cpDist;
+      const cp1y = source.y;
+      const cp2x = target.x - cpDist;
+      const cp2y = target.y;
 
       ctx.save();
 
@@ -1248,49 +1110,6 @@ export const TopicKnowledgeGraph: React.FC = () => {
         ref={containerRef}
         className="relative w-full flex-1 h-full min-h-0 bg-[#f8fafc] rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden select-none cursor-default"
       >
-      {/* 360-Degree Rotary Domain Wheel Navigator */}
-      <div className="absolute top-4 left-4 sm:left-6 z-20 flex items-center gap-1.5 bg-white/95 backdrop-blur-md px-2 py-1.5 rounded-2xl border border-slate-200/90 shadow-md">
-        <button
-          onClick={handlePrevDomain}
-          className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
-          title="Xoay sang nhóm ngành trước"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-        </button>
-
-        <div className="h-4 w-px bg-slate-200 mx-0.5" />
-
-        {domainOrder.map((dKey) => {
-          const cfg = DOMAIN_CONFIG[dKey];
-          const isActive = activeDomainKey === dKey;
-          return (
-            <button
-              key={dKey}
-              onClick={() => rotateToDomain(dKey)}
-              className={cn(
-                "px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer",
-                isActive
-                  ? "bg-[#8299E0] text-white shadow-sm shadow-[#8299E0]/30 scale-[1.02]"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-              )}
-            >
-              <span className="text-sm leading-none">{cfg.symbol}</span>
-              <span className="tracking-wide">{cfg.code}</span>
-            </button>
-          );
-        })}
-
-        <div className="h-4 w-px bg-slate-200 mx-0.5" />
-
-        <button
-          onClick={handleNextDomain}
-          className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
-          title="Xoay sang nhóm ngành tiếp theo"
-        >
-          <RotateCw className="w-3.5 h-3.5" />
-        </button>
-      </div>
-
       {/* 1. Main Interactive ForceGraph2D Canvas */}
       <ForceGraph2D
         ref={fgRef}
