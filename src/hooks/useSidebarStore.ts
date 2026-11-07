@@ -40,3 +40,4 @@ export const useSidebarStore = create<SidebarState>((set) => ({
     set({ isCollapsed: collapsed });
   },
 }));
+
