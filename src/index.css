@@ -9,6 +9,14 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Nahla Script';
+  src: url('/fonts/Nahla-Script.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer base {
   body {
     background-color: #f3f6fa;

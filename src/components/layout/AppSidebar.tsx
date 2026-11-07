@@ -67,7 +67,10 @@ export const AppSidebar: React.FC = () => {
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#7286D3] via-[#8EA7E9] to-[#FFB4B4] p-0.5 flex items-center justify-center shadow-xs transition-transform group-hover:scale-105 shrink-0">
             <EliseCatMascot className="w-full h-full" />
           </div>
-          <span className="font-black text-2xl tracking-tight text-slate-800">
+          <span
+            className="text-3xl text-slate-800 transition-colors group-hover:text-[#5066A1] select-none pt-1.5 leading-none"
+            style={{ fontFamily: "'Nahla Script', cursive, sans-serif" }}
+          >
             Elise
           </span>
         </Link>
