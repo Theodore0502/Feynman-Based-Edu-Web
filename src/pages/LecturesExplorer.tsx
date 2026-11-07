@@ -156,23 +156,34 @@ export const LecturesExplorer: React.FC = () => {
             </button>
 
             {/* Page Title Header (Cấp 1: Kho Bài Giảng) */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#EEF2FC] via-[#F5F2FB] to-[#FFF5F5] p-6 sm:p-8 border border-[#E8EEF8]">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div className="space-y-2">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 backdrop-blur-md text-[#5066A1] text-xs font-black tracking-wide border border-[#D5E1FA] uppercase">
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#EEF2FC] via-[#F5F2FB] to-[#FFF5F5] p-4 sm:p-6 border border-[#E8EEF8] shadow-xs">
+              {/* Dreamy Hero Background Image (mờ nhẹ) */}
+              <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+                <img
+                  src="/images/hero-banner-bg.png"
+                  alt="Hero background"
+                  className="w-full h-full object-cover object-center opacity-30"
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-white/50 via-white/30 to-white/50 backdrop-blur-[0.5px]" />
+              </div>
+
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
+                {/* Lớp blur trắng ở dưới các chữ để nhìn rõ chữ */}
+                <div className="space-y-2 p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs max-w-2xl">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-[#5066A1] text-xs font-black tracking-wide border border-[#D5E1FA] uppercase">
                     <Sparkles className="w-3.5 h-3.5 text-[#7286D3]" />
                     <span>Chương Trình Học Feynman 3 Tầng</span>
                   </div>
                   <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
                     Kho Bài Giảng Học Thuật
                   </h1>
-                  <p className="text-xs sm:text-sm text-slate-600 max-w-2xl leading-relaxed">
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                     Lựa chọn nhóm ngành chuyên môn để khám phá các môn học thành phần và bắt đầu chu trình giảng giải bình dân hóa cùng khán giả AI.
                   </p>
                 </div>
 
-                {/* Global Quick Metrics */}
-                <div className="flex items-center gap-4 bg-white/80 backdrop-blur-md p-4 rounded-2xl border border-white/60 shadow-xs shrink-0">
+                {/* Global Quick Metrics (Lớp blur trắng) */}
+                <div className="flex items-center gap-4 bg-white/85 backdrop-blur-md p-4 rounded-2xl border border-white/80 shadow-xs shrink-0">
                   <div className="text-center px-2">
                     <div className="text-xl font-black text-slate-800">8</div>
                     <div className="text-[10px] text-slate-500 font-bold uppercase">Nhóm Ngành</div>

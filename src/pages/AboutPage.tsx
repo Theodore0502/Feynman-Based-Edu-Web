@@ -25,8 +25,18 @@ export const AboutPage: React.FC = () => {
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-16">
       {/* 1. Hero Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#EEF2FC] via-[#F5F2FB] to-[#FFF5F5] p-8 sm:p-12 border border-[#E8EEF8] shadow-subtle">
-        <div className="relative z-10 space-y-4 max-w-3xl">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#EEF2FC] via-[#F5F2FB] to-[#FFF5F5] p-6 sm:p-10 border border-[#E8EEF8] shadow-subtle">
+        {/* Dreamy Hero Background Image (mờ nhẹ) */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+          <img
+            src="/images/hero-banner-bg.png"
+            alt="Hero background"
+            className="w-full h-full object-cover object-center opacity-30"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-white/50 via-white/30 to-white/50 backdrop-blur-[0.5px]" />
+        </div>
+
+        <div className="relative z-10 space-y-4 max-w-3xl p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 backdrop-blur-md text-[#5066A1] text-xs font-black tracking-wide border border-[#D5E1FA] uppercase shadow-2xs">
             <Sparkles className="w-3.5 h-3.5 text-[#7286D3]" />
             <span>Triết Lý Học Sâu Feynman</span>

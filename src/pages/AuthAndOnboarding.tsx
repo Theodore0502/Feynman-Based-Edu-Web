@@ -13,6 +13,7 @@ import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuthStore } from "@/hooks/useAuthStore";
 import { EliseCatMascot } from "@/components/shared/EliseCatMascot";
+import { FallingLeavesEffect } from "@/components/shared/FallingLeavesEffect";
 import { toast } from "sonner";
 import {
   ArrowRight,
@@ -103,14 +104,15 @@ export const AuthAndOnboarding: React.FC = () => {
 
   return (
     <div className="h-screen w-screen max-h-screen overflow-hidden bg-[#F1F6FD] relative select-none">
+      {/* Hiệu ứng cánh hoa & chiếc lá rơi nhẹ nhàng ở tầng nền sau cùng (z-0) */}
+      <FallingLeavesEffect count={26} className="z-0" />
+
       {/* =========================================================================
           KHỐI 1: GIÀN HOA TRÁI (Image 1 - efrt57efrt57efrt)
-          - Ở tab LOGIN: Nằm ở nửa trái (translate-x-0)
-          - Ở tab REGISTER: Trượt hoàn toàn sang bên trái ra khỏi màn hình (-translate-x-full)
-          - Không dùng mờ ảo (opacity), chuyển động trượt cơ học thực thụ
+          - z-10: Nằm đè lên trên lớp lá rơi (lá không chèn lên hình hoa)
           ========================================================================= */}
       <div
-        className={`w-full lg:w-1/2 h-44 sm:h-56 lg:h-full absolute inset-y-0 left-0 overflow-hidden bg-slate-900 transition-transform duration-1000 ease-in-out z-0 ${
+        className={`w-full lg:w-1/2 h-44 sm:h-56 lg:h-full absolute inset-y-0 left-0 overflow-hidden bg-slate-900 transition-transform duration-1000 ease-in-out z-10 ${
           activeTab === "LOGIN"
             ? "translate-x-0 pointer-events-auto"
             : "-translate-x-full pointer-events-none"
@@ -125,12 +127,10 @@ export const AuthAndOnboarding: React.FC = () => {
 
       {/* =========================================================================
           KHỐI 2: GIÀN HOA PHẢI (Image 2 - k753tak753tak753)
-          - Ở tab LOGIN: Nằm ngoài rìa phải (+translate-x-full)
-          - Ở tab REGISTER: Trượt từ rìa phải vào chiếm trọn nửa phải (translate-x-0)
-          - Không dùng mờ ảo (opacity), chuyển động trượt cơ học thực thụ
+          - z-10: Nằm đè lên trên lớp lá rơi (lá không chèn lên hình hoa)
           ========================================================================= */}
       <div
-        className={`w-full lg:w-1/2 h-44 sm:h-56 lg:h-full absolute inset-y-0 right-0 overflow-hidden bg-slate-900 transition-transform duration-1000 ease-in-out z-0 ${
+        className={`w-full lg:w-1/2 h-44 sm:h-56 lg:h-full absolute inset-y-0 right-0 overflow-hidden bg-slate-900 transition-transform duration-1000 ease-in-out z-10 ${
           activeTab === "REGISTER"
             ? "translate-x-0 pointer-events-auto"
             : "translate-x-full pointer-events-none"
@@ -145,12 +145,10 @@ export const AuthAndOnboarding: React.FC = () => {
 
       {/* =========================================================================
           KHỐI 3: BÀN LÀM VIỆC ĐĂNG NHẬP / ĐĂNG KÝ (AUTH CARD DESK)
-          - Trượt êm ái nhẹ nhàng trong 1000ms:
-            + Ở tab LOGIN: Nằm ở nửa phải nhưng xích nhẹ sang trái sát trục giữa
-            + Ở tab REGISTER: Nằm ở nửa trái nhưng xích nhẹ sang phải sát trục giữa
+          - z-20: Nằm trên cùng, tuyệt đối không bị lá rơi bay đè lên form hay nút bấm
           ========================================================================= */}
       <div
-        className={`w-full lg:w-[450px] h-full absolute inset-y-0 left-1/2 flex items-center justify-center p-3 sm:p-5 z-10 transition-transform duration-1000 ease-in-out ${
+        className={`w-full lg:w-[450px] h-full absolute inset-y-0 left-1/2 flex items-center justify-center p-3 sm:p-5 z-20 transition-transform duration-1000 ease-in-out ${
           activeTab === "LOGIN"
             ? "translate-x-[-50%] lg:translate-x-[calc(-50%+19vw)]"
             : "translate-x-[-50%] lg:translate-x-[calc(-50%-19vw)]"

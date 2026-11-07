@@ -291,22 +291,33 @@ export const AnalogyJargonVault: React.FC = () => {
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-12">
       {/* 1. Header & Quick Drill Action Banner */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-[#8EA7E9]/20 via-[#B5B2E8]/20 to-[#FFD1D1]/30 border border-[#E8EEF8] rounded-3xl p-6 sm:p-7 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 backdrop-blur-md text-[#7286D3] text-xs font-bold shadow-2xs border border-[#8EA7E9]/20">
+      <div className="relative overflow-hidden bg-gradient-to-r from-[#8EA7E9]/20 via-[#B5B2E8]/20 to-[#FFD1D1]/30 border border-[#E8EEF8] rounded-3xl p-4 sm:p-6 shadow-xs">
+        {/* Dreamy Hero Background Image (mờ nhẹ) */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+          <img
+            src="/images/hero-banner-bg.png"
+            alt="Hero background"
+            className="w-full h-full object-cover object-center opacity-30"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-white/50 via-white/30 to-white/50 backdrop-blur-[0.5px]" />
+        </div>
+
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
+          {/* Lớp blur trắng ở dưới các chữ để nhìn rõ chữ */}
+          <div className="space-y-2 p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-[#7286D3] text-xs font-bold shadow-2xs border border-[#8EA7E9]/20">
               <Sparkles className="w-3.5 h-3.5" />
               <span>Thuật Toán Lặp Lại Ngắt Quãng SM-2 (Spaced Repetition)</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
               Sổ Tay Thuật Ngữ & Ẩn Dụ Feynman
             </h1>
-            <p className="text-xs sm:text-sm text-slate-600 max-w-2xl leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
               Tổng hợp những thuật ngữ chuyên môn bạn đã giảng giải thành công. Thuật toán **SM-2** sẽ tự động dời lịch ôn tập theo đường cong quên lãng để bạn ghi nhớ vĩnh viễn và phản xạ tự nhiên khi giảng bài.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-3 shrink-0 p-3 sm:p-4 rounded-2xl bg-white/70 backdrop-blur-md border border-white/80 shadow-xs">
             <button
               onClick={() => handleStartDrill()}
               className="px-5 py-3 rounded-2xl bg-[#7286D3] hover:bg-[#5E72C4] text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer group"

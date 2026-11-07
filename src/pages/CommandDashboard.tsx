@@ -69,10 +69,21 @@ export const CommandDashboard: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Hero Welcome Action Banner */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-[#F0F4FC] via-[#F6F3FC] to-[#FCF4F7] border border-[#E2EAFD] rounded-3xl p-6 sm:p-8 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-          <div className="max-w-xl space-y-3">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E5ECFB] text-[#5066A1] text-xs font-bold border border-[#D3E0FA]">
+      <div className="relative overflow-hidden bg-gradient-to-r from-[#F0F4FC] via-[#F6F3FC] to-[#FCF4F7] border border-[#E2EAFD] rounded-3xl p-4 sm:p-6 shadow-xs">
+        {/* Dreamy Hero Background Image (mờ nhẹ nhàng) */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+          <img
+            src="/images/hero-banner-bg.png"
+            alt="Hero background"
+            className="w-full h-full object-cover object-center opacity-35"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-white/50 via-white/30 to-white/50 backdrop-blur-[0.5px]" />
+        </div>
+
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
+          {/* Lớp blur trắng ở dưới các chữ để nhìn rõ chữ 100% */}
+          <div className="max-w-xl space-y-3 p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E5ECFB]/90 text-[#5066A1] text-xs font-bold border border-[#D3E0FA]">
               <Database className="w-3.5 h-3.5 text-[#7286D3]" />
               <span>Đã Đồng Bộ Supabase Cloud</span>
             </div>
@@ -82,10 +93,10 @@ export const CommandDashboard: React.FC = () => {
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
               Hãy chọn một chủ đề kỹ thuật hoặc trừu tượng và bắt đầu giảng giải cho AI. Hệ thống sẽ bóc tách các lỗ hổng kiến thức của bạn theo thời gian thực.
             </p>
-            <div className="flex flex-wrap items-center gap-3 pt-2">
+            <div className="flex flex-wrap items-center gap-3 pt-1">
               <Link
                 to="/lectures"
-                className="px-5 py-2.5 rounded-2xl bg-white hover:bg-slate-50 text-[#5066A1] text-xs font-bold border border-[#E8EEF8] flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+                className="px-5 py-2.5 rounded-2xl bg-white/95 hover:bg-white text-[#5066A1] text-xs font-bold border border-[#E8EEF8] flex items-center gap-2 shadow-xs transition-all cursor-pointer"
               >
                 <BookOpen className="w-4 h-4" />
                 <span>Khám Phá Bài Giảng</span>
@@ -99,15 +110,15 @@ export const CommandDashboard: React.FC = () => {
               </Link>
               <button
                 onClick={() => openModal("QUICK_DRILL")}
-                className="px-5 py-2.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-200/80 shadow-xs transition-all cursor-pointer"
+                className="px-5 py-2.5 rounded-2xl bg-white/95 hover:bg-white text-slate-700 text-xs font-semibold border border-slate-200/80 shadow-xs transition-all cursor-pointer"
               >
                 Thử Thách 60 Giây
               </button>
             </div>
           </div>
 
-          {/* Quick Clarity Gauge */}
-          <div className="shrink-0 bg-white/90 backdrop-blur-md p-5 rounded-3xl border border-[#E2EAFD] shadow-xs flex flex-col items-center">
+          {/* Quick Clarity Gauge (Lớp blur trắng) */}
+          <div className="shrink-0 bg-white/80 backdrop-blur-md p-5 rounded-3xl border border-white/80 shadow-xs flex flex-col items-center">
             <ClarityMeter score={82} variant="circle" />
             <span className="text-[11px] text-slate-500 font-semibold mt-2">Độ Thấu Suốt Tuần Này</span>
           </div>
