@@ -67,26 +67,23 @@ export const AppSidebar: React.FC = () => {
   return (
     <aside
       className={cn(
-        "bg-white/90 backdrop-blur-md border-r border-[#E8EEF8] flex flex-col justify-between shrink-0 h-screen sticky top-0 overflow-y-auto overflow-x-hidden scrollbar-none z-30 transition-all duration-300 ease-out",
-        isCollapsed ? "w-20 p-3" : "w-64 p-6"
+        "bg-white/90 backdrop-blur-md border-r border-[#E8EEF8] flex flex-col justify-between shrink-0 h-screen sticky top-0 overflow-y-auto overflow-x-hidden scrollbar-none z-30 transition-all duration-300 ease-out px-3 py-6",
+        isCollapsed ? "w-[68px]" : "w-64"
       )}
     >
       {/* Brand Logo & Name */}
       <div>
         <Link
           to="/about"
-          className={cn(
-            "flex items-center mb-6 group transition-all duration-300 overflow-hidden whitespace-nowrap",
-            isCollapsed ? "justify-center px-0 gap-0" : "gap-3 px-1"
-          )}
+          className="flex items-center h-12 mb-6 group transition-all overflow-hidden whitespace-nowrap"
           title="Khám phá triết lý học tập"
         >
-          <div className="w-12 h-12 flex items-center justify-center transition-transform duration-300 group-hover:scale-105 shrink-0">
-            <EliseCatMascot className="w-full h-full drop-shadow-xs" />
+          <div className="w-11 h-11 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105">
+            <EliseCatMascot className="w-9 h-9 drop-shadow-xs" />
           </div>
           <span
             className={cn(
-              "text-3xl text-slate-800 transition-all select-none pt-1.5 leading-none whitespace-nowrap overflow-hidden group-hover:text-[#5066A1]",
+              "text-3xl text-slate-800 transition-all select-none pt-1 pl-2 leading-none whitespace-nowrap overflow-hidden group-hover:text-[#5066A1]",
               isCollapsed
                 ? "opacity-0 max-w-0 -translate-x-3 pointer-events-none duration-100 delay-0"
                 : "opacity-100 max-w-[140px] translate-x-0 delay-150 duration-200"
@@ -111,43 +108,37 @@ export const AppSidebar: React.FC = () => {
                 to={item.href}
                 title={isCollapsed ? item.label : undefined}
                 className={cn(
-                  "flex items-center rounded-2xl text-xs font-bold transition-all relative group overflow-hidden whitespace-nowrap",
-                  isCollapsed
-                    ? "justify-center p-3"
-                    : "justify-between px-3.5 py-2.5",
+                  "flex items-center w-full h-11 rounded-2xl text-xs font-bold transition-all relative group overflow-hidden whitespace-nowrap",
                   isActive
                     ? "bg-[#EEF2FC] text-[#5066A1] shadow-2xs font-extrabold"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 )}
               >
-                <div
-                  className={cn(
-                    "flex items-center min-w-0 overflow-hidden transition-all duration-200",
-                    isCollapsed ? "gap-0" : "gap-3"
-                  )}
-                >
+                {/* Fixed Icon slot: exact same size and location in both collapsed & expanded */}
+                <div className="w-11 h-11 flex items-center justify-center shrink-0">
                   <Icon
                     className={cn(
                       "w-4 h-4 shrink-0 transition-colors",
                       isActive ? "text-[#7286D3]" : "text-slate-400"
                     )}
                   />
-                  <span
-                    className={cn(
-                      "whitespace-nowrap overflow-hidden transition-all ease-out",
-                      isCollapsed
-                        ? "opacity-0 max-w-0 -translate-x-3 pointer-events-none duration-100 delay-0"
-                        : "opacity-100 max-w-[180px] translate-x-0 delay-150 duration-200"
-                    )}
-                  >
-                    {item.label}
-                  </span>
                 </div>
+
+                <span
+                  className={cn(
+                    "whitespace-nowrap overflow-hidden transition-all ease-out pl-0.5",
+                    isCollapsed
+                      ? "opacity-0 max-w-0 -translate-x-3 pointer-events-none duration-100 delay-0"
+                      : "opacity-100 max-w-[150px] translate-x-0 delay-150 duration-200"
+                  )}
+                >
+                  {item.label}
+                </span>
 
                 {item.badge && (
                   <span
                     className={cn(
-                      "text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap transition-all ease-out shrink-0",
+                      "ml-auto mr-2.5 text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap transition-all ease-out shrink-0",
                       isActive
                         ? "bg-[#7286D3] text-white"
                         : "bg-slate-100 text-slate-500",
@@ -205,38 +196,31 @@ export const AppSidebar: React.FC = () => {
                     to={item.href}
                     title={isCollapsed ? item.label : undefined}
                     className={cn(
-                      "flex items-center rounded-2xl text-xs font-bold transition-all relative group overflow-hidden whitespace-nowrap",
-                      isCollapsed
-                        ? "justify-center p-3"
-                        : "justify-between px-3.5 py-2.5",
+                      "flex items-center w-full h-11 rounded-2xl text-xs font-bold transition-all relative group overflow-hidden whitespace-nowrap",
                       isActive
                         ? "bg-purple-100/70 text-purple-800 shadow-2xs font-extrabold"
                         : "text-slate-600 hover:bg-purple-50/50 hover:text-purple-900"
                     )}
                   >
-                    <div
-                      className={cn(
-                        "flex items-center min-w-0 overflow-hidden transition-all duration-200",
-                        isCollapsed ? "gap-0" : "gap-3"
-                      )}
-                    >
+                    <div className="w-11 h-11 flex items-center justify-center shrink-0">
                       <Icon
                         className={cn(
                           "w-4 h-4 shrink-0 transition-colors",
                           isActive ? "text-purple-600" : "text-purple-400"
                         )}
                       />
-                      <span
-                        className={cn(
-                          "whitespace-nowrap overflow-hidden transition-all ease-out",
-                          isCollapsed
-                            ? "opacity-0 max-w-0 -translate-x-3 pointer-events-none duration-100 delay-0"
-                            : "opacity-100 max-w-[180px] translate-x-0 delay-150 duration-200"
-                        )}
-                      >
-                        {item.label}
-                      </span>
                     </div>
+
+                    <span
+                      className={cn(
+                        "whitespace-nowrap overflow-hidden transition-all ease-out pl-0.5",
+                        isCollapsed
+                          ? "opacity-0 max-w-0 -translate-x-3 pointer-events-none duration-100 delay-0"
+                          : "opacity-100 max-w-[150px] translate-x-0 delay-150 duration-200"
+                      )}
+                    >
+                      {item.label}
+                    </span>
 
                     {/* Floating Tooltip in collapsed mode */}
                     {isCollapsed && (
@@ -295,15 +279,14 @@ export const AppSidebar: React.FC = () => {
           <button
             onClick={() => openModal("VOICE_CALIBRATION")}
             title={isCollapsed ? "Kiểm Tra Giọng Nói" : undefined}
-            className={cn(
-              "w-full flex items-center rounded-2xl text-xs font-bold text-slate-600 hover:bg-[#EEF2FC] hover:text-[#5066A1] transition-all cursor-pointer relative group overflow-hidden whitespace-nowrap",
-              isCollapsed ? "justify-center p-3 gap-0" : "gap-3 px-3.5 py-2.5"
-            )}
+            className="w-full flex items-center h-11 rounded-2xl text-xs font-bold text-slate-600 hover:bg-[#EEF2FC] hover:text-[#5066A1] transition-all cursor-pointer relative group overflow-hidden whitespace-nowrap"
           >
-            <Volume2 className="w-4 h-4 text-[#7286D3] shrink-0" />
+            <div className="w-11 h-11 flex items-center justify-center shrink-0">
+              <Volume2 className="w-4 h-4 text-[#7286D3] shrink-0" />
+            </div>
             <span
               className={cn(
-                "whitespace-nowrap overflow-hidden transition-all ease-out",
+                "whitespace-nowrap overflow-hidden transition-all ease-out pl-0.5",
                 isCollapsed
                   ? "opacity-0 max-w-0 -translate-x-3 pointer-events-none duration-100 delay-0"
                   : "opacity-100 max-w-[180px] translate-x-0 delay-150 duration-200"
@@ -321,15 +304,14 @@ export const AppSidebar: React.FC = () => {
           <button
             onClick={() => openModal("HELP_FEEDBACK")}
             title={isCollapsed ? "Trợ Giúp & Phím Tắt" : undefined}
-            className={cn(
-              "w-full flex items-center rounded-2xl text-xs font-bold text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-all cursor-pointer relative group overflow-hidden whitespace-nowrap",
-              isCollapsed ? "justify-center p-3 gap-0" : "gap-3 px-3.5 py-2.5"
-            )}
+            className="w-full flex items-center h-11 rounded-2xl text-xs font-bold text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-all cursor-pointer relative group overflow-hidden whitespace-nowrap"
           >
-            <HelpCircle className="w-4 h-4 shrink-0" />
+            <div className="w-11 h-11 flex items-center justify-center shrink-0">
+              <HelpCircle className="w-4 h-4 shrink-0" />
+            </div>
             <span
               className={cn(
-                "whitespace-nowrap overflow-hidden transition-all ease-out",
+                "whitespace-nowrap overflow-hidden transition-all ease-out pl-0.5",
                 isCollapsed
                   ? "opacity-0 max-w-0 -translate-x-3 pointer-events-none duration-100 delay-0"
                   : "opacity-100 max-w-[180px] translate-x-0 delay-150 duration-200"
