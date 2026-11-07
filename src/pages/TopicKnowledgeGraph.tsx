@@ -487,7 +487,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
           shortLabel: sub.title.slice(0, 10),
           status,
           clarityScore,
-          r: 11,
+          r: 7.5,
           x,
           y,
           fx: x,
@@ -525,7 +525,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
             name: `${sub.title} • Module ${gLetter}`,
             shortLabel: gLetter,
             color: "#64748b",
-            r: 6,
+            r: 5,
             x: gx,
             y: gy,
             fx: gx,
@@ -573,7 +573,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
               shortLabel: "•",
               status: cStatus,
               clarityScore: cStatus === "MASTERED" ? 92 : cStatus === "GAP" ? 48 : cStatus === "ACTIVE" ? 75 : 0,
-              r: 3.5,
+              r: 2.8,
               x: cx,
               y: cy,
               fx: cx,
@@ -884,7 +884,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
       // LEVEL 3: SUBJECT NODES (Môn Học)
       // ==========================================
       if (node.level === 3) {
-        const r = isActive ? 13 : (node.r ?? 11);
+        const r = isActive ? 12 : (node.r ?? 7.5);
 
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
@@ -896,22 +896,89 @@ export const TopicKnowledgeGraph: React.FC = () => {
         ctx.fill();
 
         ctx.strokeStyle = isActive ? "#ffffff" : "#8299E0";
-        ctx.lineWidth = (isActive ? 2.2 : 1.8) / globalScale;
+        ctx.lineWidth = (isActive ? 2.2 : 1.5) / globalScale;
         ctx.stroke();
         ctx.shadowBlur = 0;
 
         // Inner indicator dot
         ctx.beginPath();
-        ctx.arc(x, y, 2.5 / globalScale, 0, 2 * Math.PI);
+        ctx.arc(x, y, (isActive ? 2.5 : 1.8) / globalScale, 0, 2 * Math.PI);
         ctx.fillStyle = isActive ? "#ffffff" : "#8299E0";
         ctx.fill();
 
-        // Subject Name beside node
-        ctx.font = isActive ? `bold ${8 / globalScale}px 'Lato', sans-serif` : `600 ${7.5 / globalScale}px 'Lato', sans-serif`;
-        ctx.fillStyle = isActive ? "#8299E0" : "#5A6678";
-        ctx.textAlign = "left";
-        ctx.textBaseline = "middle";
-        ctx.fillText(node.name, x + r + 5 / globalScale, y);
+        // Subject Name Pill beside node
+        const displayText =
+          !isActive && node.name.length > 15
+            ? node.name.slice(0, 14) + "…"
+            : node.name;
+
+        ctx.font = isActive
+          ? `bold ${8 / globalScale}px 'Lato', sans-serif`
+          : `600 ${6.8 / globalScale}px 'Lato', sans-serif`;
+
+        const textMetrics = ctx.measureText(displayText);
+        const textWidth = textMetrics.width;
+        const textHeight = (isActive ? 13 : 10) / globalScale;
+        const textX = x + r + 4 / globalScale;
+        const textY = y;
+
+        if (isActive) {
+          // Highlight badge for active/selected node: pops cleanly over other layers
+          ctx.save();
+          ctx.shadowColor = "rgba(130, 153, 224, 0.35)";
+          ctx.shadowBlur = 6 / globalScale;
+          ctx.fillStyle = "#8299E0";
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(
+              textX - 2 / globalScale,
+              textY - textHeight / 2,
+              textWidth + 8 / globalScale,
+              textHeight,
+              textHeight / 2
+            );
+          } else {
+            ctx.rect(
+              textX - 2 / globalScale,
+              textY - textHeight / 2,
+              textWidth + 8 / globalScale,
+              textHeight
+            );
+          }
+          ctx.fill();
+          ctx.restore();
+
+          ctx.fillStyle = "#ffffff";
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+          ctx.fillText(displayText, textX + 2 / globalScale, textY);
+        } else {
+          // Soft protective backdrop pill to prevent line bleed through
+          ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(
+              textX - 2 / globalScale,
+              textY - textHeight / 2,
+              textWidth + 4 / globalScale,
+              textHeight,
+              3 / globalScale
+            );
+          } else {
+            ctx.rect(
+              textX - 2 / globalScale,
+              textY - textHeight / 2,
+              textWidth + 4 / globalScale,
+              textHeight
+            );
+          }
+          ctx.fill();
+
+          ctx.fillStyle = "#5A6678";
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+          ctx.fillText(displayText, textX, textY);
+        }
 
         ctx.restore();
         return;
@@ -921,7 +988,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
       // LEVEL 4: TOPIC GROUP NODES (Nhóm Kiến Thức)
       // ==========================================
       if (node.level === 4) {
-        const r = isActive ? 7 : (node.r ?? 6);
+        const r = isActive ? 7 : (node.r ?? 5);
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
         ctx.fillStyle = isActive ? "#8299E0" : "#ffffff";
@@ -932,11 +999,11 @@ export const TopicKnowledgeGraph: React.FC = () => {
         ctx.fill();
 
         ctx.strokeStyle = isActive ? "#ffffff" : "#8299E0";
-        ctx.lineWidth = (isActive ? 1.8 : 1.3) / globalScale;
+        ctx.lineWidth = (isActive ? 1.8 : 1.2) / globalScale;
         ctx.stroke();
         ctx.shadowBlur = 0;
 
-        ctx.font = `bold ${5.5 / globalScale}px 'Lato', sans-serif`;
+        ctx.font = `bold ${5 / globalScale}px 'Lato', sans-serif`;
         ctx.fillStyle = isActive ? "#ffffff" : "#5A6678";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -950,19 +1017,19 @@ export const TopicKnowledgeGraph: React.FC = () => {
       // LEVEL 5: MICRO-CONCEPT LEAVES (Chấm Tri Thức)
       // ==========================================
       if (node.level === 5) {
-        const r = isActive ? 5.5 : (node.r ?? 3.5);
+        const r = isActive ? 4.5 : (node.r ?? 2.8);
 
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
         ctx.fillStyle = isActive ? "#8299E0" : "#ffffff";
         if (isActive) {
           ctx.shadowColor = "rgba(130, 153, 224, 0.5)";
-          ctx.shadowBlur = 8 / globalScale;
+          ctx.shadowBlur = 6 / globalScale;
         }
         ctx.fill();
 
         ctx.strokeStyle = isActive ? "#ffffff" : "#8299E0";
-        ctx.lineWidth = (isActive ? 1.6 : 1) / globalScale;
+        ctx.lineWidth = (isActive ? 1.4 : 0.8) / globalScale;
         ctx.stroke();
         ctx.shadowBlur = 0;
 
