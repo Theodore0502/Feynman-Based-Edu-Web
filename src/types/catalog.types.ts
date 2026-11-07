@@ -11,7 +11,7 @@ export type LectureStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "NEEDS
 
 export interface AcademicSubject {
   id: string;
-  domainId: string;
+  domainId?: string;
   domainSlug?: string;
   name: string;
   slug: string;
@@ -60,8 +60,8 @@ export interface StarterAnalogyItem {
 
 export interface CatalogTopic {
   id: string;
-  domainId: string;
-  domainName: string;
+  domainId?: string;
+  domainName?: string;
   subjectId?: string;
   subjectSlug?: string;
   subjectName?: string;
@@ -72,8 +72,8 @@ export interface CatalogTopic {
   difficultyLevel: number; // 1 - 5
   estimatedReadingMinutes: number;
   requiredConcepts: string[];
-  jargonTraps: JargonTrapItem[];
-  starterAnalogies: StarterAnalogyItem[];
+  jargonTraps?: JargonTrapItem[];
+  starterAnalogies?: StarterAnalogyItem[];
   fullMaterialMarkdown?: string;
   prerequisiteIds?: string[];
 

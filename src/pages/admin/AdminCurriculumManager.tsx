@@ -307,10 +307,10 @@ export const AdminCurriculumManager: React.FC = () => {
                   {/* Jargon Traps */}
                   <div className="p-3.5 rounded-2xl bg-rose-50/50 border border-rose-100 space-y-2">
                     <span className="text-[10px] font-black uppercase tracking-wider text-rose-700 block">
-                      Bẫy Thuật Ngữ Jargon ({activeTopic.jargonTraps.length})
+                      Bẫy Thuật Ngữ Jargon ({(activeTopic.jargonTraps || []).length})
                     </span>
                     <div className="flex flex-wrap gap-1.5">
-                      {activeTopic.jargonTraps.map((trap, idx) => (
+                      {(activeTopic.jargonTraps || []).map((trap, idx) => (
                         <span
                           key={idx}
                           className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-rose-700 border border-rose-200"

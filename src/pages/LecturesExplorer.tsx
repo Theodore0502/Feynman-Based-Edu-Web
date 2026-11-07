@@ -6,7 +6,7 @@
  *   - Cấp 3: Danh sách Bài giảng dọc (Table View kèm bộ lọc trạng thái và action buttons)
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   THREE_TIER_DOMAINS,
@@ -17,10 +17,11 @@ import {
   getSubjectsByDomainSlug,
   getLecturesBySubjectSlug,
 } from "@/data/three-tier-curriculum.data";
+import { CurriculumService } from "@/lib/services/curriculum-service";
 import { DomainCard } from "@/components/lectures/DomainCard";
 import { SubjectCard } from "@/components/lectures/SubjectCard";
 import { LectureRow } from "@/components/lectures/LectureRow";
-import type { LectureStatus } from "@/types/catalog.types";
+import type { DomainCategory, AcademicSubject, CatalogTopic, LectureStatus } from "@/types/catalog.types";
 import {
   Search,
   BookOpen,
@@ -33,6 +34,13 @@ import {
   Clock,
   AlertCircle,
   Cpu,
+  Terminal,
+  Code2,
+  ShoppingCart,
+  Calculator,
+  Briefcase,
+  Compass,
+  Stethoscope,
   Sigma,
   Eye,
   Network,
@@ -44,6 +52,13 @@ import {
 
 const DOMAIN_ICONS: Record<string, React.ElementType> = {
   Cpu,
+  Terminal,
+  Code2,
+  ShoppingCart,
+  Calculator,
+  Briefcase,
+  Compass,
+  Stethoscope,
   Sigma,
   Eye,
   Network,
@@ -67,34 +82,83 @@ export const LecturesExplorer: React.FC = () => {
   const domainSlug = params.domainSlug;
   const subjectSlug = params.subjectSlug;
 
-  // Query Current Domain & Subject
-  const currentDomain = useMemo(
-    () => (domainSlug ? getDomainBySlug(domainSlug) : undefined),
-    [domainSlug]
-  );
-
-  const currentSubject = useMemo(
-    () => (subjectSlug ? getSubjectBySlug(subjectSlug) : undefined),
-    [subjectSlug]
-  );
+  // Determine current tier level (1, 2, or 3)
+  const currentLevel = subjectSlug ? 3 : domainSlug ? 2 : 1;
 
   // Cấp 3 Filter States
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>("ALL");
 
-  // Determine current tier level (1, 2, or 3)
-  const currentLevel = subjectSlug ? 3 : domainSlug ? 2 : 1;
+  // Dynamic State with Instant Fallback
+  const [domains, setDomains] = useState<DomainCategory[]>(THREE_TIER_DOMAINS);
+  const [currentDomain, setCurrentDomain] = useState<DomainCategory | undefined>(() =>
+    domainSlug ? getDomainBySlug(domainSlug) : undefined
+  );
+  const [domainSubjects, setDomainSubjects] = useState<AcademicSubject[]>(() =>
+    domainSlug ? getSubjectsByDomainSlug(domainSlug) : []
+  );
+  const [currentSubject, setCurrentSubject] = useState<AcademicSubject | undefined>(() =>
+    subjectSlug ? getSubjectBySlug(subjectSlug) : undefined
+  );
+  const [subjectLectures, setSubjectLectures] = useState<CatalogTopic[]>(() =>
+    subjectSlug ? getLecturesBySubjectSlug(subjectSlug) : []
+  );
 
-  // Data for Level 2 (Subjects of current domain)
-  const domainSubjects = useMemo(() => {
-    if (!domainSlug) return [];
-    return getSubjectsByDomainSlug(domainSlug);
+  // Load Tier 1 (Domains from Supabase or Fallback)
+  useEffect(() => {
+    let isMounted = true;
+    CurriculumService.getDomains().then((res) => {
+      if (isMounted && res && res.length > 0) {
+        setDomains(res);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Load Tier 2 (Subjects of domainSlug from Supabase or Fallback)
+  useEffect(() => {
+    let isMounted = true;
+    if (domainSlug) {
+      setCurrentDomain(getDomainBySlug(domainSlug));
+      setDomainSubjects(getSubjectsByDomainSlug(domainSlug));
+
+      CurriculumService.getDomainBySlug(domainSlug).then((d) => {
+        if (isMounted && d) setCurrentDomain(d);
+      });
+
+      CurriculumService.getSubjectsByDomainSlug(domainSlug).then((subs) => {
+        if (isMounted && subs && subs.length > 0) {
+          setDomainSubjects(subs);
+        }
+      });
+    }
+    return () => {
+      isMounted = false;
+    };
   }, [domainSlug]);
 
-  // Data for Level 3 (Lectures of current subject)
-  const subjectLectures = useMemo(() => {
-    if (!subjectSlug) return [];
-    return getLecturesBySubjectSlug(subjectSlug);
+  // Load Tier 3 (Lectures of subjectSlug from Supabase or Fallback)
+  useEffect(() => {
+    let isMounted = true;
+    if (subjectSlug) {
+      setCurrentSubject(getSubjectBySlug(subjectSlug));
+      setSubjectLectures(getLecturesBySubjectSlug(subjectSlug));
+
+      CurriculumService.getSubjectBySlug(subjectSlug).then((s) => {
+        if (isMounted && s) setCurrentSubject(s);
+      });
+
+      CurriculumService.getLecturesBySubjectSlug(subjectSlug).then((lecs) => {
+        if (isMounted && lecs && lecs.length > 0) {
+          setSubjectLectures(lecs);
+        }
+      });
+    }
+    return () => {
+      isMounted = false;
+    };
   }, [subjectSlug]);
 
   // Filtered lectures for Level 3
@@ -194,7 +258,7 @@ export const LecturesExplorer: React.FC = () => {
 
           {/* Grid 4 Cột: 8 Nhóm Ngành */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {THREE_TIER_DOMAINS.map((domain, idx) => (
+            {domains.map((domain, idx) => (
               <DomainCard key={domain.id} domain={domain} index={idx} />
             ))}
           </div>
@@ -416,7 +480,7 @@ export const LecturesExplorer: React.FC = () => {
                 }`}
               >
                 <Clock className="w-3.5 h-3.5" />
-                <span>Đang học dở ({statusCounts.IN_PROGRESS})</span>
+                <span>Đang học ({statusCounts.IN_PROGRESS})</span>
               </button>
 
               <button
@@ -428,7 +492,7 @@ export const LecturesExplorer: React.FC = () => {
                 }`}
               >
                 <AlertCircle className="w-3.5 h-3.5" />
-                <span>Cần củng cố ({statusCounts.NEEDS_REVIEW})</span>
+                <span>Học lại ({statusCounts.NEEDS_REVIEW})</span>
               </button>
 
               <button

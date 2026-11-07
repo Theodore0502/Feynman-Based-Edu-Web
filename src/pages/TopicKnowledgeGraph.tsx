@@ -434,7 +434,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
       const fy = domainY + f.dist * Math.sin(fieldAngle);
 
       const fieldSubjects = TOPICS_CATALOG.filter((c: CatalogTopic) => {
-        const assigned = assignSubjectToField(c.id, c.domainId);
+        const assigned = assignSubjectToField(c.id, c.domainId || "");
         return assigned === f.id;
       });
 
@@ -664,7 +664,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
       setFilterState((prev) => ({
         ...prev,
         selectedTopicId: topic.id,
-        domainId: topic.domainId,
+        domainId: topic.domainId || "all",
       }));
       const found = graphData.nodes.find(
         (n) =>

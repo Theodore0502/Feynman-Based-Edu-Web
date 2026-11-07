@@ -7,6 +7,13 @@ import React from "react";
 import { Link } from "react-router-dom";
 import {
   Cpu,
+  Terminal,
+  Code2,
+  ShoppingCart,
+  Calculator,
+  Briefcase,
+  Compass,
+  Stethoscope,
   Sigma,
   Eye,
   Network,
@@ -22,6 +29,13 @@ import type { DomainCategory } from "@/types/catalog.types";
 
 const DOMAIN_ICONS: Record<string, React.ElementType> = {
   Cpu,
+  Terminal,
+  Code2,
+  ShoppingCart,
+  Calculator,
+  Briefcase,
+  Compass,
+  Stethoscope,
   Sigma,
   Eye,
   Network,
