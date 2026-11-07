@@ -145,16 +145,7 @@ export const LecturesExplorer: React.FC = () => {
       {/* ========================================================================= */}
       {currentLevel === 1 && (
         <div className="space-y-6">
-          {/* Nút lùi về Cấp 0 (Tổng Quan) */}
           <div>
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-[#E2EAFD] text-xs font-bold text-slate-600 hover:text-[#5066A1] shadow-2xs transition-all cursor-pointer group mb-3"
-            >
-              <ArrowLeft className="w-3.5 h-3.5 text-slate-400 group-hover:-translate-x-0.5 transition-transform" />
-              <span>Quay lại Tổng Quan</span>
-            </button>
-
             {/* Page Title Header (Cấp 1: Kho Bài Giảng) */}
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#EEF2FC] via-[#F5F2FB] to-[#FFF5F5] p-4 sm:p-6 border border-[#E8EEF8] shadow-xs">
               {/* Dreamy Hero Background Image (mờ nhẹ) */}
