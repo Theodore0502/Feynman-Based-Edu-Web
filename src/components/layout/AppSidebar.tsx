@@ -96,14 +96,6 @@ export const AppSidebar: React.FC = () => {
 
         {/* Navigation Items */}
         <nav className="space-y-1.5">
-          {!isCollapsed ? (
-            <div className="px-3 pb-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
-              KHÔNG GIAN FEYNMAN
-            </div>
-          ) : (
-            <div className="h-2" />
-          )}
-
           {LEARNER_NAVIGATION.map((item) => {
             const Icon = ICON_MAP[item.icon] || LayoutDashboard;
             const isActive =
