@@ -127,10 +127,22 @@ export const CommandDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Quick Clarity Gauge (Lớp blur trắng) */}
-          <div className="shrink-0 bg-white/80 backdrop-blur-md p-5 rounded-3xl border border-white/80 shadow-xs flex flex-col items-center">
-            <ClarityMeter score={82} variant="circle" />
-            <span className="text-[11px] text-slate-500 font-semibold mt-2">Độ Thấu Suốt Tuần Này</span>
+          {/* Right Section: Linh vật nổi bay cạnh thanh tiến độ */}
+          <div className="flex items-center justify-center md:justify-end gap-3 sm:gap-6 self-center md:self-auto shrink-0 relative">
+            {/* Mascot Linh Vật Cú Theodore bay nổi sinh động */}
+            <div className="relative group transition-transform duration-300 hover:scale-105 shrink-0">
+              <img
+                src="/images/theodore-mascot.png"
+                alt="Linh vật Theodore"
+                className="w-28 h-28 sm:w-36 sm:h-36 md:w-40 md:h-40 lg:w-44 lg:h-44 object-contain filter drop-shadow-[0_12px_24px_rgba(114,134,211,0.28)] animate-float select-none pointer-events-none"
+              />
+            </div>
+
+            {/* Quick Clarity Gauge (Lớp blur trắng) */}
+            <div className="shrink-0 bg-white/80 backdrop-blur-md p-5 rounded-3xl border border-white/80 shadow-xs flex flex-col items-center">
+              <ClarityMeter score={82} variant="circle" />
+              <span className="text-[11px] text-slate-500 font-semibold mt-2">Độ Thấu Suốt Tuần Này</span>
+            </div>
           </div>
         </div>
       </div>
