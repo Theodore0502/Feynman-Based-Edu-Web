@@ -29,7 +29,7 @@ export const WorkspaceLayout: React.FC = () => {
       {/* Vùng Làm Việc Chính Cuộn Độc Lập */}
       <main
         className={cn(
-          "flex-1 overflow-y-auto h-screen",
+          "flex-1 overflow-y-auto h-screen transition-all duration-300 ease-in-out min-w-0",
           isTopicsPage
             ? "p-3 sm:p-4 overflow-hidden flex flex-col h-screen"
             : "p-4 sm:p-6 lg:p-8"
