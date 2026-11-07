@@ -67,7 +67,7 @@ export const AppSidebar: React.FC = () => {
   return (
     <aside
       className={cn(
-        "bg-white/90 backdrop-blur-md border-r border-[#E8EEF8] flex flex-col justify-between shrink-0 h-screen sticky top-0 overflow-y-auto scrollbar-none z-30 transition-all duration-300 ease-in-out",
+        "bg-white/90 backdrop-blur-md border-r border-[#E8EEF8] flex flex-col justify-between shrink-0 h-screen sticky top-0 overflow-y-auto overflow-x-hidden scrollbar-none z-30 transition-all duration-300 ease-out",
         isCollapsed ? "w-20 p-3" : "w-64 p-6"
       )}
     >
@@ -76,22 +76,25 @@ export const AppSidebar: React.FC = () => {
         <Link
           to="/about"
           className={cn(
-            "flex items-center mb-6 group transition-all",
-            isCollapsed ? "justify-center px-0" : "gap-3 px-2"
+            "flex items-center mb-6 group transition-all duration-300 overflow-hidden whitespace-nowrap",
+            isCollapsed ? "justify-center px-0 gap-0" : "gap-3 px-2"
           )}
           title="Khám phá triết lý học tập"
         >
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#7286D3] via-[#8EA7E9] to-[#FFB4B4] p-0.5 flex items-center justify-center shadow-xs transition-transform group-hover:scale-105 shrink-0">
             <EliseCatMascot className="w-full h-full" />
           </div>
-          {!isCollapsed && (
-            <span
-              className="text-3xl text-slate-800 transition-colors group-hover:text-[#5066A1] select-none pt-1.5 leading-none"
-              style={{ fontFamily: "'Nahla Script', cursive, sans-serif" }}
-            >
-              Elise
-            </span>
-          )}
+          <span
+            className={cn(
+              "text-3xl text-slate-800 transition-all select-none pt-1.5 leading-none whitespace-nowrap overflow-hidden group-hover:text-[#5066A1]",
+              isCollapsed
+                ? "opacity-0 max-w-0 -translate-x-3 pointer-events-none duration-100 delay-0"
+                : "opacity-100 max-w-[140px] translate-x-0 delay-150 duration-200"
+            )}
+            style={{ fontFamily: "'Nahla Script', cursive, sans-serif" }}
+          >
+            Elise
+          </span>
         </Link>
 
         {/* Navigation Items */}
@@ -108,7 +111,7 @@ export const AppSidebar: React.FC = () => {
                 to={item.href}
                 title={isCollapsed ? item.label : undefined}
                 className={cn(
-                  "flex items-center rounded-2xl text-xs font-bold transition-all relative group",
+                  "flex items-center rounded-2xl text-xs font-bold transition-all relative group overflow-hidden whitespace-nowrap",
                   isCollapsed
                     ? "justify-center p-3"
                     : "justify-between px-3.5 py-2.5",
@@ -117,22 +120,40 @@ export const AppSidebar: React.FC = () => {
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 )}
               >
-                <div className={cn("flex items-center", !isCollapsed && "gap-3")}>
+                <div
+                  className={cn(
+                    "flex items-center min-w-0 overflow-hidden transition-all duration-200",
+                    isCollapsed ? "gap-0" : "gap-3"
+                  )}
+                >
                   <Icon
                     className={cn(
-                      "w-4 h-4 shrink-0",
+                      "w-4 h-4 shrink-0 transition-colors",
                       isActive ? "text-[#7286D3]" : "text-slate-400"
                     )}
                   />
-                  {!isCollapsed && <span>{item.label}</span>}
-                </div>
-                {!isCollapsed && item.badge && (
                   <span
                     className={cn(
-                      "text-[10px] px-2 py-0.5 rounded-full font-bold",
+                      "whitespace-nowrap overflow-hidden transition-all ease-out",
+                      isCollapsed
+                        ? "opacity-0 max-w-0 -translate-x-3 pointer-events-none duration-100 delay-0"
+                        : "opacity-100 max-w-[180px] translate-x-0 delay-150 duration-200"
+                    )}
+                  >
+                    {item.label}
+                  </span>
+                </div>
+
+                {item.badge && (
+                  <span
+                    className={cn(
+                      "text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap transition-all ease-out shrink-0",
                       isActive
                         ? "bg-[#7286D3] text-white"
-                        : "bg-slate-100 text-slate-500"
+                        : "bg-slate-100 text-slate-500",
+                      isCollapsed
+                        ? "opacity-0 max-w-0 scale-75 pointer-events-none duration-100 delay-0 overflow-hidden"
+                        : "opacity-100 max-w-[60px] scale-100 delay-150 duration-200"
                     )}
                   >
                     {item.badge}
@@ -158,7 +179,14 @@ export const AppSidebar: React.FC = () => {
           {isAdmin && (
             <div className="pt-4 space-y-1.5">
               {!isCollapsed ? (
-                <div className="px-3 pb-1 text-[10px] font-black uppercase tracking-wider text-purple-600 flex items-center justify-between">
+                <div
+                  className={cn(
+                    "px-3 pb-1 text-[10px] font-black uppercase tracking-wider text-purple-600 flex items-center justify-between transition-all overflow-hidden whitespace-nowrap",
+                    isCollapsed
+                      ? "opacity-0 max-h-0 pointer-events-none duration-100 delay-0"
+                      : "opacity-100 max-h-8 delay-150 duration-200"
+                  )}
+                >
                   <span>Quản Trị Kiểm Chuẩn</span>
                   <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.2 rounded-md font-bold">
                     Admin
@@ -177,7 +205,7 @@ export const AppSidebar: React.FC = () => {
                     to={item.href}
                     title={isCollapsed ? item.label : undefined}
                     className={cn(
-                      "flex items-center rounded-2xl text-xs font-bold transition-all relative group",
+                      "flex items-center rounded-2xl text-xs font-bold transition-all relative group overflow-hidden whitespace-nowrap",
                       isCollapsed
                         ? "justify-center p-3"
                         : "justify-between px-3.5 py-2.5",
@@ -186,14 +214,28 @@ export const AppSidebar: React.FC = () => {
                         : "text-slate-600 hover:bg-purple-50/50 hover:text-purple-900"
                     )}
                   >
-                    <div className={cn("flex items-center", !isCollapsed && "gap-3")}>
+                    <div
+                      className={cn(
+                        "flex items-center min-w-0 overflow-hidden transition-all duration-200",
+                        isCollapsed ? "gap-0" : "gap-3"
+                      )}
+                    >
                       <Icon
                         className={cn(
-                          "w-4 h-4 shrink-0",
+                          "w-4 h-4 shrink-0 transition-colors",
                           isActive ? "text-purple-600" : "text-purple-400"
                         )}
                       />
-                      {!isCollapsed && <span>{item.label}</span>}
+                      <span
+                        className={cn(
+                          "whitespace-nowrap overflow-hidden transition-all ease-out",
+                          isCollapsed
+                            ? "opacity-0 max-w-0 -translate-x-3 pointer-events-none duration-100 delay-0"
+                            : "opacity-100 max-w-[180px] translate-x-0 delay-150 duration-200"
+                        )}
+                      >
+                        {item.label}
+                      </span>
                     </div>
 
                     {/* Floating Tooltip in collapsed mode */}
@@ -220,7 +262,7 @@ export const AppSidebar: React.FC = () => {
           <button
             onClick={toggleCollapse}
             className={cn(
-              "relative z-10 bg-white hover:bg-[#EEF2FC] border border-[#E8EEF8] hover:border-[#8299E0] text-slate-500 hover:text-[#5066A1] shadow-2xs transition-all cursor-pointer group flex items-center justify-center",
+              "relative z-10 bg-white hover:bg-[#EEF2FC] border border-[#E8EEF8] hover:border-[#8299E0] text-slate-500 hover:text-[#5066A1] shadow-2xs transition-all duration-300 cursor-pointer group flex items-center justify-center overflow-hidden",
               isCollapsed
                 ? "w-7 h-7 rounded-full"
                 : "px-3 py-1 rounded-full gap-1.5"
@@ -233,7 +275,14 @@ export const AppSidebar: React.FC = () => {
             ) : (
               <>
                 <ChevronLeft className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#7286D3] transition-transform group-hover:-translate-x-0.5" />
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#5066A1]">
+                <span
+                  className={cn(
+                    "text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#5066A1] whitespace-nowrap overflow-hidden transition-all ease-out",
+                    isCollapsed
+                      ? "opacity-0 max-w-0 pointer-events-none duration-100 delay-0"
+                      : "opacity-100 max-w-[80px] delay-150 duration-200"
+                  )}
+                >
                   Thu gọn
                 </span>
               </>
@@ -247,12 +296,21 @@ export const AppSidebar: React.FC = () => {
             onClick={() => openModal("VOICE_CALIBRATION")}
             title={isCollapsed ? "Kiểm Tra Giọng Nói" : undefined}
             className={cn(
-              "w-full flex items-center rounded-2xl text-xs font-bold text-slate-600 hover:bg-[#EEF2FC] hover:text-[#5066A1] transition-all cursor-pointer relative group",
-              isCollapsed ? "justify-center p-3" : "gap-3 px-3.5 py-2.5"
+              "w-full flex items-center rounded-2xl text-xs font-bold text-slate-600 hover:bg-[#EEF2FC] hover:text-[#5066A1] transition-all cursor-pointer relative group overflow-hidden whitespace-nowrap",
+              isCollapsed ? "justify-center p-3 gap-0" : "gap-3 px-3.5 py-2.5"
             )}
           >
             <Volume2 className="w-4 h-4 text-[#7286D3] shrink-0" />
-            {!isCollapsed && <span>Kiểm Tra Giọng Nói</span>}
+            <span
+              className={cn(
+                "whitespace-nowrap overflow-hidden transition-all ease-out",
+                isCollapsed
+                  ? "opacity-0 max-w-0 -translate-x-3 pointer-events-none duration-100 delay-0"
+                  : "opacity-100 max-w-[180px] translate-x-0 delay-150 duration-200"
+              )}
+            >
+              Kiểm Tra Giọng Nói
+            </span>
             {isCollapsed && (
               <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-800 text-white text-xs font-medium rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-lg z-50">
                 Kiểm Tra Giọng Nói
@@ -264,12 +322,21 @@ export const AppSidebar: React.FC = () => {
             onClick={() => openModal("HELP_FEEDBACK")}
             title={isCollapsed ? "Trợ Giúp & Phím Tắt" : undefined}
             className={cn(
-              "w-full flex items-center rounded-2xl text-xs font-bold text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-all cursor-pointer relative group",
-              isCollapsed ? "justify-center p-3" : "gap-3 px-3.5 py-2.5"
+              "w-full flex items-center rounded-2xl text-xs font-bold text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-all cursor-pointer relative group overflow-hidden whitespace-nowrap",
+              isCollapsed ? "justify-center p-3 gap-0" : "gap-3 px-3.5 py-2.5"
             )}
           >
             <HelpCircle className="w-4 h-4 shrink-0" />
-            {!isCollapsed && <span>Trợ Giúp & Phím Tắt</span>}
+            <span
+              className={cn(
+                "whitespace-nowrap overflow-hidden transition-all ease-out",
+                isCollapsed
+                  ? "opacity-0 max-w-0 -translate-x-3 pointer-events-none duration-100 delay-0"
+                  : "opacity-100 max-w-[180px] translate-x-0 delay-150 duration-200"
+              )}
+            >
+              Trợ Giúp & Phím Tắt
+            </span>
             {isCollapsed && (
               <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-800 text-white text-xs font-medium rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-lg z-50">
                 Trợ Giúp & Phím Tắt
