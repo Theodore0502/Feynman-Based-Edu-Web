@@ -23,7 +23,6 @@ import {
   BookOpen, 
   ArrowUpRight, 
   ChevronRight,
-  Database,
   Trash2
 } from "lucide-react";
 
@@ -93,10 +92,6 @@ export const CommandDashboard: React.FC = () => {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
           {/* Khối 1 (Trái): Card nội dung chính & nút hành động */}
           <div className="max-w-xl lg:max-w-lg xl:max-w-xl space-y-3 p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs shrink-0">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E5ECFB]/90 text-[#5066A1] text-xs font-bold border border-[#D3E0FA]">
-              <Database className="w-3.5 h-3.5 text-[#7286D3]" />
-              <span>Đã Đồng Bộ Supabase Cloud</span>
-            </div>
             <h2 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight leading-snug">
               Hôm nay bạn muốn làm chủ <span className="whitespace-nowrap">khái niệm nào?</span>
             </h2>

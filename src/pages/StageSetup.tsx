@@ -107,10 +107,6 @@ export const StageSetup: React.FC = () => {
     <div className="w-full space-y-8 pb-12">
       {/* Step Header */}
       <div className="text-center space-y-2">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EEF2FC] text-[#5066A1] text-xs font-bold border border-[#D5E1FA]">
-          <Sparkles className="w-3.5 h-3.5 text-[#7286D3]" />
-          <span>Bước 2: Lên Bục Giảng Feynman</span>
-        </div>
         <h2 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
           Bạn chuẩn bị giảng giải về điều gì?
         </h2>

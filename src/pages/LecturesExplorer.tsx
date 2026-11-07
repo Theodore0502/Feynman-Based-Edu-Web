@@ -161,10 +161,6 @@ export const LecturesExplorer: React.FC = () => {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
                 {/* Lớp blur trắng ở dưới các chữ để nhìn rõ chữ */}
                 <div className="space-y-2 p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs max-w-2xl">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-[#5066A1] text-xs font-black tracking-wide border border-[#D5E1FA] uppercase">
-                    <Sparkles className="w-3.5 h-3.5 text-[#7286D3]" />
-                    <span>Chương Trình Học Feynman 3 Tầng</span>
-                  </div>
                   <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
                     Kho Bài Giảng Học Thuật
                   </h1>
@@ -236,9 +232,6 @@ export const LecturesExplorer: React.FC = () => {
                 </div>
 
                 <div className="space-y-1.5">
-                  <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-[#EEF2FC] text-[#5066A1] text-[11px] font-black tracking-wide border border-[#D5E1FA] uppercase">
-                    <span>Nhóm Ngành Học Thuật</span>
-                  </div>
                   <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
                     {currentDomain.name}
                   </h1>

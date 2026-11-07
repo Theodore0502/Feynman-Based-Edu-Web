@@ -305,10 +305,6 @@ export const AnalogyJargonVault: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
           {/* Lớp blur trắng ở dưới các chữ để nhìn rõ chữ */}
           <div className="space-y-2 p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-[#7286D3] text-xs font-bold shadow-2xs border border-[#8EA7E9]/20">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Thuật Toán Lặp Lại Ngắt Quãng SM-2 (Spaced Repetition)</span>
-            </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
               Sổ Tay Thuật Ngữ & Ẩn Dụ Feynman
             </h1>

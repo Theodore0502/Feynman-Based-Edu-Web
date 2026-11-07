@@ -37,11 +37,6 @@ export const AboutPage: React.FC = () => {
         </div>
 
         <div className="relative z-10 space-y-4 max-w-3xl p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 backdrop-blur-md text-[#5066A1] text-xs font-black tracking-wide border border-[#D5E1FA] uppercase shadow-2xs">
-            <Sparkles className="w-3.5 h-3.5 text-[#7286D3]" />
-            <span>Triết Lý Học Sâu Feynman</span>
-          </div>
-
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-800 tracking-tight leading-tight">
             Elise
           </h1>

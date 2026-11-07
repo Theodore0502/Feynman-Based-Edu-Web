@@ -107,10 +107,6 @@ export const StudyPrepLab: React.FC = () => {
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
           {/* Lớp blur trắng ở dưới các chữ để nhìn rõ chữ */}
           <div className="space-y-2 p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-[#7286D3] text-xs font-bold shadow-2xs border border-[#8EA7E9]/20">
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>Bước 1: Nạp & Chuẩn Bị Kiến Thức (Feynman Prep)</span>
-            </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
               Phòng Chuẩn Bị & Nghiên Cứu
             </h1>

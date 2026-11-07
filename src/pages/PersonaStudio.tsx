@@ -50,10 +50,6 @@ export const PersonaStudio: React.FC = () => {
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
           {/* Lớp blur trắng ở dưới các chữ để nhìn rõ chữ */}
           <div className="space-y-2 p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-[#5066A1] text-xs font-black tracking-wide border border-[#D5E1FA] uppercase">
-              <Bot className="w-3.5 h-3.5 text-[#7286D3]" />
-              <span>Khán Giả Phản Biện Socrates</span>
-            </div>
             <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
               Thư Viện AI
             </h1>
