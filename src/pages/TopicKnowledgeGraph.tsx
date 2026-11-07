@@ -86,30 +86,81 @@ const DOMAIN_CONFIG: Record<
     code: "MATH",
     name: "Toán Cao Cấp & Đại Số",
     symbol: "∑",
-    angle: -2.35, // -135° (Top-Left quadrant)
-    dist: 260,
+    angle: -2.356, // -135° (Top-Left quadrant)
+    dist: 270,
   },
   discrete: {
     code: "DISC",
     name: "Toán Rời Rạc & Đồ Thị",
     symbol: "⑂",
-    angle: -0.78, // -45° (Top-Right quadrant)
-    dist: 280,
+    angle: -0.785, // -45° (Top-Right quadrant)
+    dist: 270,
   },
   cv: {
     code: "CV",
     name: "Thị Giác Máy Tính & AI",
     symbol: "👁",
-    angle: 0.78, // +45° (Bottom-Right quadrant)
-    dist: 280,
+    angle: 0.785, // +45° (Bottom-Right quadrant)
+    dist: 270,
   },
   cs: {
     code: "SYS",
     name: "Hệ Thống & Khoa Học Máy Tính",
     symbol: "⚙",
-    angle: 2.35, // +135° (Bottom-Left quadrant)
-    dist: 260,
+    angle: 2.356, // +135° (Bottom-Left quadrant)
+    dist: 270,
   },
+};
+
+// Deterministic topic-to-field mapping: guarantees balanced 3 to 4 topics per field (no cramming/overlap)
+const TOPIC_TO_FIELD: Record<string, string> = {
+  // Math (10 topics)
+  "math-linear-transformations": "field-algebra",
+  "math-eigenvalues-eigenvectors": "field-algebra",
+  "math-svd": "field-algebra",
+  "math-gauss-jordan-elimination": "field-algebra",
+  "math-taylor-series": "field-calculus",
+  "math-fourier-transform": "field-calculus",
+  "math-double-integrals-green": "field-calculus",
+  "math-gradient-descent": "field-optimization",
+  "math-hessian-saddle-points": "field-optimization",
+  "math-gram-schmidt": "field-optimization",
+
+  // Discrete (10 topics)
+  "discrete-bfs-dfs-graph-traversal": "field-graph-theory",
+  "discrete-dijkstra-algorithm": "field-graph-theory",
+  "discrete-minimum-spanning-tree": "field-graph-theory",
+  "discrete-euler-hamilton-cycles": "field-graph-theory",
+  "discrete-propositional-logic-boolean": "field-logic",
+  "discrete-equivalence-relations-partitions": "field-logic",
+  "discrete-graph-coloring-four-color": "field-logic",
+  "discrete-combinatorics-binomial": "field-combinatorics",
+  "discrete-pigeonhole-principle": "field-combinatorics",
+  "discrete-mathematical-induction-recurrence": "field-combinatorics",
+
+  // CV (10 topics)
+  "cv-edge-detection-canny-sobel": "field-image-proc",
+  "cv-color-spaces-morphology": "field-image-proc",
+  "cv-sift-harris-corner": "field-image-proc",
+  "cv-yolo-object-detection": "field-detection",
+  "cv-hough-transform": "field-detection",
+  "cv-optical-flow-lucas-kanade": "field-detection",
+  "cv-convolution-cnn": "field-neural-nets",
+  "cv-resnet-skip-connections": "field-neural-nets",
+  "cv-unet-semantic-segmentation": "field-neural-nets",
+  "cv-vision-transformers-vit": "field-neural-nets",
+
+  // CS Systems (10 topics)
+  "cs-pointers-memory-management": "field-os",
+  "cs-process-vs-thread-concurrency": "field-os",
+  "cs-deadlock-coffman-conditions": "field-os",
+  "cs-virtual-memory-paging": "field-os",
+  "cs-btree-database-indexing": "field-db",
+  "cs-hash-tables-collision-resolution": "field-db",
+  "cs-docker-containers-namespaces": "field-db",
+  "cs-cap-theorem-distributed-systems": "field-dist-sys",
+  "cs-tcp-3way-handshake": "field-dist-sys",
+  "cs-message-queues-event-driven": "field-dist-sys",
 };
 
 export const TopicKnowledgeGraph: React.FC = () => {
@@ -304,7 +355,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
       });
     });
 
-    // 2. Level 2: Field Nodes (12 fields, 3 per domain radiating outward)
+    // 2. Level 2: Field Nodes (12 fields, 3 per domain radiating outward with ample spread)
     const fieldDefinitions: Array<{
       id: string;
       domainId: string;
@@ -314,21 +365,21 @@ export const TopicKnowledgeGraph: React.FC = () => {
       dist: number;
     }> = [
       // Math
-      { id: "field-algebra", domainId: "math", name: "Đại Số Tuyến Tính", shortLabel: "ĐSTT", offsetAngle: -0.32, dist: 130 },
-      { id: "field-calculus", domainId: "math", name: "Giải Tích Nhiều Biến", shortLabel: "GT", offsetAngle: 0, dist: 155 },
-      { id: "field-optimization", domainId: "math", name: "Tối Ưu Hóa Vi Phân", shortLabel: "TƯH", offsetAngle: 0.32, dist: 130 },
+      { id: "field-algebra", domainId: "math", name: "Đại Số Tuyến Tính", shortLabel: "ĐSTT", offsetAngle: -0.46, dist: 140 },
+      { id: "field-calculus", domainId: "math", name: "Giải Tích Nhiều Biến", shortLabel: "GT", offsetAngle: 0, dist: 210 },
+      { id: "field-optimization", domainId: "math", name: "Tối Ưu Hóa Vi Phân", shortLabel: "TƯH", offsetAngle: 0.46, dist: 140 },
       // Discrete
-      { id: "field-graph-theory", domainId: "discrete", name: "Lý Thuyết Đồ Thị", shortLabel: "ĐTH", offsetAngle: -0.32, dist: 130 },
-      { id: "field-logic", domainId: "discrete", name: "Logic & Boole", shortLabel: "LOGIC", offsetAngle: 0, dist: 155 },
-      { id: "field-combinatorics", domainId: "discrete", name: "Tổ Hợp & Nhị Thức", shortLabel: "TỔ HỢP", offsetAngle: 0.32, dist: 130 },
+      { id: "field-graph-theory", domainId: "discrete", name: "Lý Thuyết Đồ Thị", shortLabel: "ĐTH", offsetAngle: -0.46, dist: 140 },
+      { id: "field-logic", domainId: "discrete", name: "Logic & Boole", shortLabel: "LOGIC", offsetAngle: 0, dist: 210 },
+      { id: "field-combinatorics", domainId: "discrete", name: "Tổ Hợp & Nhị Thức", shortLabel: "TỔ HỢP", offsetAngle: 0.46, dist: 140 },
       // CV
-      { id: "field-neural-nets", domainId: "cv", name: "Mạng Tích Chập CNN", shortLabel: "CNN", offsetAngle: -0.32, dist: 130 },
-      { id: "field-image-proc", domainId: "cv", name: "Xử Lý & Lọc Biên", shortLabel: "LỌC", offsetAngle: 0, dist: 155 },
-      { id: "field-detection", domainId: "cv", name: "Nhận Diện & Detection", shortLabel: "YOLO", offsetAngle: 0.32, dist: 130 },
+      { id: "field-image-proc", domainId: "cv", name: "Xử Lý & Lọc Biên", shortLabel: "LỌC", offsetAngle: -0.46, dist: 140 },
+      { id: "field-neural-nets", domainId: "cv", name: "Mạng Tích Chập CNN", shortLabel: "CNN", offsetAngle: 0, dist: 210 },
+      { id: "field-detection", domainId: "cv", name: "Nhận Diện & Detection", shortLabel: "YOLO", offsetAngle: 0.46, dist: 140 },
       // CS
-      { id: "field-os", domainId: "cs", name: "Hệ Điều Hành & Con Trỏ", shortLabel: "HĐH", offsetAngle: -0.32, dist: 130 },
-      { id: "field-db", domainId: "cs", name: "Cơ Sở Dữ Liệu B-Tree", shortLabel: "CSDL", offsetAngle: 0, dist: 155 },
-      { id: "field-dist-sys", domainId: "cs", name: "Hệ Thống Phân Tán", shortLabel: "PHÂN TÁN", offsetAngle: 0.32, dist: 130 },
+      { id: "field-os", domainId: "cs", name: "Hệ Điều Hành & Con Trỏ", shortLabel: "HĐH", offsetAngle: -0.46, dist: 140 },
+      { id: "field-db", domainId: "cs", name: "Cơ Sở Dữ Liệu B-Tree", shortLabel: "CSDL", offsetAngle: 0, dist: 210 },
+      { id: "field-dist-sys", domainId: "cs", name: "Hệ Thống Phân Tán", shortLabel: "PHÂN TÁN", offsetAngle: 0.46, dist: 140 },
     ];
 
     fieldDefinitions.forEach((f) => {
@@ -363,32 +414,17 @@ export const TopicKnowledgeGraph: React.FC = () => {
       });
     });
 
-    // Helper: Map subject to field
+    // Helper: Map subject to field deterministically
     const assignSubjectToField = (topicId: string, domainId: string): string => {
-      if (domainId === "math") {
-        if (topicId.includes("gradient") || topicId.includes("hessian") || topicId.includes("taylor")) return "field-optimization";
-        if (topicId.includes("linear") || topicId.includes("eigenvalues") || topicId.includes("svd") || topicId.includes("gauss") || topicId.includes("gram")) return "field-algebra";
-        return "field-calculus";
-      }
-      if (domainId === "discrete") {
-        if (topicId.includes("logic") || topicId.includes("induction") || topicId.includes("equivalence")) return "field-logic";
-        if (topicId.includes("combinatorics") || topicId.includes("recurrence") || topicId.includes("pigeonhole")) return "field-combinatorics";
-        return "field-graph-theory";
-      }
-      if (domainId === "cv") {
-        if (topicId.includes("sobel") || topicId.includes("filtering") || topicId.includes("histogram") || topicId.includes("morphology")) return "field-image-proc";
-        if (topicId.includes("yolo") || topicId.includes("iou") || topicId.includes("rcnn") || topicId.includes("anchor")) return "field-detection";
-        return "field-neural-nets";
-      }
-      if (domainId === "cs") {
-        if (topicId.includes("btree") || topicId.includes("transaction") || topicId.includes("acid") || topicId.includes("indexing")) return "field-db";
-        if (topicId.includes("raft") || topicId.includes("cap") || topicId.includes("consensus") || topicId.includes("sharding")) return "field-dist-sys";
-        return "field-os";
-      }
+      if (TOPIC_TO_FIELD[topicId]) return TOPIC_TO_FIELD[topicId];
+      if (domainId === "math") return "field-algebra";
+      if (domainId === "discrete") return "field-graph-theory";
+      if (domainId === "cv") return "field-neural-nets";
+      if (domainId === "cs") return "field-os";
       return "field-algebra";
     };
 
-    // 3. Level 3: Subject Nodes (Môn học fanning outward)
+    // 3. Level 3: Subject Nodes & Colinear Satellites (Zero-collision ray architecture)
     fieldDefinitions.forEach((f) => {
       const domainCfg = DOMAIN_CONFIG[f.domainId];
       const domainX = domainCfg.dist * Math.cos(domainCfg.angle);
@@ -416,11 +452,19 @@ export const TopicKnowledgeGraph: React.FC = () => {
               },
             ];
 
+      const numSubs = subjectsToRender.length;
+      const angleOffsets =
+        numSubs === 3
+          ? [-0.26, 0, 0.26]
+          : numSubs === 4
+          ? [-0.36, -0.12, 0.12, 0.36]
+          : [0];
+
       subjectsToRender.forEach((sub: any, sIdx: number) => {
-        const totalSubs = subjectsToRender.length;
-        const subOffset = totalSubs === 1 ? 0 : (sIdx - (totalSubs - 1) / 2) * 0.22;
+        const subOffset = angleOffsets[sIdx] ?? (sIdx - (numSubs - 1) / 2) * 0.22;
         const subAngle = fieldAngle + subOffset;
-        const subDist = 95 + (sIdx % 2) * 24;
+        // Staggered distance to ensure neighboring subjects differ by >= 65px radially
+        const subDist = 90 + (sIdx % 3) * 65;
         const sx = fx + subDist * Math.cos(subAngle);
         const sy = fy + subDist * Math.sin(subAngle);
 
@@ -473,89 +517,93 @@ export const TopicKnowledgeGraph: React.FC = () => {
           isHierarchy: true,
         });
 
-        // 4. Level 4: Topic Group Nodes (Cụm kiến thức A, B)
-        const numGroups = 2;
-        for (let gIdx = 0; gIdx < numGroups; gIdx++) {
-          const gOffset = (gIdx - 0.5) * 0.44;
-          const gAngle = subAngle + gOffset;
-          const gx = sx + 40 * Math.cos(gAngle);
-          const gy = sy + 40 * Math.sin(gAngle);
+        // 4. Level 4: Topic Group Nodes (A, B) - strung colinearly along the needle ray
+        const modOffsets = [28, 48];
+        const gNodeIds: string[] = [];
+        for (let gIdx = 0; gIdx < 2; gIdx++) {
+          const gDist = modOffsets[gIdx];
+          const gx = sx + gDist * Math.cos(subAngle);
+          const gy = sy + gDist * Math.sin(subAngle);
           const gLetter = String.fromCharCode(65 + gIdx);
+          const gId = `group-${sub.id}-${gIdx}`;
+          gNodeIds.push(gId);
 
           const gNode: RadialGraphNode = {
-            id: `group-${sub.id}-${gIdx}`,
+            id: gId,
             level: 4,
             domainId: sub.domainId,
             fieldId: f.id,
             subjectId: sub.id,
             name: `${sub.title} • Module ${gLetter}`,
             shortLabel: gLetter,
-            r: 5.2,
+            r: 5,
             x: gx,
             y: gy,
             fx: gx,
             fy: gy,
-            targetRadius: 40,
-            targetAngle: gAngle,
+            targetRadius: gDist,
+            targetAngle: subAngle,
           };
 
           nodes.push(gNode);
           links.push({
             id: `link-sub-${subNode.id}-${gNode.id}`,
-            source: subNode.id,
+            source: gIdx === 0 ? subNode.id : gNodeIds[0],
             target: gNode.id,
             isHierarchy: true,
           });
+        }
 
-          // 5. Level 5: Micro-concept Leaves (Khái niệm nhỏ li ti)
-          const numConcepts = 3;
-          for (let cIdx = 0; cIdx < numConcepts; cIdx++) {
-            const cOffset = (cIdx - 1) * 0.25;
-            const cAngle = gAngle + cOffset;
-            const cx = gx + 26 * Math.cos(cAngle);
-            const cy = gy + 26 * Math.sin(cAngle);
+        // 5. Level 5: Micro-concept Leaves - strung colinearly along the needle ray
+        const cOffsets = [64, 74, 84];
+        let prevConceptId = gNodeIds[1];
+        for (let cIdx = 0; cIdx < 3; cIdx++) {
+          const cDist = cOffsets[cIdx];
+          const cx = sx + cDist * Math.cos(subAngle);
+          const cy = sy + cDist * Math.sin(subAngle);
 
-            let cStatus: RadialGraphNode["status"] = "UNLEARNED";
-            if (status === "GAP") {
-              cStatus = cIdx === 0 ? "GAP" : "UNLEARNED";
-            } else if (status === "MASTERED") {
-              cStatus = cIdx === 2 ? "UNLEARNED" : "MASTERED";
-            } else if (status === "ACTIVE") {
-              cStatus = cIdx === 0 ? "ACTIVE" : "UNLEARNED";
-            } else {
-              cStatus = "UNLEARNED";
-            }
-
-            const cName = sub.requiredConcepts?.[cIdx] || `${sub.title} • Khái niệm #${cIdx + 1}`;
-
-            const cNode: RadialGraphNode = {
-              id: `concept-${sub.id}-${gIdx}-${cIdx}`,
-              level: 5,
-              domainId: sub.domainId,
-              fieldId: f.id,
-              subjectId: sub.id,
-              name: cName,
-              shortLabel: "•",
-              status: cStatus,
-              clarityScore: cStatus === "MASTERED" ? 92 : cStatus === "GAP" ? 48 : cStatus === "ACTIVE" ? 75 : 0,
-              r: 2.8,
-              x: cx,
-              y: cy,
-              fx: cx,
-              fy: cy,
-              targetRadius: 26,
-              targetAngle: cAngle,
-              summary: sub.summary,
-            };
-
-            nodes.push(cNode);
-            links.push({
-              id: `link-grp-${gNode.id}-${cNode.id}`,
-              source: gNode.id,
-              target: cNode.id,
-              isHierarchy: true,
-            });
+          let cStatus: RadialGraphNode["status"] = "UNLEARNED";
+          if (status === "GAP") {
+            cStatus = cIdx === 0 ? "GAP" : "UNLEARNED";
+          } else if (status === "MASTERED") {
+            cStatus = cIdx === 2 ? "UNLEARNED" : "MASTERED";
+          } else if (status === "ACTIVE") {
+            cStatus = cIdx === 0 ? "ACTIVE" : "UNLEARNED";
+          } else {
+            cStatus = "UNLEARNED";
           }
+
+          const cName = sub.requiredConcepts?.[cIdx] || `${sub.title} • Khái niệm #${cIdx + 1}`;
+          const cId = `concept-${sub.id}-${cIdx}`;
+
+          const cNode: RadialGraphNode = {
+            id: cId,
+            level: 5,
+            domainId: sub.domainId,
+            fieldId: f.id,
+            subjectId: sub.id,
+            name: cName,
+            shortLabel: "•",
+            status: cStatus,
+            clarityScore: cStatus === "MASTERED" ? 92 : cStatus === "GAP" ? 48 : cStatus === "ACTIVE" ? 75 : 0,
+            r: 2.5,
+            x: cx,
+            y: cy,
+            fx: cx,
+            fy: cy,
+            targetRadius: cDist,
+            targetAngle: subAngle,
+            summary: sub.summary,
+          };
+
+          nodes.push(cNode);
+          links.push({
+            id: `link-c-${prevConceptId}-${cId}`,
+            source: prevConceptId,
+            target: cId,
+            isHierarchy: true,
+          });
+          prevConceptId = cId;
         }
       });
     });
@@ -874,8 +922,13 @@ export const TopicKnowledgeGraph: React.FC = () => {
         ctx.fillStyle = isActive ? "#ffffff" : "#8299E0";
         ctx.fill();
 
-        // Subject Name Pill radiating outward
-        const isRight = x >= 0;
+        // Subject Name Pill placed at the ray tip (faces outward into empty space, 0% overlap)
+        const subAngle = node.targetAngle ?? Math.atan2(y, x);
+        const tipDist = 96 / globalScale;
+        const tipX = x + tipDist * Math.cos(subAngle);
+        const tipY = y + tipDist * Math.sin(subAngle);
+        const isRight = tipX >= 0;
+
         const displayText =
           !isActive && node.name.length > 15
             ? node.name.slice(0, 14) + "…"
@@ -888,12 +941,12 @@ export const TopicKnowledgeGraph: React.FC = () => {
         const textMetrics = ctx.measureText(displayText);
         const textWidth = textMetrics.width;
         const textHeight = (isActive ? 13 : 10) / globalScale;
-        const textX = isRight ? x + r + 5 / globalScale : x - r - 5 / globalScale;
-        const textY = y;
+        const textX = isRight ? tipX + 4 / globalScale : tipX - 4 / globalScale;
+        const textY = tipY;
         const pillX = isRight ? textX - 2 / globalScale : textX - textWidth - 6 / globalScale;
 
         if (isActive) {
-          // Highlight badge for active/selected node
+          // Highlight badge at the ray tip
           ctx.save();
           ctx.shadowColor = "rgba(130, 153, 224, 0.35)";
           ctx.shadowBlur = 6 / globalScale;
@@ -922,9 +975,29 @@ export const TopicKnowledgeGraph: React.FC = () => {
           ctx.textAlign = isRight ? "left" : "right";
           ctx.textBaseline = "middle";
           ctx.fillText(displayText, isRight ? textX + 2 / globalScale : textX - 2 / globalScale, textY);
+
+          // Also draw floating focal title directly above the subject node for instant visual confirmation
+          const focalY = y - r - 8 / globalScale;
+          const focalMetrics = ctx.measureText(node.name);
+          const fw = focalMetrics.width;
+          const fh = 14 / globalScale;
+
+          ctx.fillStyle = "#8299E0";
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(x - fw / 2 - 5 / globalScale, focalY - fh / 2, fw + 10 / globalScale, fh, 4 / globalScale);
+          } else {
+            ctx.rect(x - fw / 2 - 5 / globalScale, focalY - fh / 2, fw + 10 / globalScale, fh);
+          }
+          ctx.fill();
+
+          ctx.fillStyle = "#ffffff";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(node.name, x, focalY);
         } else {
-          // Soft protective backdrop pill to prevent line bleed through
-          ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+          // Soft protective backdrop pill at the ray tip
+          ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
           ctx.beginPath();
           if (ctx.roundRect) {
             ctx.roundRect(
@@ -959,10 +1032,10 @@ export const TopicKnowledgeGraph: React.FC = () => {
       }
 
       // ==========================================
-      // LEVEL 4: TOPIC GROUP NODES (Nhóm Kiến Thức)
+      // LEVEL 4: TOPIC GROUP NODES (Nhóm Kiến Thức A, B)
       // ==========================================
       if (node.level === 4) {
-        const r = isActive ? 7 : (node.r ?? 5.2);
+        const r = isActive ? 7 : (node.r ?? 5);
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
         ctx.fillStyle = isActive ? "#8299E0" : "#ffffff";
@@ -991,7 +1064,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
       // LEVEL 5: MICRO-CONCEPT LEAVES (Chấm Tri Thức)
       // ==========================================
       if (node.level === 5) {
-        const r = isActive ? 4.5 : (node.r ?? 2.8);
+        const r = isActive ? 4 : (node.r ?? 2.5);
 
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
