@@ -14,7 +14,7 @@ import { getSubjectBySlug } from "@/data/three-tier-curriculum.data";
 import { PersonaAvatarCard } from "@/components/shared/PersonaAvatarCard";
 import { SupabaseService } from "@/lib/services/supabase-service";
 import { useStudyStore } from "@/hooks/useStudyStore";
-import { ArrowLeft, ArrowRight, Sparkles, BookOpen, Edit3 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Sparkles, BookOpen, Edit3, Sigma, Network, Eye, Cpu, Layers } from "lucide-react";
 
 export const StageSetup: React.FC = () => {
   const navigate = useNavigate();
@@ -30,6 +30,38 @@ export const StageSetup: React.FC = () => {
   const [selectedPersonaId, setSelectedPersonaId] = useState("");
   const [difficulty, setDifficulty] = useState<"EASY" | "MEDIUM" | "HARD">("MEDIUM");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedDomainTab, setSelectedDomainTab] = useState<string>("ALL");
+
+  const DOMAIN_TABS = [
+    { id: "ALL", label: "Tất cả khu vực", count: TOPICS_CATALOG.length, icon: Layers },
+    { id: "math", label: "Toán Cao Cấp", count: 10, icon: Sigma, color: "text-blue-600" },
+    { id: "discrete", label: "Toán Rời Rạc", count: 10, icon: Network, color: "text-emerald-600" },
+    { id: "cv", label: "Thị Giác Máy Tính", count: 10, icon: Eye, color: "text-purple-600" },
+    { id: "cs", label: "Hệ Thống CNTT", count: 10, icon: Cpu, color: "text-amber-600" },
+  ];
+
+  const filteredTopics = selectedDomainTab === "ALL"
+    ? TOPICS_CATALOG
+    : TOPICS_CATALOG.filter((t) => t.domainId === selectedDomainTab);
+
+  const getDifficultyBadge = (diff?: string, level?: number) => {
+    if (diff === "Beginner" || level === 1) {
+      return {
+        label: "Cơ bản",
+        classes: "bg-emerald-50 text-emerald-700 border-emerald-200/90",
+      };
+    }
+    if (diff === "Intermediate" || level === 3) {
+      return {
+        label: "Trung cấp",
+        classes: "bg-blue-50 text-blue-700 border-blue-200/90",
+      };
+    }
+    return {
+      label: "Nâng cao",
+      classes: "bg-purple-50 text-purple-700 border-purple-200/90",
+    };
+  };
 
   useEffect(() => {
     const list = getAllPersonas();
@@ -170,27 +202,102 @@ export const StageSetup: React.FC = () => {
             className="w-full px-5 py-3 rounded-2xl bg-[#F8FAFD] border border-[#E2EAFD] text-sm focus:outline-none focus:ring-2 focus:ring-[#8EA7E9]"
           />
 
-          {/* Gợi ý Preset Topics theo chuyên ngành */}
-          <div className="space-y-2.5 pt-1">
-            <span className="text-xs text-slate-500 font-bold block">
-              Gợi ý chủ đề Toán học & CNTT trọng tâm:
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {TOPICS_CATALOG.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setTopic(item.title)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
-                    topic === item.title
-                      ? "bg-[#EEF2FC] border-[#7286D3] text-[#5066A1] ring-1 ring-[#7286D3]"
-                      : "bg-[#F8FAFD] hover:bg-[#EEF2FC] text-slate-700 hover:text-[#5066A1] border-slate-200/80"
-                  }`}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#7286D3]" />
-                  <span>{item.title}</span>
-                </button>
-              ))}
+          {/* Gợi ý Preset Topics theo chuyên ngành & phân cấp độ */}
+          <div className="space-y-3.5 pt-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+              <span className="text-xs text-slate-700 font-extrabold flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-[#7286D3]" />
+                Gợi ý chủ đề Toán học & CNTT trọng tâm ({filteredTopics.length} chủ đề):
+              </span>
+              <span className="text-[11px] text-slate-400">
+                Click vào thẻ để tự động điền và chọn độ khó phù hợp
+              </span>
+            </div>
+
+            {/* Phân chia khu vực (Domain Tabs) */}
+            <div className="flex flex-wrap gap-1.5 p-1 rounded-2xl bg-[#F4F7FC] border border-[#E2EAFD]">
+              {DOMAIN_TABS.map((tab) => {
+                const IconComponent = tab.icon;
+                const isActive = selectedDomainTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setSelectedDomainTab(tab.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      isActive
+                        ? "bg-white text-slate-800 shadow-2xs border border-slate-200/80"
+                        : "text-slate-500 hover:text-slate-800 hover:bg-white/50"
+                    }`}
+                  >
+                    <IconComponent className={`w-3.5 h-3.5 ${tab.color || "text-slate-500"}`} />
+                    <span>{tab.label}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
+                        isActive ? "bg-slate-100 text-slate-700" : "bg-slate-200/60 text-slate-500"
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Danh sách chủ đề có gán nhãn cấp độ */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 max-h-96 overflow-y-auto pr-1">
+              {filteredTopics.map((item) => {
+                const badge = getDifficultyBadge(item.difficulty, item.difficultyLevel);
+                const isSelected = topic === item.title;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setTopic(item.title);
+                      // Tự động gợi ý mức độ khó phù hợp
+                      if (item.difficultyLevel === 1 || item.difficulty === "Beginner") {
+                        setDifficulty("EASY");
+                      } else if (item.difficultyLevel === 5 || item.difficulty === "Advanced") {
+                        setDifficulty("HARD");
+                      } else {
+                        setDifficulty("MEDIUM");
+                      }
+                    }}
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
+                      isSelected
+                        ? "bg-[#EEF2FC] border-[#7286D3] ring-2 ring-[#7286D3]/20 shadow-xs"
+                        : "bg-[#F8FAFD] hover:bg-white border-slate-200/80 hover:border-[#B5B2E8] shadow-2xs hover:shadow-xs"
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                            isSelected ? "bg-[#7286D3]" : "bg-slate-300"
+                          }`}
+                        />
+                        <span
+                          className={`text-xs font-bold truncate ${
+                            isSelected ? "text-[#5066A1]" : "text-slate-700"
+                          }`}
+                        >
+                          {item.title}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 block truncate pl-3">
+                        {item.domainName}
+                      </span>
+                    </div>
+
+                    <span
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-bold border shrink-0 ${badge.classes}`}
+                    >
+                      {badge.label}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
