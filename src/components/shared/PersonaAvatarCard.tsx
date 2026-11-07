@@ -12,7 +12,7 @@
 
 import React from "react";
 import type { PersonaDefinition } from "@/config/personas.config";
-import { Check, Sparkles, ShieldCheck, Compass } from "lucide-react";
+import { Check, Sparkles, ShieldCheck } from "lucide-react";
 
 interface PersonaAvatarCardProps {
   persona: PersonaDefinition;
@@ -120,22 +120,22 @@ export const PersonaAvatarCard: React.FC<PersonaAvatarCardProps> = ({
 
         {/* 3. Sở thích */}
         <div className="text-xs leading-relaxed text-slate-600 bg-slate-50/70 p-3 rounded-2xl border border-slate-100">
-          <div className="flex items-start gap-1.5">
-            <span className="font-bold text-slate-700 shrink-0">🎯 Sở thích:</span>
-            <span className="text-slate-600 line-clamp-2 leading-relaxed">
-              {hobbiesText}
-            </span>
-          </div>
+          <p className="leading-relaxed">
+            <span className="font-bold text-slate-700">Sở thích: </span>
+            <span className="text-slate-600">{hobbiesText}</span>
+          </p>
         </div>
       </div>
 
-      {/* 4. Lăng kính (tóm gọn) */}
-      <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-start gap-2 text-xs text-slate-600">
-        <Sparkles className="w-3.5 h-3.5 text-[#8EA7E9] shrink-0 mt-0.5" />
-        <div className="leading-relaxed min-w-0">
-          <span className="font-bold text-slate-700">Lăng kính: </span>
-          <span className="text-slate-500 line-clamp-2">{persona.worldview}</span>
+      {/* 4. Lăng kính (Hiển thị đầy đủ full text, chiều cao card tự động co giãn đồng bộ) */}
+      <div className="mt-4 pt-3.5 border-t border-slate-100 space-y-1 text-xs">
+        <div className="flex items-center gap-1.5 font-bold text-slate-700">
+          <Sparkles className="w-3.5 h-3.5 text-[#8EA7E9] shrink-0" />
+          <span>Lăng kính:</span>
         </div>
+        <p className="text-slate-600 leading-relaxed">
+          {persona.worldview}
+        </p>
       </div>
     </div>
   );
