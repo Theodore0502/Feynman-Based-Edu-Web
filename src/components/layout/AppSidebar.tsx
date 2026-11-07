@@ -77,12 +77,12 @@ export const AppSidebar: React.FC = () => {
           to="/about"
           className={cn(
             "flex items-center mb-6 group transition-all duration-300 overflow-hidden whitespace-nowrap",
-            isCollapsed ? "justify-center px-0 gap-0" : "gap-3 px-2"
+            isCollapsed ? "justify-center px-0 gap-0" : "gap-3 px-1"
           )}
           title="Khám phá triết lý học tập"
         >
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#7286D3] via-[#8EA7E9] to-[#FFB4B4] p-0.5 flex items-center justify-center shadow-xs transition-transform group-hover:scale-105 shrink-0">
-            <EliseCatMascot className="w-full h-full" />
+          <div className="w-12 h-12 flex items-center justify-center transition-transform duration-300 group-hover:scale-105 shrink-0">
+            <EliseCatMascot className="w-full h-full drop-shadow-xs" />
           </div>
           <span
             className={cn(
