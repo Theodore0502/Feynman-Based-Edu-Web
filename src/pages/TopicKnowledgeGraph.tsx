@@ -131,42 +131,60 @@ export const TopicKnowledgeGraph: React.FC = () => {
   const navigate = useNavigate();
   const { selectTopic } = useStudyStore();
   const fgRef = useRef<ForceGraphMethods | undefined>(undefined);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Active / Selected Node State
   const [selectedNode, setSelectedNode] = useState<RadialGraphNode | null>(null);
   const [hoveredNode, setHoveredNode] = useState<RadialGraphNode | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+  const [zoomLevel, setZoomLevel] = useState<number>(0.85);
 
-  // Responsive dimensions
+  // Responsive dimensions measured directly from container
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({
-    width: typeof window !== "undefined" ? window.innerWidth - 260 : 1200,
-    height: typeof window !== "undefined" ? window.innerHeight - 80 : 800,
+    width: 1200,
+    height: 800,
   });
 
+  // Track container dimensions with ResizeObserver for full responsiveness
   useEffect(() => {
-    const handleResize = () => {
-      const sidebar = document.querySelector("aside");
-      const sidebarWidth = sidebar ? sidebar.getBoundingClientRect().width : 256;
-      setDimensions({
-        width: Math.max(800, window.innerWidth - sidebarWidth),
-        height: Math.max(620, window.innerHeight - 80),
-      });
-    };
+    const container = containerRef.current;
+    if (!container) return;
 
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          setDimensions({ width, height });
+        }
+      }
+    });
+
+    ro.observe(container);
+    return () => ro.disconnect();
   }, []);
 
-  // Initial Camera position: Left-anchored core, viewing fan spreading to the right
+  // Strict Pinning of Center: Always lock world (0,0) to left edge (px = 0) and vertical center
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (fgRef.current) {
-        fgRef.current.centerAt(380, 0, 700);
-        fgRef.current.zoom(0.82, 700);
-      }
-    }, 250);
-    return () => clearTimeout(timer);
+    if (fgRef.current && dimensions.width > 0) {
+      const targetX = dimensions.width / (2 * zoomLevel);
+      fgRef.current.zoom(zoomLevel, 0);
+      fgRef.current.centerAt(targetX, 0, 0);
+    }
+  }, [dimensions.width, dimensions.height, zoomLevel]);
+
+  // Non-passive wheel event: Allows zooming in/out smoothly while preventing position movement
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+      setZoomLevel((prev) => Math.min(Math.max(prev * zoomFactor, 0.45), 2.8));
+    };
+
+    container.addEventListener("wheel", onWheel, { passive: false });
+    return () => container.removeEventListener("wheel", onWheel);
   }, []);
 
   // Build Hierarchical Radial Dendrogram Dataset
@@ -502,42 +520,29 @@ export const TopicKnowledgeGraph: React.FC = () => {
     }
   }, []);
 
-  // Node Click handler
-  const handleNodeClick = useCallback(
-    (node: RadialGraphNode) => {
-      setSelectedNode(node);
-      focusOnNode(node);
-
-      if (node.level === 3 || node.level === 5) {
-        setIsDrawerOpen(true);
-      }
-    },
-    [focusOnNode]
-  );
+  // Node Click handler: Select and open details, but keep center position pinned
+  const handleNodeClick = useCallback((node: RadialGraphNode) => {
+    setSelectedNode(node);
+    if (node.level === 3 || node.level === 5) {
+      setIsDrawerOpen(true);
+    }
+  }, []);
 
   const handleBackgroundClick = useCallback(() => {
     setSelectedNode(null);
   }, []);
 
+  // Zoom controls that strictly preserve center anchor
   const handleResetCamera = () => {
-    if (fgRef.current) {
-      fgRef.current.centerAt(380, 0, 700);
-      fgRef.current.zoom(0.82, 700);
-    }
+    setZoomLevel(0.85);
   };
 
   const handleZoomIn = () => {
-    if (fgRef.current) {
-      const curZoom = fgRef.current.zoom();
-      fgRef.current.zoom(curZoom * 1.3, 400);
-    }
+    setZoomLevel((prev) => Math.min(prev * 1.25, 2.8));
   };
 
   const handleZoomOut = () => {
-    if (fgRef.current) {
-      const curZoom = fgRef.current.zoom();
-      fgRef.current.zoom(curZoom / 1.3, 400);
-    }
+    setZoomLevel((prev) => Math.max(prev / 1.25, 0.45));
   };
 
   const handleTeachTopic = (topicName: string) => {
@@ -949,7 +954,10 @@ export const TopicKnowledgeGraph: React.FC = () => {
   );
 
   return (
-    <div className="relative w-full h-[calc(100vh-100px)] min-h-[640px] bg-[#f8fafc] rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden select-none">
+    <div
+      ref={containerRef}
+      className="relative w-full flex-1 h-[calc(100vh-130px)] min-h-[640px] bg-[#f8fafc] rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden select-none cursor-default"
+    >
       {/* 1. Main Interactive ForceGraph2D Canvas */}
       <ForceGraph2D
         ref={fgRef}
@@ -964,9 +972,9 @@ export const TopicKnowledgeGraph: React.FC = () => {
         onNodeClick={handleNodeClick as any}
         onNodeHover={(node) => setHoveredNode((node as RadialGraphNode) || null)}
         onBackgroundClick={handleBackgroundClick}
-        enableNodeDrag={true}
-        enableZoomInteraction={true}
-        enablePanInteraction={true}
+        enableNodeDrag={false}
+        enableZoomInteraction={false}
+        enablePanInteraction={false}
         cooldownTicks={1}
       />
 

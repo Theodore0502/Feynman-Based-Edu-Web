@@ -7,13 +7,17 @@
  */
 
 import React from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { TopHeader } from "@/components/layout/TopHeader";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { cn } from "@/lib/utils";
 
 export const WorkspaceLayout: React.FC = () => {
+  const location = useLocation();
+  const isTopicsPage = location.pathname.startsWith("/topics");
+
   return (
     <div className="h-screen bg-[#F3F6FA] flex overflow-hidden">
       {/* Tầng 1: Toast Sonner Toaster toàn cục */}
@@ -23,8 +27,19 @@ export const WorkspaceLayout: React.FC = () => {
       <AppSidebar />
 
       {/* Vùng Làm Việc Chính Cuộn Độc Lập */}
-      <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto h-screen">
-        <PageContainer>
+      <main
+        className={cn(
+          "flex-1 overflow-y-auto h-screen",
+          isTopicsPage
+            ? "p-4 sm:p-5 overflow-hidden flex flex-col"
+            : "p-4 sm:p-6 lg:p-8"
+        )}
+      >
+        <PageContainer
+          className={cn(
+            isTopicsPage && "max-w-none w-full pb-0 flex-1 flex flex-col space-y-3"
+          )}
+        >
           <TopHeader />
           <Outlet />
         </PageContainer>
@@ -32,4 +47,3 @@ export const WorkspaceLayout: React.FC = () => {
     </div>
   );
 };
-
