@@ -23,7 +23,8 @@ import {
   BookOpen, 
   ArrowUpRight, 
   ChevronRight,
-  Database
+  Database,
+  Trash2
 } from "lucide-react";
 
 export const CommandDashboard: React.FC = () => {
@@ -54,6 +55,15 @@ export const CommandDashboard: React.FC = () => {
     }
     loadData();
   }, []);
+
+  const handleDeleteSession = async (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (window.confirm("Bạn có chắc chắn muốn xóa bản ghi phiên học này không?")) {
+      await SupabaseService.deleteSession(id);
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+    }
+  };
 
   const sampleReport = {
     id: "rep-sample",
@@ -188,41 +198,59 @@ export const CommandDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {sessions.map((ses) => {
-                  const persona = getPersonaById(ses.personaId);
-                  return (
-                    <tr key={ses.id} className="hover:bg-[#F8FAFD] transition-colors">
-                      <td className="py-3 px-3 font-bold text-slate-800">{ses.topic}</td>
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-2">
-                          <img src={persona.avatar} alt="P" className="w-6 h-6 rounded-full object-cover" />
-                          <span className="font-semibold text-slate-700">{persona.name}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 font-bold text-[#5066A1]">
-                        {ses.clarityScore > 0 ? `${ses.clarityScore}%` : "Chưa chấm"}
-                      </td>
-                      <td className="py-3 px-3">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                          ses.status === "COMPLETED"
-                            ? "bg-[#E8F8F0] text-[#1E7E50]"
-                            : "bg-[#EEF2FC] text-[#5066A1]"
-                        }`}>
-                          {ses.status === "COMPLETED" ? "Đã xong" : "Đang học"}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <Link
-                          to={ses.status === "COMPLETED" ? `/stage/${ses.id}/report?topic=${encodeURIComponent(ses.topic)}` : `/stage/${ses.id}?topic=${encodeURIComponent(ses.topic)}&persona=${ses.personaId}`}
-                          className="inline-flex items-center gap-1 font-bold text-[#7286D3] hover:underline"
-                        >
-                          <span>{ses.status === "COMPLETED" ? "Xem báo cáo" : "Vào giảng bài"}</span>
-                          <ArrowUpRight className="w-3.5 h-3.5" />
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {sessions.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-slate-400">
+                      Chưa có phiên học nào. Bấm <span className="font-bold text-[#7286D3]">Giảng bài mới</span> để bắt đầu phiên học đầu tiên!
+                    </td>
+                  </tr>
+                ) : (
+                  sessions.map((ses) => {
+                    const persona = getPersonaById(ses.personaId);
+                    return (
+                      <tr key={ses.id} className="hover:bg-[#F8FAFD] transition-colors group">
+                        <td className="py-3 px-3 font-bold text-slate-800">{ses.topic}</td>
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-2">
+                            <img src={persona.avatar} alt="P" className="w-6 h-6 rounded-full object-cover" />
+                            <span className="font-semibold text-slate-700">{persona.name}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 font-bold text-[#5066A1]">
+                          {ses.clarityScore > 0 ? `${ses.clarityScore}%` : "Chưa chấm"}
+                        </td>
+                        <td className="py-3 px-3">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                            ses.status === "COMPLETED"
+                              ? "bg-[#E8F8F0] text-[#1E7E50]"
+                              : "bg-[#EEF2FC] text-[#5066A1]"
+                          }`}>
+                            {ses.status === "COMPLETED" ? "Đã xong" : "Đang học"}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <div className="inline-flex items-center gap-2 justify-end">
+                            <Link
+                              to={ses.status === "COMPLETED" ? `/stage/${ses.id}/report?topic=${encodeURIComponent(ses.topic)}` : `/stage/${ses.id}?topic=${encodeURIComponent(ses.topic)}&persona=${ses.personaId}`}
+                              className="inline-flex items-center gap-1 font-bold text-[#7286D3] hover:underline"
+                            >
+                              <span>{ses.status === "COMPLETED" ? "Xem báo cáo" : "Vào giảng bài"}</span>
+                              <ArrowUpRight className="w-3.5 h-3.5" />
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteSession(e, ses.id)}
+                              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all cursor-pointer"
+                              title="Xóa phiên học này"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>

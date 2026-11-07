@@ -14,16 +14,64 @@ import { supabase } from "@/lib/supabase";
 import type { FeynmanSession, ChatMessage, ReportData, VaultRecord } from "@/types/session.types";
 import type { AnalyticalResult } from "@/types/agent.types";
 
+const LOCAL_SESSIONS_STORAGE_KEY = "theodore_persistent_sessions";
+
+function getLocalSessions(): FeynmanSession[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_SESSIONS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveLocalSession(session: FeynmanSession) {
+  if (typeof window === "undefined") return;
+  try {
+    const current = getLocalSessions();
+    const idx = current.findIndex((s) => s.id === session.id);
+    let updated: FeynmanSession[];
+    if (idx >= 0) {
+      updated = [...current];
+      updated[idx] = { ...updated[idx], ...session };
+    } else {
+      updated = [session, ...current];
+    }
+    localStorage.setItem(LOCAL_SESSIONS_STORAGE_KEY, JSON.stringify(updated));
+  } catch (e) {
+    console.error("Lỗi lưu session local:", e);
+  }
+}
+
 export const SupabaseService = {
   /**
    * Tạo phiên giảng dạy mới
    */
-  async createSession(topic: string, personaId: string = "child_10yo", difficulty: string = "MEDIUM"): Promise<FeynmanSession> {
+  async createSession(
+    topic: string,
+    personaId: string = "child_10yo",
+    difficulty: string = "MEDIUM",
+    topicId?: string,
+    domainId?: string
+  ): Promise<FeynmanSession> {
+    const newSession: FeynmanSession = {
+      id: `ses_${Date.now()}`,
+      topic,
+      personaId,
+      difficulty: difficulty as "EASY" | "MEDIUM" | "HARD",
+      status: "ACTIVE",
+      clarityScore: 0,
+      createdAt: new Date().toISOString(),
+    };
+
     try {
       const { data, error } = await supabase
         .from("sessions")
         .insert({
           topic,
+          topic_id: topicId || null,
+          domain_id: domainId || null,
           persona_id: personaId,
           difficulty,
           status: "ACTIVE",
@@ -32,36 +80,24 @@ export const SupabaseService = {
         .select()
         .single();
 
-      if (error || !data) throw error;
-
-      return {
-        id: data.id,
-        topic: data.topic,
-        personaId: data.persona_id,
-        difficulty: data.difficulty,
-        status: data.status,
-        clarityScore: data.clarity_score,
-        createdAt: data.created_at,
-      };
+      if (!error && data) {
+        newSession.id = data.id;
+        newSession.createdAt = data.created_at;
+      }
     } catch (err) {
       console.warn("Supabase createSession fallback:", err);
-      // Fallback local memory ID
-      return {
-        id: `ses_${Date.now()}`,
-        topic,
-        personaId,
-        difficulty: difficulty as "EASY" | "MEDIUM" | "HARD",
-        status: "ACTIVE",
-        clarityScore: 0,
-        createdAt: new Date().toISOString(),
-      };
     }
+
+    // Luôn lưu session vào bộ nhớ bền vững phía client
+    saveLocalSession(newSession);
+    return newSession;
   },
 
   /**
    * Lấy danh sách các phiên giảng gần nhất
    */
-  async getSessions(limit: number = 10): Promise<FeynmanSession[]> {
+  async getSessions(limit: number = 20): Promise<FeynmanSession[]> {
+    let cloudSessions: FeynmanSession[] = [];
     try {
       const { data, error } = await supabase
         .from("sessions")
@@ -69,52 +105,146 @@ export const SupabaseService = {
         .order("created_at", { ascending: false })
         .limit(limit);
 
-      if (error || !data || data.length === 0) throw error;
-
-      return data.map((item: any) => ({
-        id: item.id,
-        topic: item.topic,
-        personaId: item.persona_id,
-        difficulty: item.difficulty,
-        status: item.status,
-        clarityScore: item.clarity_score,
-        createdAt: item.created_at,
-        report: item.evaluation_reports?.[0]
-          ? {
-              id: item.evaluation_reports[0].id,
-              sessionId: item.id,
-              clarityScore: item.evaluation_reports[0].clarity_score,
-              logicCompleteness: item.evaluation_reports[0].logic_completeness,
-              bestAnalogy: item.evaluation_reports[0].best_analogy,
-              knowledgeGaps: item.evaluation_reports[0].knowledge_gaps || [],
-              summaryFeedback: item.evaluation_reports[0].summary_feedback,
-              createdAt: item.evaluation_reports[0].created_at,
-            }
-          : null,
-      }));
+      if (!error && data && data.length > 0) {
+        cloudSessions = data.map((item: any) => ({
+          id: item.id,
+          topic: item.topic,
+          personaId: item.persona_id,
+          difficulty: item.difficulty,
+          status: item.status,
+          clarityScore: item.clarity_score,
+          createdAt: item.created_at,
+          report: item.evaluation_reports?.[0]
+            ? {
+                id: item.evaluation_reports[0].id,
+                sessionId: item.id,
+                clarityScore: item.evaluation_reports[0].clarity_score,
+                logicCompleteness: item.evaluation_reports[0].logic_completeness,
+                bestAnalogy: item.evaluation_reports[0].best_analogy,
+                knowledgeGaps: item.evaluation_reports[0].knowledge_gaps || [],
+                summaryFeedback: item.evaluation_reports[0].summary_feedback,
+                createdAt: item.evaluation_reports[0].created_at,
+              }
+            : null,
+        }));
+      }
     } catch (err) {
       console.warn("Supabase getSessions fallback:", err);
-      return [
-        {
-          id: "ses-1",
-          topic: "Cơ chế Docker Container",
-          personaId: "child_10yo",
-          difficulty: "MEDIUM",
-          status: "COMPLETED",
-          clarityScore: 84,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: "ses-2",
-          topic: "Lạm phát & Sức mua",
-          personaId: "non_tech",
-          difficulty: "MEDIUM",
-          status: "ACTIVE",
-          clarityScore: 72,
-          createdAt: new Date().toISOString(),
-        },
-      ];
     }
+
+    // Kết hợp dữ liệu từ Cloud và LocalStorage (chống mất session khi offline/chưa chạy migration)
+    const local = getLocalSessions();
+    const mergedMap = new Map<string, FeynmanSession>();
+
+    cloudSessions.forEach((s) => mergedMap.set(s.id, s));
+    local.forEach((s) => {
+      if (!mergedMap.has(s.id)) {
+        mergedMap.set(s.id, s);
+      }
+    });
+
+    const result = Array.from(mergedMap.values()).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    if (result.length > 0) {
+      return result.slice(0, limit);
+    }
+
+    // Các phiên học ban đầu nếu người dùng mới tinh chưa giảng bài nào
+    const initialSamples: FeynmanSession[] = [
+      {
+        id: "ses-sample-1",
+        topic: "Thuật Toán Hạ Độ Dốc (Gradient Descent)",
+        personaId: "child_10yo",
+        difficulty: "MEDIUM",
+        status: "COMPLETED",
+        clarityScore: 88,
+        createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
+      },
+      {
+        id: "ses-sample-2",
+        topic: "Công Nghệ Đóng Gói Docker Container",
+        personaId: "non_tech",
+        difficulty: "MEDIUM",
+        status: "COMPLETED",
+        clarityScore: 84,
+        createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
+      },
+      {
+        id: "ses-sample-3",
+        topic: "Lý Thuyết Đồ Thị & Thuật Toán Dijkstra",
+        personaId: "farmer",
+        difficulty: "HARD",
+        status: "ACTIVE",
+        clarityScore: 65,
+        createdAt: new Date().toISOString(),
+      },
+    ];
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem(LOCAL_SESSIONS_STORAGE_KEY, JSON.stringify(initialSamples));
+    }
+    return initialSamples;
+  },
+
+  /**
+   * Lấy chi tiết 1 phiên giảng theo ID
+   */
+  async getSessionById(id: string): Promise<FeynmanSession | null> {
+    try {
+      const { data, error } = await supabase
+        .from("sessions")
+        .select("*, evaluation_reports(*)")
+        .eq("id", id)
+        .single();
+
+      if (!error && data) {
+        return {
+          id: data.id,
+          topic: data.topic,
+          personaId: data.persona_id,
+          difficulty: data.difficulty,
+          status: data.status,
+          clarityScore: data.clarity_score,
+          createdAt: data.created_at,
+          report: data.evaluation_reports?.[0]
+            ? {
+                id: data.evaluation_reports[0].id,
+                sessionId: data.id,
+                clarityScore: data.evaluation_reports[0].clarity_score,
+                logicCompleteness: data.evaluation_reports[0].logic_completeness,
+                bestAnalogy: data.evaluation_reports[0].best_analogy,
+                knowledgeGaps: data.evaluation_reports[0].knowledge_gaps || [],
+                summaryFeedback: data.evaluation_reports[0].summary_feedback,
+                createdAt: data.evaluation_reports[0].created_at,
+              }
+            : null,
+        };
+      }
+    } catch (err) {
+      console.warn("Supabase getSessionById fallback:", err);
+    }
+
+    const local = getLocalSessions();
+    return local.find((s) => s.id === id) || null;
+  },
+
+  /**
+   * Xóa 1 phiên giảng
+   */
+  async deleteSession(id: string): Promise<boolean> {
+    try {
+      await supabase.from("sessions").delete().eq("id", id);
+    } catch (err) {
+      console.warn("Supabase deleteSession error:", err);
+    }
+
+    if (typeof window !== "undefined") {
+      const local = getLocalSessions().filter((s) => s.id !== id);
+      localStorage.setItem(LOCAL_SESSIONS_STORAGE_KEY, JSON.stringify(local));
+    }
+    return true;
   },
 
   /**
@@ -180,6 +310,17 @@ export const SupabaseService = {
     knowledgeGaps: string[],
     summaryFeedback: string
   ): Promise<ReportData> {
+    const reportData: ReportData = {
+      id: `rep_${Date.now()}`,
+      sessionId,
+      clarityScore,
+      logicCompleteness,
+      bestAnalogy,
+      knowledgeGaps,
+      summaryFeedback,
+      createdAt: new Date().toISOString(),
+    };
+
     try {
       const { data, error } = await supabase
         .from("evaluation_reports")
@@ -197,37 +338,39 @@ export const SupabaseService = {
         .select()
         .single();
 
-      // Đánh dấu session COMPLETED
+      if (!error && data) {
+        reportData.id = data.id;
+        reportData.createdAt = data.created_at;
+      }
+
+      // Đánh dấu session COMPLETED trên Supabase
       await supabase
         .from("sessions")
-        .update({ status: "COMPLETED", clarity_score: clarityScore })
+        .update({
+          status: "COMPLETED",
+          clarity_score: clarityScore,
+          best_analogy: bestAnalogy,
+          summary_feedback: summaryFeedback,
+          completed_at: new Date().toISOString(),
+        })
         .eq("id", sessionId);
-
-      if (error || !data) throw error;
-
-      return {
-        id: data.id,
-        sessionId: data.session_id,
-        clarityScore: data.clarity_score,
-        logicCompleteness: data.logic_completeness,
-        bestAnalogy: data.best_analogy,
-        knowledgeGaps: data.knowledge_gaps || [],
-        summaryFeedback: data.summary_feedback,
-        createdAt: data.created_at,
-      };
     } catch (err) {
       console.warn("Supabase saveEvaluationReport fallback:", err);
-      return {
-        id: `rep_${Date.now()}`,
-        sessionId,
-        clarityScore,
-        logicCompleteness,
-        bestAnalogy,
-        knowledgeGaps,
-        summaryFeedback,
-        createdAt: new Date().toISOString(),
-      };
     }
+
+    // Luôn cập nhật trạng thái session local thành COMPLETED
+    if (typeof window !== "undefined") {
+      const local = getLocalSessions();
+      const target = local.find((s) => s.id === sessionId);
+      if (target) {
+        target.status = "COMPLETED";
+        target.clarityScore = clarityScore;
+        target.report = reportData;
+        saveLocalSession(target);
+      }
+    }
+
+    return reportData;
   },
 
   /**
