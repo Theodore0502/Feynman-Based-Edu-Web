@@ -3,15 +3,17 @@
  * Mục đích: Màn hình Bản Đồ Tri Thức (Knowledge Graph) theo cấu trúc Bố Cục Tỏa Tròn (Radial Dendrogram)
  * học theo phong cách Cybernetic / Neural Dendrogram:
  *   - Lõi trung tâm ở rìa trái (Core Rim với vòng cung phát sáng đứt đoạn & nhãn mã hóa DE, FE, MATH...)
+ *   - Tâm vòng tròn ghim tuyệt đối tại mép trái và chính giữa theo trục dọc (X=0, Y=height/2)
  *   - Hệ thống quỹ đạo đồng tâm mảnh (Concentric Guide Orbits)
  *   - Phân cấp 5 tầng (Domain, Field, Subject, Topic Group, Micro-concept Leaves)
  *   - Bó sợi liên kết uốn cong Bézier mảnh như sợi quang (Fiber-optic Bundles)
  *   - Đường dẫn tín hiệu cảnh báo màu đỏ (Red Tracer Pathways) cho các lỗ hổng kiến thức
  *   - Các node lá dạng vòng tròn li ti (Hollow Ringlets & Pulse Dots)
  *   - BẢNG MÀU HỆ THỐNG: Giao diện sáng chuẩn Theodore (#f8fafc / trắng / slate / xanh / đỏ / ngọc), KHÔNG DÙNG MÀU ĐEN.
+ *   - Khóa kéo/pan màn hình, zoom to nhỏ mượt mà bảo toàn tâm.
  */
 
-import React, { useMemo, useState, useRef, useCallback, useEffect } from "react";
+import React, { useMemo, useState, useRef, useCallback, useEffect, useLayoutEffect } from "react";
 import ForceGraph2D, { ForceGraphMethods } from "react-force-graph-2d";
 import { useNavigate } from "react-router-dom";
 import {
@@ -68,15 +70,15 @@ export interface RadialGraphLink {
   isCrossLink?: boolean;
 }
 
-// Radial Dendrogram Orbit Radii (Origin centered at X=0, Y=0 on the left edge)
-const ORBIT_0_R = 170; // Core Arc Rim
-const ORBIT_1_R = 280; // Domain Hubs (Cấp 1)
-const ORBIT_2_R = 420; // Field Hubs (Cấp 2)
-const ORBIT_3_R = 580; // Subject Nodes (Cấp 3)
-const ORBIT_4_R = 730; // Topic Groups (Cấp 4)
-const ORBIT_5_R = 880; // Micro-concept Leaves (Cấp 5)
+// Proportional Orbit Radii (Balanced to fit comfortably inside any screen height)
+const ORBIT_0_R = 75;  // Core Arc Rim
+const ORBIT_1_R = 145; // Domain Hubs (Cấp 1)
+const ORBIT_2_R = 225; // Field Hubs (Cấp 2)
+const ORBIT_3_R = 315; // Subject Nodes (Cấp 3)
+const ORBIT_4_R = 395; // Topic Groups (Cấp 4)
+const ORBIT_5_R = 465; // Micro-concept Leaves (Cấp 5)
 
-// Domain Angular Sectors (Fanning out rightwards from -75° to +75°)
+// Domain Angular Sectors (Symmetrically balanced around 0 rad / horizontal center)
 const DOMAIN_CONFIG: Record<
   string,
   {
@@ -96,7 +98,7 @@ const DOMAIN_CONFIG: Record<
     color: "#2563eb", // Royal Blue
     lightColor: "#60a5fa",
     bgColor: "#eff6ff",
-    angle: -1.05, // ~ -60°
+    angle: -0.76, // ~ -43° (Upper quadrant)
   },
   discrete: {
     code: "DISC",
@@ -105,7 +107,7 @@ const DOMAIN_CONFIG: Record<
     color: "#059669", // Emerald
     lightColor: "#34d399",
     bgColor: "#ecfdf5",
-    angle: -0.35, // ~ -20°
+    angle: -0.25, // ~ -14° (Upper-mid)
   },
   cv: {
     code: "CV",
@@ -114,7 +116,7 @@ const DOMAIN_CONFIG: Record<
     color: "#7c3aed", // Violet / Purple
     lightColor: "#a78bfa",
     bgColor: "#f5f3ff",
-    angle: 0.35, // ~ +20°
+    angle: 0.25, // ~ +14° (Lower-mid)
   },
   cs: {
     code: "SYS",
@@ -123,7 +125,7 @@ const DOMAIN_CONFIG: Record<
     color: "#d97706", // Amber
     lightColor: "#fbbf24",
     bgColor: "#fffbeb",
-    angle: 1.05, // ~ +60°
+    angle: 0.76, // ~ +43° (Lower quadrant)
   },
 };
 
@@ -137,42 +139,78 @@ export const TopicKnowledgeGraph: React.FC = () => {
   const [selectedNode, setSelectedNode] = useState<RadialGraphNode | null>(null);
   const [hoveredNode, setHoveredNode] = useState<RadialGraphNode | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
-  const [zoomLevel, setZoomLevel] = useState<number>(0.85);
+  const [zoomLevel, setZoomLevel] = useState<number>(0.75);
 
-  // Responsive dimensions measured directly from container
+  // Exact measurement of container size
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({
-    width: 1200,
-    height: 800,
+    width: typeof window !== "undefined" ? Math.max(600, window.innerWidth - 300) : 1000,
+    height: typeof window !== "undefined" ? Math.max(450, window.innerHeight - 150) : 600,
   });
 
-  // Track container dimensions with ResizeObserver for full responsiveness
-  useEffect(() => {
+  // Track container dimensions via ResizeObserver
+  useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        if (width > 0 && height > 0) {
-          setDimensions({ width, height });
-        }
+    const update = () => {
+      const rect = container.getBoundingClientRect();
+      const w = Math.floor(rect.width);
+      const h = Math.floor(rect.height);
+      if (w > 0 && h > 0) {
+        setDimensions((prev) => (prev.width === w && prev.height === h ? prev : { width: w, height: h }));
       }
-    });
+    };
 
+    update();
+    const ro = new ResizeObserver(update);
     ro.observe(container);
     return () => ro.disconnect();
   }, []);
 
-  // Strict Pinning of Center: Always lock world (0,0) to left edge (px = 0) and vertical center
-  useEffect(() => {
-    if (fgRef.current && dimensions.width > 0) {
-      const targetX = dimensions.width / (2 * zoomLevel);
-      fgRef.current.zoom(zoomLevel, 0);
-      fgRef.current.centerAt(targetX, 0, 0);
-    }
-  }, [dimensions.width, dimensions.height, zoomLevel]);
+  // Strict Pinning of Center: Locks world (0,0) to Left Edge (X=0) and Exact Vertical Middle (Y=height/2)
+  const pinCamera = useCallback(
+    (zoom: number = zoomLevel) => {
+      if (fgRef.current && dimensions.width > 0 && dimensions.height > 0) {
+        const targetX = dimensions.width / (2 * zoom);
+        fgRef.current.zoom(zoom, 0);
+        fgRef.current.centerAt(targetX, 0, 0);
+      }
+    },
+    [dimensions.width, dimensions.height, zoomLevel]
+  );
 
-  // Non-passive wheel event: Allows zooming in/out smoothly while preventing position movement
+  // Apply pin on mount, resize, zoom
+  useEffect(() => {
+    if (dimensions.width > 0 && dimensions.height > 0) {
+      pinCamera();
+      const t1 = setTimeout(() => pinCamera(), 60);
+      const t2 = setTimeout(() => pinCamera(), 180);
+      const t3 = setTimeout(() => pinCamera(), 360);
+      const t4 = setTimeout(() => pinCamera(), 650);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+        clearTimeout(t4);
+      };
+    }
+  }, [dimensions.width, dimensions.height, zoomLevel, pinCamera]);
+
+  // Apply zoom safely while preserving the pinned center
+  const applyZoom = useCallback(
+    (newZoom: number) => {
+      const clamped = Math.min(Math.max(newZoom, 0.4), 2.2);
+      setZoomLevel(clamped);
+      if (fgRef.current && dimensions.width > 0 && dimensions.height > 0) {
+        const targetX = dimensions.width / (2 * clamped);
+        fgRef.current.zoom(clamped, 0);
+        fgRef.current.centerAt(targetX, 0, 0);
+      }
+    },
+    [dimensions.width, dimensions.height]
+  );
+
+  // Non-passive wheel event on container
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -180,26 +218,34 @@ export const TopicKnowledgeGraph: React.FC = () => {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
-      setZoomLevel((prev) => Math.min(Math.max(prev * zoomFactor, 0.45), 2.8));
+      setZoomLevel((prev) => {
+        const next = Math.min(Math.max(prev * zoomFactor, 0.4), 2.2);
+        if (fgRef.current && dimensions.width > 0 && dimensions.height > 0) {
+          const targetX = dimensions.width / (2 * next);
+          fgRef.current.zoom(next, 0);
+          fgRef.current.centerAt(targetX, 0, 0);
+        }
+        return next;
+      });
     };
 
     container.addEventListener("wheel", onWheel, { passive: false });
     return () => container.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [dimensions.width, dimensions.height]);
 
   // Build Hierarchical Radial Dendrogram Dataset
   const graphData = useMemo(() => {
     const nodes: RadialGraphNode[] = [];
     const links: RadialGraphLink[] = [];
 
-    // 0. Level 0: Core Node (Feynman Matrix Hub)
+    // 0. Level 0: Core Node (Feynman Matrix Hub at origin)
     nodes.push({
       id: "core-feynman",
       level: 0,
       name: "KHÔNG GIAN FEYNMAN",
       shortLabel: "FEYNMAN CORE",
       color: "#2563eb",
-      r: 38,
+      r: 36,
       x: 0,
       y: 0,
       fx: 0,
@@ -222,7 +268,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
         name: cfg.name,
         shortLabel: cfg.symbol,
         color: cfg.color,
-        r: 22,
+        r: 20,
         x,
         y,
         fx: x,
@@ -249,21 +295,21 @@ export const TopicKnowledgeGraph: React.FC = () => {
       offsetAngle: number;
     }> = [
       // Math
-      { id: "field-algebra", domainId: "math", name: "Đại Số Tuyến Tính", shortLabel: "ĐSTT", offsetAngle: -0.22 },
+      { id: "field-algebra", domainId: "math", name: "Đại Số Tuyến Tính", shortLabel: "ĐSTT", offsetAngle: -0.16 },
       { id: "field-calculus", domainId: "math", name: "Giải Tích Nhiều Biến", shortLabel: "GT", offsetAngle: 0 },
-      { id: "field-optimization", domainId: "math", name: "Tối Ưu Hóa Vi Phân", shortLabel: "TƯH", offsetAngle: 0.22 },
+      { id: "field-optimization", domainId: "math", name: "Tối Ưu Hóa Vi Phân", shortLabel: "TƯH", offsetAngle: 0.16 },
       // Discrete
-      { id: "field-graph-theory", domainId: "discrete", name: "Lý Thuyết Đồ Thị", shortLabel: "ĐTH", offsetAngle: -0.22 },
+      { id: "field-graph-theory", domainId: "discrete", name: "Lý Thuyết Đồ Thị", shortLabel: "ĐTH", offsetAngle: -0.16 },
       { id: "field-logic", domainId: "discrete", name: "Logic & Boole", shortLabel: "LOGIC", offsetAngle: 0 },
-      { id: "field-combinatorics", domainId: "discrete", name: "Tổ Hợp & Nhị Thức", shortLabel: "TỔ HỢP", offsetAngle: 0.22 },
+      { id: "field-combinatorics", domainId: "discrete", name: "Tổ Hợp & Nhị Thức", shortLabel: "TỔ HỢP", offsetAngle: 0.16 },
       // CV
-      { id: "field-neural-nets", domainId: "cv", name: "Mạng Tích Chập CNN", shortLabel: "CNN", offsetAngle: -0.22 },
+      { id: "field-neural-nets", domainId: "cv", name: "Mạng Tích Chập CNN", shortLabel: "CNN", offsetAngle: -0.16 },
       { id: "field-image-proc", domainId: "cv", name: "Xử Lý & Lọc Biên", shortLabel: "LỌC", offsetAngle: 0 },
-      { id: "field-detection", domainId: "cv", name: "Nhận Diện & Detection", shortLabel: "YOLO", offsetAngle: 0.22 },
+      { id: "field-detection", domainId: "cv", name: "Nhận Diện & Detection", shortLabel: "YOLO", offsetAngle: 0.16 },
       // CS
-      { id: "field-os", domainId: "cs", name: "Hệ Điều Hành & Con Trỏ", shortLabel: "HĐH", offsetAngle: -0.22 },
+      { id: "field-os", domainId: "cs", name: "Hệ Điều Hành & Con Trỏ", shortLabel: "HĐH", offsetAngle: -0.16 },
       { id: "field-db", domainId: "cs", name: "Cơ Sở Dữ Liệu B-Tree", shortLabel: "CSDL", offsetAngle: 0 },
-      { id: "field-dist-sys", domainId: "cs", name: "Hệ Thống Phân Tán", shortLabel: "PHÂN TÁN", offsetAngle: 0.22 },
+      { id: "field-dist-sys", domainId: "cs", name: "Hệ Thống Phân Tán", shortLabel: "PHÂN TÁN", offsetAngle: 0.16 },
     ];
 
     fieldDefinitions.forEach((f) => {
@@ -279,7 +325,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
         name: f.name,
         shortLabel: f.shortLabel,
         color: domainCfg.color,
-        r: 15,
+        r: 13,
         x,
         y,
         fx: x,
@@ -348,7 +394,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
 
       subjectsToRender.forEach((sub: any, sIdx: number) => {
         const totalSubs = subjectsToRender.length;
-        const subOffset = totalSubs === 1 ? 0 : (sIdx - (totalSubs - 1) / 2) * 0.085;
+        const subOffset = totalSubs === 1 ? 0 : (sIdx - (totalSubs - 1) / 2) * 0.055;
         const subAngle = fieldAngle + subOffset;
         const x = ORBIT_3_R * Math.cos(subAngle);
         const y = ORBIT_3_R * Math.sin(subAngle);
@@ -382,7 +428,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
           shortLabel: sub.title.slice(0, 10),
           status,
           clarityScore,
-          r: 13,
+          r: 11,
           x,
           y,
           fx: x,
@@ -405,7 +451,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
         // 4. Level 4: Topic Group Nodes (Cụm kiến thức)
         const numGroups = 2;
         for (let gIdx = 0; gIdx < numGroups; gIdx++) {
-          const gOffset = (gIdx - 0.5) * 0.038;
+          const gOffset = (gIdx - 0.5) * 0.026;
           const gAngle = subAngle + gOffset;
           const gx = ORBIT_4_R * Math.cos(gAngle);
           const gy = ORBIT_4_R * Math.sin(gAngle);
@@ -420,7 +466,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
             name: `${sub.title} • Module ${gLetter}`,
             shortLabel: gLetter,
             color: "#64748b",
-            r: 7,
+            r: 6,
             x: gx,
             y: gy,
             fx: gx,
@@ -440,7 +486,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
           // 5. Level 5: Micro-concept Leaves (Khái niệm nhỏ li ti xếp theo chùm)
           const numConcepts = 3;
           for (let cIdx = 0; cIdx < numConcepts; cIdx++) {
-            const cOffset = (cIdx - 1) * 0.016;
+            const cOffset = (cIdx - 1) * 0.011;
             const cAngle = gAngle + cOffset;
             const cx = ORBIT_5_R * Math.cos(cAngle);
             const cy = ORBIT_5_R * Math.sin(cAngle);
@@ -456,7 +502,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
               cStatus = "UNLEARNED";
             }
 
-            const cName = sub.requiredConcepts?.[cIdx] || `${sub.title} • Khái niệm con #${cIdx + 1}`;
+            const cName = sub.requiredConcepts?.[cIdx] || `${sub.title} • Khái niệm #${cIdx + 1}`;
 
             const cNode: RadialGraphNode = {
               id: `concept-${sub.id}-${gIdx}-${cIdx}`,
@@ -468,7 +514,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
               shortLabel: "•",
               status: cStatus,
               clarityScore: cStatus === "MASTERED" ? 92 : cStatus === "GAP" ? 48 : cStatus === "ACTIVE" ? 75 : 0,
-              r: 4.2,
+              r: 3.5,
               x: cx,
               y: cy,
               fx: cx,
@@ -511,16 +557,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
     return { nodes, links };
   }, []);
 
-  // Center camera to specific node
-  const focusOnNode = useCallback((node: RadialGraphNode) => {
-    if (fgRef.current && typeof node.x === "number" && typeof node.y === "number") {
-      fgRef.current.centerAt(node.x, node.y, 800);
-      const targetZoom = node.level >= 3 ? 1.5 : 1.05;
-      fgRef.current.zoom(targetZoom, 800);
-    }
-  }, []);
-
-  // Node Click handler: Select and open details, but keep center position pinned
+  // Node Click handler: Select and open details, keeping the center strictly pinned
   const handleNodeClick = useCallback((node: RadialGraphNode) => {
     setSelectedNode(node);
     if (node.level === 3 || node.level === 5) {
@@ -532,17 +569,16 @@ export const TopicKnowledgeGraph: React.FC = () => {
     setSelectedNode(null);
   }, []);
 
-  // Zoom controls that strictly preserve center anchor
   const handleResetCamera = () => {
-    setZoomLevel(0.85);
+    applyZoom(0.75);
   };
 
   const handleZoomIn = () => {
-    setZoomLevel((prev) => Math.min(prev * 1.25, 2.8));
+    applyZoom(zoomLevel * 1.25);
   };
 
   const handleZoomOut = () => {
-    setZoomLevel((prev) => Math.max(prev / 1.25, 0.45));
+    applyZoom(zoomLevel / 1.25);
   };
 
   const handleTeachTopic = (topicName: string) => {
@@ -560,7 +596,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
   const handleRenderFramePre = useCallback((ctx: CanvasRenderingContext2D, globalScale: number) => {
     ctx.save();
 
-    // 1. Concentric Guide Orbits (Light Slate / Indigo lines)
+    // 1. Concentric Guide Orbits
     const orbits = [
       { r: ORBIT_0_R, isRim: true },
       { r: ORBIT_1_R, isRim: false },
@@ -576,31 +612,30 @@ export const TopicKnowledgeGraph: React.FC = () => {
       ctx.arc(0, 0, orbit.r, -Math.PI / 2, Math.PI / 2);
 
       if (orbit.isRim) {
-        // Glowing Segmented Core Arc Rim (Inspired by reference image)
+        // Glowing Segmented Core Arc Rim
         ctx.strokeStyle = "#3b82f6";
-        ctx.lineWidth = 3 / globalScale;
-        ctx.setLineDash([70 / globalScale, 12 / globalScale, 130 / globalScale, 12 / globalScale]);
+        ctx.lineWidth = 2.5 / globalScale;
+        ctx.setLineDash([40 / globalScale, 8 / globalScale, 80 / globalScale, 8 / globalScale]);
         ctx.shadowColor = "rgba(59, 130, 246, 0.35)";
-        ctx.shadowBlur = 10 / globalScale;
+        ctx.shadowBlur = 8 / globalScale;
         ctx.stroke();
 
-        // Clear shadow for labels
         ctx.shadowBlur = 0;
         ctx.setLineDash([]);
 
-        // Sector Codes along the rim: DE, FE, MATH, CV, SYS
+        // Sector Codes along the rim: MATH, DISC, FE, CV, SYS
         const rimLabels = [
-          { text: "MATH", angle: -1.05 },
-          { text: "DISC", angle: -0.35 },
+          { text: "MATH", angle: -0.76 },
+          { text: "DISC", angle: -0.25 },
           { text: "FE", angle: 0 },
-          { text: "CV", angle: 0.35 },
-          { text: "SYS", angle: 1.05 },
+          { text: "CV", angle: 0.25 },
+          { text: "SYS", angle: 0.76 },
         ];
 
         rimLabels.forEach((lbl) => {
-          const lx = (ORBIT_0_R - 16) * Math.cos(lbl.angle);
-          const ly = (ORBIT_0_R - 16) * Math.sin(lbl.angle);
-          ctx.font = `bold ${8.5 / globalScale}px monospace`;
+          const lx = (ORBIT_0_R - 13) * Math.cos(lbl.angle);
+          const ly = (ORBIT_0_R - 13) * Math.sin(lbl.angle);
+          ctx.font = `bold ${7.5 / globalScale}px monospace`;
           ctx.fillStyle = "#64748b";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
@@ -608,23 +643,23 @@ export const TopicKnowledgeGraph: React.FC = () => {
         });
       } else {
         // Subtle guide orbits
-        ctx.strokeStyle = "rgba(148, 163, 184, 0.35)";
-        ctx.lineWidth = 0.8 / globalScale;
-        ctx.setLineDash([6 / globalScale, 6 / globalScale]);
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.3)";
+        ctx.lineWidth = 0.7 / globalScale;
+        ctx.setLineDash([5 / globalScale, 5 / globalScale]);
         ctx.shadowBlur = 0;
         ctx.stroke();
       }
     });
 
     // 2. Faint Radial Sector Separators
-    const sectorAngles = [-0.7, 0, 0.7];
+    const sectorAngles = [-0.5, 0, 0.5];
     sectorAngles.forEach((ang) => {
       ctx.beginPath();
       ctx.moveTo(ORBIT_0_R * Math.cos(ang), ORBIT_0_R * Math.sin(ang));
-      ctx.lineTo((ORBIT_5_R + 30) * Math.cos(ang), (ORBIT_5_R + 30) * Math.sin(ang));
-      ctx.strokeStyle = "rgba(203, 213, 225, 0.4)";
+      ctx.lineTo((ORBIT_5_R + 20) * Math.cos(ang), (ORBIT_5_R + 20) * Math.sin(ang));
+      ctx.strokeStyle = "rgba(203, 213, 225, 0.35)";
       ctx.lineWidth = 0.6 / globalScale;
-      ctx.setLineDash([4 / globalScale, 8 / globalScale]);
+      ctx.setLineDash([4 / globalScale, 6 / globalScale]);
       ctx.stroke();
     });
 
@@ -642,32 +677,34 @@ export const TopicKnowledgeGraph: React.FC = () => {
       ctx.save();
 
       // ==========================================
-      // LEVEL 0: CORE NODE (KHÔNG GIAN FEYNMAN)
+      // LEVEL 0: CORE NODE (KHÔNG GIAN FEYNMAN) - Bán Nguyệt Sát Mép Trái
       // ==========================================
       if (node.level === 0) {
-        const r = node.r ?? 38;
+        const r = node.r ?? 36;
         ctx.beginPath();
-        ctx.arc(x, y, r, 0, 2 * Math.PI);
+        // Draw exact semi-circle pointing rightward from x=0
+        ctx.arc(x, y, r, -Math.PI / 2, Math.PI / 2);
+        ctx.closePath();
         ctx.fillStyle = "#ffffff";
         ctx.shadowColor = "rgba(59, 130, 246, 0.25)";
-        ctx.shadowBlur = 12 / globalScale;
+        ctx.shadowBlur = 10 / globalScale;
         ctx.fill();
 
         ctx.strokeStyle = "#2563eb";
-        ctx.lineWidth = 3 / globalScale;
+        ctx.lineWidth = 2.5 / globalScale;
         ctx.stroke();
         ctx.shadowBlur = 0;
 
-        // Subtitle & Core Name
+        // Subtitle & Core Name (Aligned cleanly to the right of x=0)
         ctx.font = `bold ${6 / globalScale}px sans-serif`;
         ctx.fillStyle = "#3b82f6";
-        ctx.textAlign = "center";
+        ctx.textAlign = "left";
         ctx.textBaseline = "middle";
-        ctx.fillText("ELISE MATRIX", x, y - 7 / globalScale);
+        ctx.fillText("ELISE MATRIX", x + 8 / globalScale, y - 6 / globalScale);
 
         ctx.font = `900 ${8 / globalScale}px sans-serif`;
         ctx.fillStyle = "#0f172a";
-        ctx.fillText("FEYNMAN", x, y + 4 / globalScale);
+        ctx.fillText("FEYNMAN", x + 8 / globalScale, y + 5 / globalScale);
 
         ctx.restore();
         return;
@@ -677,31 +714,31 @@ export const TopicKnowledgeGraph: React.FC = () => {
       // LEVEL 1: DOMAIN HUBS (Nhóm Ngành)
       // ==========================================
       if (node.level === 1) {
-        const r = isHovered || isSelected ? 24 : (node.r ?? 22);
+        const r = isHovered || isSelected ? 22 : (node.r ?? 20);
 
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
         ctx.fillStyle = node.color || "#2563eb";
         ctx.shadowColor = `${node.color}55`;
-        ctx.shadowBlur = (isSelected ? 16 : 8) / globalScale;
+        ctx.shadowBlur = (isSelected ? 14 : 7) / globalScale;
         ctx.fill();
 
-        ctx.strokeStyle = isSelected ? "#ffffff" : "#ffffff";
-        ctx.lineWidth = 2.5 / globalScale;
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2 / globalScale;
         ctx.stroke();
         ctx.shadowBlur = 0;
 
         // Domain Symbol Icon
-        ctx.font = `bold ${12 / globalScale}px sans-serif`;
+        ctx.font = `bold ${11 / globalScale}px sans-serif`;
         ctx.fillStyle = "#ffffff";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(node.shortLabel || "∑", x, y);
 
         // Tooltip text below domain hub
-        ctx.font = `bold ${9 / globalScale}px sans-serif`;
+        ctx.font = `bold ${8.5 / globalScale}px sans-serif`;
         ctx.fillStyle = "#1e293b";
-        ctx.fillText(node.name, x, y + r + 13 / globalScale);
+        ctx.fillText(node.name, x, y + r + 11 / globalScale);
 
         ctx.restore();
         return;
@@ -711,23 +748,22 @@ export const TopicKnowledgeGraph: React.FC = () => {
       // LEVEL 2: FIELD NODES (Ngành Chuyên Môn)
       // ==========================================
       if (node.level === 2) {
-        const r = isHovered || isSelected ? 17 : (node.r ?? 15);
+        const r = isHovered || isSelected ? 15 : (node.r ?? 13);
 
-        // Hollow Circle Style (White body with colored border)
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
         ctx.fillStyle = "#ffffff";
         ctx.fill();
 
         ctx.strokeStyle = node.color || "#3b82f6";
-        ctx.lineWidth = (isSelected ? 3 : 2.2) / globalScale;
+        ctx.lineWidth = (isSelected ? 2.8 : 2) / globalScale;
         ctx.shadowColor = `${node.color}40`;
-        ctx.shadowBlur = (isSelected ? 10 : 4) / globalScale;
+        ctx.shadowBlur = (isSelected ? 8 : 3) / globalScale;
         ctx.stroke();
         ctx.shadowBlur = 0;
 
         // Abbreviation
-        ctx.font = `900 ${7.5 / globalScale}px sans-serif`;
+        ctx.font = `900 ${7 / globalScale}px sans-serif`;
         ctx.fillStyle = "#1e293b";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -741,7 +777,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
       // LEVEL 3: SUBJECT NODES (Môn Học - Hubs Tỏa Nhánh)
       // ==========================================
       if (node.level === 3) {
-        const r = isHovered || isSelected ? 15 : (node.r ?? 13);
+        const r = isHovered || isSelected ? 13 : (node.r ?? 11);
 
         let fill = "#ffffff";
         let stroke = "#94a3b8";
@@ -749,25 +785,21 @@ export const TopicKnowledgeGraph: React.FC = () => {
         let glowColor = "transparent";
 
         if (node.status === "GAP") {
-          // Lỗ hổng kiến thức -> Đỏ sáng phát quang (như chấm đỏ trong ảnh mẫu)
           fill = "#ef4444";
           stroke = "#b91c1c";
           textColor = "#ffffff";
           glowColor = "rgba(239, 68, 68, 0.45)";
         } else if (node.status === "MASTERED") {
-          // Đã thông thạo -> Xanh ngọc
           fill = "#10b981";
           stroke = "#047857";
           textColor = "#ffffff";
           glowColor = "rgba(16, 185, 129, 0.3)";
         } else if (node.status === "ACTIVE") {
-          // Đang học -> Vàng hổ phách
           fill = "#f59e0b";
           stroke = "#b45309";
           textColor = "#ffffff";
           glowColor = "rgba(245, 158, 11, 0.35)";
         } else {
-          // Chưa học -> Vòng tròn trắng viền xám (Hollow)
           fill = "#ffffff";
           stroke = "#94a3b8";
           textColor = "#475569";
@@ -778,27 +810,27 @@ export const TopicKnowledgeGraph: React.FC = () => {
         ctx.fillStyle = fill;
         if (glowColor !== "transparent") {
           ctx.shadowColor = glowColor;
-          ctx.shadowBlur = 12 / globalScale;
+          ctx.shadowBlur = 10 / globalScale;
         }
         ctx.fill();
 
         ctx.strokeStyle = stroke;
-        ctx.lineWidth = (isSelected ? 3 : 2) / globalScale;
+        ctx.lineWidth = (isSelected ? 2.5 : 1.8) / globalScale;
         ctx.stroke();
         ctx.shadowBlur = 0;
 
-        // Inner center indicator dot
+        // Inner indicator dot
         ctx.beginPath();
-        ctx.arc(x, y, 3 / globalScale, 0, 2 * Math.PI);
+        ctx.arc(x, y, 2.5 / globalScale, 0, 2 * Math.PI);
         ctx.fillStyle = textColor;
         ctx.fill();
 
         // Subject Name Pill beside node
-        ctx.font = `600 ${8 / globalScale}px sans-serif`;
+        ctx.font = `600 ${7.5 / globalScale}px sans-serif`;
         ctx.fillStyle = "#334155";
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
-        ctx.fillText(node.name, x + r + 6 / globalScale, y);
+        ctx.fillText(node.name, x + r + 5 / globalScale, y);
 
         ctx.restore();
         return;
@@ -808,17 +840,17 @@ export const TopicKnowledgeGraph: React.FC = () => {
       // LEVEL 4: TOPIC GROUP NODES (Nhóm Kiến Thức)
       // ==========================================
       if (node.level === 4) {
-        const r = node.r ?? 7;
+        const r = node.r ?? 6;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
         ctx.fillStyle = "#ffffff";
         ctx.fill();
 
         ctx.strokeStyle = isSelected ? "#2563eb" : "#64748b";
-        ctx.lineWidth = 1.5 / globalScale;
+        ctx.lineWidth = 1.3 / globalScale;
         ctx.stroke();
 
-        ctx.font = `bold ${6 / globalScale}px sans-serif`;
+        ctx.font = `bold ${5.5 / globalScale}px sans-serif`;
         ctx.fillStyle = "#475569";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -832,46 +864,42 @@ export const TopicKnowledgeGraph: React.FC = () => {
       // LEVEL 5: MICRO-CONCEPT LEAVES (Chấm Tri Thức Li Ti)
       // ==========================================
       if (node.level === 5) {
-        const r = isHovered || isSelected ? 6.5 : (node.r ?? 4.2);
+        const r = isHovered || isSelected ? 5.5 : (node.r ?? 3.5);
 
         if (node.status === "GAP") {
-          // Lỗ hổng -> Chấm đỏ neon phát sáng rực rỡ
           ctx.beginPath();
           ctx.arc(x, y, r, 0, 2 * Math.PI);
           ctx.fillStyle = "#ef4444";
           ctx.shadowColor = "rgba(239, 68, 68, 0.6)";
-          ctx.shadowBlur = 10 / globalScale;
+          ctx.shadowBlur = 8 / globalScale;
           ctx.fill();
 
           ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 1.2 / globalScale;
+          ctx.lineWidth = 1 / globalScale;
           ctx.stroke();
           ctx.shadowBlur = 0;
         } else if (node.status === "MASTERED") {
-          // Thông thạo -> Chấm xanh ngọc đặc
           ctx.beginPath();
           ctx.arc(x, y, r, 0, 2 * Math.PI);
           ctx.fillStyle = "#10b981";
           ctx.fill();
 
           ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 1 / globalScale;
+          ctx.lineWidth = 0.8 / globalScale;
           ctx.stroke();
         } else if (node.status === "ACTIVE") {
-          // Đang học -> Chấm vàng hổ phách
           ctx.beginPath();
           ctx.arc(x, y, r, 0, 2 * Math.PI);
           ctx.fillStyle = "#f59e0b";
           ctx.fill();
         } else {
-          // Chưa học -> Vòng tròn rỗng (Hollow Ringlet) màu trắng viền xám mảnh
           ctx.beginPath();
           ctx.arc(x, y, r, 0, 2 * Math.PI);
           ctx.fillStyle = "#ffffff";
           ctx.fill();
 
           ctx.strokeStyle = "#94a3b8";
-          ctx.lineWidth = 1.2 / globalScale;
+          ctx.lineWidth = 1 / globalScale;
           ctx.stroke();
         }
 
@@ -924,27 +952,22 @@ export const TopicKnowledgeGraph: React.FC = () => {
       ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, target.x, target.y);
 
       if (isConnectedToSelected) {
-        // Active Selected Focus: Royal Blue
         ctx.strokeStyle = "#2563eb";
-        ctx.lineWidth = 2.4 / globalScale;
+        ctx.lineWidth = 2.2 / globalScale;
         ctx.shadowColor = "rgba(37, 99, 235, 0.35)";
-        ctx.shadowBlur = 6 / globalScale;
+        ctx.shadowBlur = 5 / globalScale;
       } else if (target.status === "GAP") {
-        // Red Tracer Pathway (Lỗ hổng kiến thức dẫn truyền từ rễ ra lá)
         ctx.strokeStyle = "rgba(239, 68, 68, 0.7)";
-        ctx.lineWidth = 1.4 / globalScale;
+        ctx.lineWidth = 1.3 / globalScale;
       } else if (target.status === "ACTIVE") {
-        // Amber Pathway
         ctx.strokeStyle = "rgba(245, 158, 11, 0.55)";
-        ctx.lineWidth = 1.2 / globalScale;
+        ctx.lineWidth = 1.1 / globalScale;
       } else if (link.isPrereq) {
-        // Prerequisite Cross-links: Indigo
         ctx.strokeStyle = "rgba(99, 102, 241, 0.4)";
-        ctx.lineWidth = 1.2 / globalScale;
+        ctx.lineWidth = 1.1 / globalScale;
       } else {
-        // Hair-thin delicate fiber threads (như sợi quang học trong ảnh mẫu)
         ctx.strokeStyle = "rgba(148, 163, 184, 0.28)";
-        ctx.lineWidth = 0.75 / globalScale;
+        ctx.lineWidth = 0.7 / globalScale;
       }
 
       ctx.stroke();
@@ -956,13 +979,13 @@ export const TopicKnowledgeGraph: React.FC = () => {
   return (
     <div
       ref={containerRef}
-      className="relative w-full flex-1 h-[calc(100vh-130px)] min-h-[640px] bg-[#f8fafc] rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden select-none cursor-default"
+      className="relative w-full flex-1 h-full min-h-0 bg-[#f8fafc] rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden select-none cursor-default"
     >
       {/* 1. Main Interactive ForceGraph2D Canvas */}
       <ForceGraph2D
         ref={fgRef}
-        width={dimensions.width}
-        height={dimensions.height}
+        width={dimensions.width || 800}
+        height={dimensions.height || 600}
         graphData={graphData}
         backgroundColor="#f8fafc"
         nodeId="id"
@@ -972,6 +995,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
         onNodeClick={handleNodeClick as any}
         onNodeHover={(node) => setHoveredNode((node as RadialGraphNode) || null)}
         onBackgroundClick={handleBackgroundClick}
+        onEngineStop={() => pinCamera()}
         enableNodeDrag={false}
         enableZoomInteraction={false}
         enablePanInteraction={false}
@@ -1032,7 +1056,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
           <button
             onClick={handleResetCamera}
             className="p-1.5 rounded-xl hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
-            title="Căn giữa lại toàn bộ đồ thị"
+            title="Căn lại góc nhìn chuẩn"
           >
             <RotateCcw className="w-4 h-4" />
           </button>

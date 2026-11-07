@@ -31,13 +31,13 @@ export const WorkspaceLayout: React.FC = () => {
         className={cn(
           "flex-1 overflow-y-auto h-screen",
           isTopicsPage
-            ? "p-4 sm:p-5 overflow-hidden flex flex-col"
+            ? "p-3 sm:p-4 overflow-hidden flex flex-col h-screen"
             : "p-4 sm:p-6 lg:p-8"
         )}
       >
         <PageContainer
           className={cn(
-            isTopicsPage && "max-w-none w-full pb-0 flex-1 flex flex-col space-y-3"
+            isTopicsPage && "max-w-none w-full pb-0 flex-1 flex flex-col space-y-2 min-h-0 h-full"
           )}
         >
           <TopHeader />
