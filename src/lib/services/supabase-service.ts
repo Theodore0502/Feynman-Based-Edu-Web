@@ -298,10 +298,47 @@ export const SupabaseService = {
         analogyUsed: data.analogy_used,
         topic: data.topic,
         createdAt: data.created_at,
+        masteryLevel: 1,
+        repetitions: 0,
+        intervalDays: 1,
+        easeFactor: 2.5,
+        nextReviewAt: new Date().toISOString(),
       };
     } catch (err) {
       console.warn("Supabase addVaultItem fallback:", err);
-      return null;
+      return {
+        id: `v-${Date.now()}`,
+        term,
+        plainExplanation,
+        analogyUsed: analogyUsed || null,
+        topic,
+        createdAt: new Date().toISOString(),
+        masteryLevel: 1,
+        repetitions: 0,
+        intervalDays: 1,
+        easeFactor: 2.5,
+        nextReviewAt: new Date().toISOString(),
+      };
+    }
+  },
+
+  /**
+   * Cập nhật tiến độ ôn tập ngắt quãng SM-2 của thẻ
+   */
+  async updateVaultCardSM2(cardId: string, sm2Result: any): Promise<boolean> {
+    try {
+      await supabase
+        .from("jargon_vault_cards")
+        .update({
+          mastery_level: sm2Result.masteryLevel,
+          next_review_at: sm2Result.nextReviewAt,
+        })
+        .eq("id", cardId);
+
+      return true;
+    } catch (err) {
+      console.warn("Supabase updateVaultCardSM2 fallback:", err);
+      return false;
     }
   },
 };

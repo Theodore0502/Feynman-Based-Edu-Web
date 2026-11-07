@@ -15,7 +15,8 @@ export type ModalType =
   | "QUICK_DRILL"
   | "VOICE_CALIBRATION"
   | "SHARE_MASTERY"
-  | "END_STAGE_CONFIRM";
+  | "END_STAGE_CONFIRM"
+  | "HELP_FEEDBACK";
 
 interface ModalState {
   activeModal: ModalType | null;

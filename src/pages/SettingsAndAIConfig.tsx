@@ -26,8 +26,8 @@ export const SettingsAndAIConfig: React.FC = () => {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h3 className="text-xl font-black text-slate-800">Cài Đặt Hệ Thống & AI Config</h3>
-        <p className="text-xs text-slate-500">Tùy chỉnh thông số tác nhân AI và thiết bị thu âm</p>
+        <h3 className="text-xl font-black text-slate-800">Thiết Lập Hệ Thống & Cấu Hình AI</h3>
+        <p className="text-xs text-slate-500">Tùy chỉnh thông số mô hình AI phản biện và thiết bị thu âm giọng nói</p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
@@ -52,7 +52,7 @@ export const SettingsAndAIConfig: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5">Tên Model</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">Tên Mô Hình (Model)</label>
               <input
                 type="text"
                 value={model}
@@ -64,8 +64,8 @@ export const SettingsAndAIConfig: React.FC = () => {
 
           <div>
             <div className="flex items-center justify-between text-xs font-bold text-slate-700 mb-1">
-              <span>Nhiệt độ phân tích ngầm (Temperature): {temp}</span>
-              <span className="text-[10px] text-slate-400">Thấp: Chính xác cao, ít bịa đặt</span>
+              <span>Nhiệt độ sáng tạo (Temperature): {temp}</span>
+              <span className="text-[10px] text-slate-400">Thấp: Chính xác cao, bám sát Ground Truth</span>
             </div>
             <input
               type="range"
@@ -80,7 +80,7 @@ export const SettingsAndAIConfig: React.FC = () => {
 
           <div className="flex items-center gap-2 p-3 rounded-2xl bg-[#E8F8F0] border border-[#BDE8D2] text-xs text-[#1E7E50]">
             <ShieldCheck className="w-4 h-4 shrink-0" />
-            <span>GEMINI_API_KEY đã được nạp sẵn từ tệp .env nội bộ của bạn.</span>
+            <span>GEMINI_API_KEY đã được nạp sẵn từ tệp cấu hình môi trường .env.</span>
           </div>
         </div>
 

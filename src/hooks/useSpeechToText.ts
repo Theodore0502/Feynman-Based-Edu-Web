@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { toast } from "sonner";
 
 // Định nghĩa giao diện nhận diện giọng nói chuẩn Webkit
 interface SpeechRecognitionEvent extends Event {
@@ -71,8 +72,18 @@ export function useSpeechToText(onTranscript?: (text: string) => void) {
         }
       };
 
-      recognition.onerror = () => {
+      recognition.onerror = (event: Event) => {
         setIsListening(false);
+        const errorMsg = (event as { error?: string }).error;
+        if (errorMsg === "not-allowed") {
+          toast.error("Không có quyền truy cập Micro", {
+            description: "Vui lòng cho phép quyền truy cập Micro trên trình duyệt để ghi âm.",
+          });
+        } else if (errorMsg && errorMsg !== "no-speech") {
+          toast.error("Lỗi nhận diện giọng nói", {
+            description: `Mã lỗi Web Speech: ${errorMsg}`,
+          });
+        }
       };
 
       recognition.onend = () => {
@@ -103,12 +114,18 @@ export function useSpeechToText(onTranscript?: (text: string) => void) {
   }, [isListening]);
 
   const toggleListening = useCallback(() => {
+    if (!isSupported) {
+      toast.error("Trình duyệt không hỗ trợ Web Speech API", {
+        description: "Vui lòng sử dụng Google Chrome hoặc Edge trên máy tính để thu âm trực tiếp.",
+      });
+      return;
+    }
     if (isListening) {
       stopListening();
     } else {
       startListening();
     }
-  }, [isListening, startListening, stopListening]);
+  }, [isSupported, isListening, startListening, stopListening]);
 
   return {
     isListening,

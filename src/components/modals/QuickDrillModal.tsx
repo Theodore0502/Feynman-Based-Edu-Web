@@ -38,7 +38,7 @@ export const QuickDrillModal: React.FC = () => {
               <Zap className="w-4 h-4 fill-[#E68A00]" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-800">Thử Thách 60s (Quick Drill)</h3>
+              <h3 className="text-base font-bold text-slate-800">Thử Thách 60 Giây</h3>
               <p className="text-xs text-slate-500">Rèn luyện phản xạ bình dân hóa tức thì</p>
             </div>
           </div>

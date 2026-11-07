@@ -11,6 +11,8 @@ import { Link } from "react-router-dom";
 import { ClarityMeter } from "@/components/shared/ClarityMeter";
 import { MasteryCardPreview } from "@/components/shared/MasteryCardPreview";
 import { useModalStore } from "@/hooks/useModalStore";
+import { useGamificationStore } from "@/hooks/useGamificationStore";
+import { useNotificationStore } from "@/hooks/useNotificationStore";
 import { getPersonaById } from "@/config/personas.config";
 import { SupabaseService } from "@/lib/services/supabase-service";
 import type { FeynmanSession, VaultRecord } from "@/types/session.types";
@@ -26,6 +28,7 @@ import {
 
 export const CommandDashboard: React.FC = () => {
   const { openModal } = useModalStore();
+  const { streakCount, currentLevel, levelTitle, totalXp } = useGamificationStore();
   const [sessions, setSessions] = useState<FeynmanSession[]>([]);
   const [vaultItems, setVaultItems] = useState<VaultRecord[]>([]);
 
@@ -38,6 +41,16 @@ export const CommandDashboard: React.FC = () => {
       ]);
       setSessions(fetchedSessions);
       setVaultItems(fetchedVault);
+
+      // Kiểm tra và đẩy thông báo tự động (Scheduled/On-load Notification)
+      // 1. Thẻ đến hạn ôn tập SM-2
+      const now = new Date();
+      const dueCards = (fetchedVault || []).filter(
+        (v) => v.nextReviewAt && new Date(v.nextReviewAt) <= now
+      );
+      if (dueCards.length > 0) {
+        useNotificationStore.getState().checkSRSDueNotifications(dueCards.length);
+      }
     }
     loadData();
   }, []);
@@ -71,17 +84,24 @@ export const CommandDashboard: React.FC = () => {
             </p>
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <Link
-                to="/stage/new"
+                to="/lectures"
+                className="px-5 py-2.5 rounded-2xl bg-white hover:bg-slate-50 text-[#5066A1] text-xs font-bold border border-[#E8EEF8] flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+              >
+                <BookOpen className="w-4 h-4" />
+                <span>Khám Phá Bài Giảng</span>
+              </Link>
+              <Link
+                to="/stage"
                 className="px-5 py-2.5 rounded-2xl bg-[#7286D3] hover:bg-[#5066A1] text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer"
               >
                 <Mic className="w-4 h-4" />
-                <span>Bắt Đầu Phiên Giảng Mới</span>
+                <span>Bắt Đầu Giảng Bài</span>
               </Link>
               <button
                 onClick={() => openModal("QUICK_DRILL")}
                 className="px-5 py-2.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-200/80 shadow-xs transition-all cursor-pointer"
               >
-                Thử Thách Nhanh 60s
+                Thử Thách 60 Giây
               </button>
             </div>
           </div>
@@ -89,7 +109,7 @@ export const CommandDashboard: React.FC = () => {
           {/* Quick Clarity Gauge */}
           <div className="shrink-0 bg-white/90 backdrop-blur-md p-5 rounded-3xl border border-[#E2EAFD] shadow-xs flex flex-col items-center">
             <ClarityMeter score={82} variant="circle" />
-            <span className="text-[11px] text-slate-500 font-semibold mt-2">Điểm Mạch Lạc Tuần Này</span>
+            <span className="text-[11px] text-slate-500 font-semibold mt-2">Độ Thấu Suốt Tuần Này</span>
           </div>
         </div>
       </div>
@@ -111,8 +131,8 @@ export const CommandDashboard: React.FC = () => {
             <Flame className="w-6 h-6 fill-[#FFA929] text-[#FFA929]" />
           </div>
           <div>
-            <span className="text-2xl font-black text-slate-800">14 Ngày</span>
-            <p className="text-xs text-slate-500 font-semibold">Chuỗi Rèn Luyện (Streak)</p>
+            <span className="text-2xl font-black text-slate-800">{streakCount} Ngày</span>
+            <p className="text-xs text-slate-500 font-semibold">Chuỗi Rèn Luyện (Cấp {currentLevel}: {levelTitle})</p>
           </div>
         </div>
 
@@ -122,7 +142,7 @@ export const CommandDashboard: React.FC = () => {
           </div>
           <div>
             <span className="text-2xl font-black text-slate-800">{vaultItems.length}</span>
-            <p className="text-xs text-slate-500 font-semibold">Thuật Ngữ Trong Vault</p>
+            <p className="text-xs text-slate-500 font-semibold">Thuật Ngữ Trong Sổ Tay</p>
           </div>
         </div>
       </div>
@@ -133,14 +153,14 @@ export const CommandDashboard: React.FC = () => {
         <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-[#E8EEF8] shadow-subtle space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-bold text-slate-800">Các Phiên Giảng Gần Đây (Supabase)</h3>
+              <h3 className="text-base font-bold text-slate-800">Các Phiên Giảng Gần Đây</h3>
               <p className="text-xs text-slate-500">Lịch sử rèn luyện phản xạ bình dân hóa lưu trữ trên đám mây</p>
             </div>
             <Link
               to="/stage/new"
               className="text-xs font-bold text-[#7286D3] hover:text-[#5066A1] flex items-center gap-1"
             >
-              <span>Tạo mới</span>
+              <span>Giảng bài mới</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -150,8 +170,8 @@ export const CommandDashboard: React.FC = () => {
               <thead>
                 <tr className="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   <th className="py-3 px-3">Chủ đề</th>
-                  <th className="py-3 px-3">Người nghe (Persona)</th>
-                  <th className="py-3 px-3">Độ rõ ràng</th>
+                  <th className="py-3 px-3">Khán giả AI</th>
+                  <th className="py-3 px-3">Độ thấu suốt</th>
                   <th className="py-3 px-3">Trạng thái</th>
                   <th className="py-3 px-3 text-right">Thao tác</th>
                 </tr>
@@ -185,7 +205,7 @@ export const CommandDashboard: React.FC = () => {
                           to={ses.status === "COMPLETED" ? `/stage/${ses.id}/report?topic=${encodeURIComponent(ses.topic)}` : `/stage/${ses.id}?topic=${encodeURIComponent(ses.topic)}&persona=${ses.personaId}`}
                           className="inline-flex items-center gap-1 font-bold text-[#7286D3] hover:underline"
                         >
-                          <span>{ses.status === "COMPLETED" ? "Báo cáo" : "Vào phòng"}</span>
+                          <span>{ses.status === "COMPLETED" ? "Xem báo cáo" : "Vào giảng bài"}</span>
                           <ArrowUpRight className="w-3.5 h-3.5" />
                         </Link>
                       </td>

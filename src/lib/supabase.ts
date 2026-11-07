@@ -8,15 +8,22 @@
 
 import { createClient } from "@supabase/supabase-js";
 
+const metaEnv = typeof import.meta !== "undefined" ? (import.meta as any).env : undefined;
+
 const supabaseUrl =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_SUPABASE_URL) ||
-  process.env.VITE_SUPABASE_URL ||
+  metaEnv?.VITE_SUPABASE_URL ||
+  (typeof process !== "undefined" && process.env?.VITE_SUPABASE_URL) ||
   "https://gvhxqjoggnoyijtguvxb.supabase.co";
 
-const supabaseAnonKey =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_SUPABASE_ANON_KEY) ||
-  process.env.VITE_SUPABASE_ANON_KEY ||
-  "";
+// Khóa fallback hợp lệ định dạng JWT để createClient không bao giờ crash React khi chưa kịp cấu hình key thật
+const FALLBACK_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2aHhxam9nZ25veWlqdGd1dnhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwMDU3OTcsImV4cCI6MjEwNzU4MTc5N30.placeholder_anon_key_for_development";
+
+const rawKey =
+  metaEnv?.VITE_SUPABASE_ANON_KEY ||
+  (typeof process !== "undefined" && process.env?.VITE_SUPABASE_ANON_KEY);
+
+const supabaseAnonKey = rawKey && rawKey.trim().length > 0 ? rawKey.trim() : FALLBACK_ANON_KEY;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 

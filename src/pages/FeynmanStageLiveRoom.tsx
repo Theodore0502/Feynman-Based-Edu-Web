@@ -15,9 +15,14 @@ import { LogicFlowMiniMap } from "@/components/stage/LogicFlowMiniMap";
 import { VoiceRecorderButton } from "@/components/shared/VoiceRecorderButton";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import { SupabaseService } from "@/lib/services/supabase-service";
+import { SpeakerScratchpadDrawer } from "@/components/study/SpeakerScratchpadDrawer";
+import { useGamificationStore } from "@/hooks/useGamificationStore";
+import { useNotificationStore } from "@/hooks/useNotificationStore";
+import { getSubjectBySlug } from "@/data/three-tier-curriculum.data";
+import { toast } from "sonner";
 import type { ChatMessage } from "@/types/session.types";
 import type { AnalyticalResult } from "@/types/agent.types";
-import { Send, ArrowLeft } from "lucide-react";
+import { Send, ArrowLeft, BookOpen, Edit3 } from "lucide-react";
 
 export const FeynmanStageLiveRoom: React.FC = () => {
   const navigate = useNavigate();
@@ -27,6 +32,9 @@ export const FeynmanStageLiveRoom: React.FC = () => {
 
   const initialTopic = searchParams.get("topic") || "Cơ chế Docker Container";
   const initialPersona = searchParams.get("persona") || "child_10yo";
+  const domain = searchParams.get("domain");
+  const subject = searchParams.get("subject");
+  const currentSubject = subject ? getSubjectBySlug(subject) : undefined;
 
   const [topic] = useState(initialTopic);
   const [personaId] = useState(initialPersona);
@@ -34,8 +42,22 @@ export const FeynmanStageLiveRoom: React.FC = () => {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [latestAnalysis, setLatestAnalysis] = useState<AnalyticalResult | null>(null);
+  const [isScratchpadOpen, setIsScratchpadOpen] = useState(false);
 
   const persona = getPersonaById(personaId);
+
+  // Điều hướng quay lại theo đúng trình tự cấp bậc
+  const handleGoBack = () => {
+    if (domain && subject) {
+      navigate(`/lectures/${domain}/${subject}`);
+    } else if (domain) {
+      navigate(`/lectures/${domain}`);
+    } else if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/lectures");
+    }
+  };
 
   const { isListening, toggleListening, isSupported } = useSpeechToText((text) =>
     setInput((prev) => (prev ? `${prev} ${text}` : text))
@@ -119,7 +141,35 @@ export const FeynmanStageLiveRoom: React.FC = () => {
       topic
     );
 
-    navigate(`/stage/${sessionId}/report?topic=${encodeURIComponent(topic)}&score=${score}`);
+    // Cập nhật chuỗi ngày và XP trong Gamification Store
+    useGamificationStore.getState().recordSessionComplete(score);
+
+    const reportParams = new URLSearchParams({
+      topic,
+      score: String(score),
+    });
+    if (domain) reportParams.set("domain", domain);
+    if (subject) reportParams.set("subject", subject);
+
+    // Kích hoạt Hệ Thống Thông Báo 2 Tầng:
+    // Tầng 2: Lưu vào Notification Center
+    useNotificationStore.getState().addNotification(
+      {
+        type: "REPORT_READY",
+        title: "Báo cáo Feynman đã sẵn sàng",
+        message: `Đã chấm xong bài giảng "${topic}". Điểm Clarity: ${score}/100.`,
+        actionUrl: `/stage/${sessionId}/report?${reportParams.toString()}`,
+        metadata: { score, topicId: sessionId },
+      },
+      false // Đã có Toast điều hướng bên dưới
+    );
+
+    // Tầng 1: Toast Sonner báo hoàn thành tức thời
+    toast.success("Buổi giảng đã hoàn tất!", {
+      description: `Báo cáo đánh giá đã sẵn sàng với điểm Clarity ${score}/100.`,
+    });
+
+    navigate(`/stage/${sessionId}/report?${reportParams.toString()}`);
   };
 
   return (
@@ -127,12 +177,18 @@ export const FeynmanStageLiveRoom: React.FC = () => {
       {/* Top Session Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-3xl border border-[#E8EEF8] shadow-subtle">
         <div className="flex items-center gap-3">
-          <Link
-            to="/dashboard"
-            className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 transition-colors"
+          <button
+            type="button"
+            onClick={handleGoBack}
+            className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+            title={
+              currentSubject
+                ? `Quay lại ${currentSubject.name}`
+                : "Quay lại danh sách bài giảng"
+            }
           >
             <ArrowLeft className="w-4 h-4" />
-          </Link>
+          </button>
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#7286D3]">
               Đang Giảng Giải Cho {persona.name} ({persona.title})
@@ -142,6 +198,14 @@ export const FeynmanStageLiveRoom: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 self-end sm:self-center">
+          <button
+            onClick={() => setIsScratchpadOpen(true)}
+            className="px-3.5 py-2 rounded-2xl bg-[#F8FAFD] hover:bg-[#EEF2FC] text-slate-700 hover:text-[#5066A1] font-bold text-xs border border-[#E2EAFD] transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <Edit3 className="w-3.5 h-3.5 text-[#7286D3]" />
+            <span>Xem Phao Dàn Ý</span>
+          </button>
+
           <button
             onClick={handleFinishSession}
             className="px-4 py-2 rounded-2xl bg-[#EEF2FC] hover:bg-[#D8E3FB] text-[#5066A1] font-bold text-xs border border-[#D5E1FA] transition-colors cursor-pointer"
@@ -199,6 +263,14 @@ export const FeynmanStageLiveRoom: React.FC = () => {
           onFinishSession={handleFinishSession}
         />
       </div>
+
+      {/* Slide-over Speaker Scratchpad Drawer */}
+      {isScratchpadOpen && (
+        <SpeakerScratchpadDrawer
+          mode="drawer"
+          onClose={() => setIsScratchpadOpen(false)}
+        />
+      )}
     </div>
   );
 };

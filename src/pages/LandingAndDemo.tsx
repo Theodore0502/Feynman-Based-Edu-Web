@@ -8,6 +8,7 @@
 
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { EliseCatMascot } from "@/components/shared/EliseCatMascot";
 import { DEFAULT_PERSONAS } from "@/config/personas.config";
 import { PersonaAvatarCard } from "@/components/shared/PersonaAvatarCard";
 import { VoiceRecorderButton } from "@/components/shared/VoiceRecorderButton";
@@ -40,13 +41,19 @@ export const LandingAndDemo: React.FC = () => {
       {/* Top Navbar */}
       <header className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#8EA7E9] via-[#B5B2E8] to-[#FFB4B4] flex items-center justify-center shadow-xs">
-            <Sparkles className="w-5 h-5 text-white" />
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#7286D3] via-[#8EA7E9] to-[#FFB4B4] p-1 flex items-center justify-center shadow-xs">
+            <EliseCatMascot className="w-full h-full" />
           </div>
-          <span className="font-extrabold text-xl tracking-tight text-slate-800">Theodore</span>
+          <span className="font-black text-xl tracking-tight text-slate-800">Elise</span>
         </div>
 
         <div className="flex items-center gap-4">
+          <Link
+            to="/about"
+            className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+          >
+            Về Elise
+          </Link>
           <Link
             to="/auth"
             className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"

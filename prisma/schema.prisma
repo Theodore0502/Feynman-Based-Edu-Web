@@ -1,67 +1,307 @@
+// ==============================================================================
 // File: prisma/schema.prisma
-// Mục đích: Định nghĩa schema Cơ sở dữ liệu cho Feynman Technique Stage với Prisma ORM
-// Bảng tạo mới: User, Session, Message, EvaluationReport, VaultItem
+// Mục đích: Định nghĩa toàn bộ schema Cơ sở dữ liệu Chuẩn hóa 12 Bảng cho "Feynman Technique Stage"
+// Phân hệ:
+//   1. Dữ liệu Người dùng: Profile, UserAiConfig
+//   2. Dữ liệu Học thuật & Đồ thị Tri thức: AcademicDomain, AcademicTopic, TopicEdge, AcademicMaterial
+//   3. Dữ liệu Phiên học & Tác nhân AI: Persona, LearningSession, SessionMessage, AgentAnalysisLog
+//   4. Dữ liệu Đánh giá & Ôn tập (Spaced Repetition): EvaluationReport, JargonVaultCard
+// ==============================================================================
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgcrypto, uuidOssp(map: "uuid-ossp"), vector]
 }
 
-model User {
-  id           String    @id @default(cuid())
-  name         String
-  email        String    @unique
-  fieldOfStudy String    @default("General") // IT, Kinh tế, Y khoa, K-12
-  streakCount  Int       @default(0)
-  createdAt    DateTime  @default(now())
+// ==============================================================================
+// PHÂN HỆ 1: DỮ LIỆU NGƯỜI DÙNG (USER DATA)
+// ==============================================================================
+
+model Profile {
+  id              String          @id @db.Uuid
+  email           String          @unique
+  fullName        String?         @map("full_name")
+  avatarUrl       String?         @map("avatar_url")
+  primaryDomainId String?         @map("primary_domain_id") @db.Uuid
+  streakCount     Int             @default(0) @map("streak_count")
+  totalXp         Int             @default(0) @map("total_xp")
+  lastActiveAt    DateTime?       @default(now()) @map("last_active_at") @db.Timestamptz(6)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  primaryDomain   AcademicDomain? @relation("DomainProfiles", fields: [primaryDomainId], references: [id], onDelete: SetNull)
+  aiConfig        UserAiConfig?
+  sessions        LearningSession[]
+  jargonCards     JargonVaultCard[]
+  materials       AcademicMaterial[]
+  customPersonas  Persona[]
+  notifications   Notification[]
+
+  @@map("profiles")
 }
 
-model Session {
-  id           String            @id @default(cuid())
-  topic        String
-  personaId    String            // child_10yo, non_tech, farmer, expert...
-  difficulty   String            @default("MEDIUM") // EASY | MEDIUM | HARD
-  status       String            @default("ACTIVE") // ACTIVE | COMPLETED
-  clarityScore Int               @default(0) // 0-100
-  createdAt    DateTime          @default(now())
-  messages     Message[]
-  report       EvaluationReport?
+model UserAiConfig {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId               String   @unique @map("user_id") @db.Uuid
+  preferredLanguage    String   @default("vi-VN") @map("preferred_language")
+  voiceGender          String   @default("female") @map("voice_gender")
+  speechRate           Float    @default(1.0) @map("speech_rate")
+  defaultDifficulty    String   @default("MEDIUM") @map("default_difficulty")
+  customModelProvider  String?  @map("custom_model_provider")
+  customModelName      String?  @map("custom_model_name")
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  profile              Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_ai_configs")
 }
 
-model Message {
-  id               String   @id @default(cuid())
-  sessionId        String
-  role             String   // user | assistant
-  content          String
-  analysisMetadata String?  // JSON string: jargonDetected, logicGaps, turnClarity
-  createdAt        DateTime @default(now())
+// ==============================================================================
+// PHÂN HỆ 2: DỮ LIỆU HỌC THUẬT & ĐỒ THỊ TRI THỨC (ACADEMIC & KNOWLEDGE GRAPH)
+// ==============================================================================
 
-  session          Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+model AcademicDomain {
+  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug        String            @unique
+  name        String
+  description String?
+  iconName    String?           @map("icon_name")
+  orderIndex  Int               @default(1) @map("order_index")
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  subjects    AcademicSubject[]
+  topics      AcademicTopic[]
+  profiles    Profile[]         @relation("DomainProfiles")
+
+  @@map("academic_domains")
 }
+
+model AcademicSubject {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  domainId        String          @map("domain_id") @db.Uuid
+  name            String
+  slug            String          @unique
+  description     String?
+  orderIndex      Int             @default(1) @map("order_index")
+  difficultyLevel Int             @default(3) @map("difficulty_level")
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  domain          AcademicDomain  @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  topics          AcademicTopic[]
+
+  @@map("academic_subjects")
+}
+
+model AcademicTopic {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  domainId         String             @map("domain_id") @db.Uuid
+  subjectId        String?            @map("subject_id") @db.Uuid
+  title            String
+  slug             String             @unique
+  summary          String             @db.Text
+  requiredConcepts Json               @default("[]") @map("required_concepts")
+  commonJargons    Json               @default("[]") @map("common_jargons")
+  difficultyLevel  Int                @default(3) @map("difficulty_level")
+  orderIndex       Int                @default(1) @map("order_index")
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  domain           AcademicDomain     @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  subject          AcademicSubject?   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  outgoingEdges    TopicEdge[]        @relation("SourceTopicEdges")
+  incomingEdges    TopicEdge[]        @relation("TargetTopicEdges")
+  materials        AcademicMaterial[]
+  sessions         LearningSession[]
+  jargonCards      JargonVaultCard[]
+
+  @@map("academic_topics")
+}
+
+model TopicEdge {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sourceTopicId String        @map("source_topic_id") @db.Uuid
+  targetTopicId String        @map("target_topic_id") @db.Uuid
+  relationType  String        @default("RELATED") @map("relation_type") // 'PREREQUISITE' | 'RELATED' | 'SUB_CONCEPT'
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  sourceTopic   AcademicTopic @relation("SourceTopicEdges", fields: [sourceTopicId], references: [id], onDelete: Cascade)
+  targetTopic   AcademicTopic @relation("TargetTopicEdges", fields: [targetTopicId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceTopicId, targetTopicId], name: "uq_topic_edge")
+  @@map("topic_edges")
+}
+
+model AcademicMaterial {
+  id              String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  topicId         String                  @map("topic_id") @db.Uuid
+  uploadedById    String?                 @map("uploaded_by_id") @db.Uuid
+  title           String
+  sourceType      String                  @default("TEXT_NOTE") @map("source_type") // 'PDF' | 'SLIDE' | 'URL' | 'TEXT_NOTE'
+  storageFilePath String?                 @map("storage_file_path")
+  extractedText   String?                 @map("extracted_text") @db.Text
+  embedding       Unsupported("vector")?
+  createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  topic           AcademicTopic           @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  uploadedBy      Profile?                @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@map("academic_materials")
+}
+
+// ==============================================================================
+// PHÂN HỆ 3: TÁC NHÂN AI & PHIÊN HỌC (PERSONAS & LEARNING SESSIONS)
+// ==============================================================================
+
+model Persona {
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  creatorId          String?           @map("creator_id") @db.Uuid
+  slug               String            @unique
+  name               String
+  roleBadge          String            @map("role_badge")
+  avatarUrl          String?           @map("avatar_url")
+  systemPrompt       String            @map("system_prompt") @db.Text
+  curiosityLevel     Int               @default(80) @map("curiosity_level")
+  preferredMetaphors Json              @default("[]") @map("preferred_metaphors")
+  isSystemDefault    Boolean           @default(false) @map("is_system_default")
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  creator            Profile?          @relation(fields: [creatorId], references: [id], onDelete: SetNull)
+  sessions           LearningSession[]
+
+  @@map("personas")
+}
+
+model LearningSession {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String            @map("user_id") @db.Uuid
+  topicId          String?           @map("topic_id") @db.Uuid
+  personaId        String            @map("persona_id") @db.Uuid
+  customTopicTitle String?           @map("custom_topic_title")
+  difficulty       String            @default("MEDIUM")
+  status           String            @default("ACTIVE")
+  currentClarity   Int               @default(0) @map("current_clarity")
+  turnCount        Int               @default(0) @map("turn_count")
+  durationSeconds  Int               @default(0) @map("duration_seconds")
+  startedAt        DateTime          @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt      DateTime?         @map("completed_at") @db.Timestamptz(6)
+
+  user             Profile           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic            AcademicTopic?    @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  persona          Persona           @relation(fields: [personaId], references: [id], onDelete: Restrict)
+  messages         SessionMessage[]
+  report           EvaluationReport?
+
+  @@map("learning_sessions")
+}
+
+model SessionMessage {
+  id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId       String             @map("session_id") @db.Uuid
+  role            String             // 'user' | 'assistant' | 'system'
+  content         String             @db.Text
+  audioStorageUrl String?            @map("audio_storage_url")
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  session         LearningSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  analysisLog     AgentAnalysisLog?
+
+  @@map("session_messages")
+}
+
+model AgentAnalysisLog {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  messageId        String         @unique @map("message_id") @db.Uuid
+  jargonsDetected  Json           @default("[]") @map("jargons_detected")
+  logicGapFound    String?        @map("logic_gap_found") @db.Text
+  detectedAnalogy  String?        @map("detected_analogy") @db.Text
+  turnClarityScore Int            @default(0) @map("turn_clarity_score")
+  conceptsCovered  Json           @default("[]") @map("concepts_covered")
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  message          SessionMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("agent_analysis_logs")
+}
+
+// ==============================================================================
+// PHÂN HỆ 4: ĐÁNH GIÁ & KHO ÔN TẬP (EVALUATION & SPACED REPETITION VAULT)
+// ==============================================================================
 
 model EvaluationReport {
-  id                String   @id @default(cuid())
-  sessionId         String   @unique
-  clarityScore      Int      // 0-100
-  logicCompleteness Int      // 0-100
-  bestAnalogy       String?
-  knowledgeGaps     String   // JSON array of strings
-  summaryFeedback   String
-  createdAt         DateTime @default(now())
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId         String          @unique @map("session_id") @db.Uuid
+  clarityScore      Int             @map("clarity_score")
+  logicCompleteness Int             @map("logic_completeness")
+  accuracyScore     Int             @default(80) @map("accuracy_score")
+  bestAnalogy       String?         @map("best_analogy") @db.Text
+  knowledgeGaps     Json            @default("[]") @map("knowledge_gaps")
+  summaryFeedback   String          @map("summary_feedback") @db.Text
+  shareToken        String          @unique @default(dbgenerated("encode(gen_random_bytes(16), 'hex')")) @map("share_token")
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  session           Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session           LearningSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("evaluation_reports")
 }
 
-model VaultItem {
-  id               String   @id @default(cuid())
-  term             String
-  plainExplanation String
-  analogyUsed      String?
-  topic            String
-  createdAt        DateTime @default(now())
+model JargonVaultCard {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String         @map("user_id") @db.Uuid
+  topicId          String?        @map("topic_id") @db.Uuid
+  jargonTerm       String         @map("jargon_term")
+  plainExplanation String         @map("plain_explanation") @db.Text
+  analogyUsed      String?        @map("analogy_used") @db.Text
+  masteryLevel     Int            @default(1) @map("mastery_level")
+  nextReviewAt     DateTime       @default(now()) @map("next_review_at") @db.Timestamptz(6)
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user             Profile        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic            AcademicTopic? @relation(fields: [topicId], references: [id], onDelete: SetNull)
+
+  @@map("jargon_vault_cards")
 }
 
+// ==============================================================================
+// PHÂN HỆ 5: DỮ LIỆU THÔNG BÁO (NOTIFICATIONS - BẢNG THỨ 13)
+// ==============================================================================
+
+model Notification {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  type      String   // 'SRS_REMINDER' | 'SESSION_RESUME' | 'REPORT_READY' | 'STREAK_ALERT' | 'SYSTEM'
+  title     String
+  message   String   @db.Text
+  actionUrl String?  @map("action_url")
+  metadata  Json     @default("{}")
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user      Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt(sort: Desc)], name: "idx_notifications_user_unread")
+  @@map("notifications")
+}
+
+// ==============================================================================
+// PHÂN HỆ 6: CẤU HÌNH TRÍ TUỆ NHÂN TẠO & PROMPTS HỆ THỐNG (AI CONFIG - BẢNG THỨ 14)
+// ==============================================================================
+
+model AISystemPrompt {
+  id           String   @id // e.g. 'prompt-child-10yo'
+  promptKey    String   @unique @map("prompt_key") // e.g. 'PERSONA_CHILD_10YO'
+  title        String
+  category     String   // 'PERSONA' | 'EVALUATOR' | 'SOCRATIC' | 'SYSTEM'
+  description  String?  @db.Text
+  systemPrompt String   @map("system_prompt") @db.Text
+  parameters   Json     @default("{\"model\": \"gemini-1.5-flash\", \"temperature\": 0.7, \"max_tokens\": 1024, \"top_p\": 0.95, \"skepticism_level\": 5}")
+  isActive     Boolean  @default(true) @map("is_active")
+  version      Int      @default(1)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([promptKey], name: "idx_ai_prompts_key")
+  @@map("ai_system_prompts")
+}

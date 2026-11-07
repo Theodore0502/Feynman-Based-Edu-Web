@@ -50,6 +50,13 @@ export interface VaultRecord {
   analogyUsed?: string | null;
   topic: string;
   createdAt: string;
+  // SM-2 Spaced Repetition Fields
+  masteryLevel?: number; // 1 - 5
+  intervalDays?: number;
+  repetitions?: number;
+  easeFactor?: number;
+  nextReviewAt?: string;
+  lastReviewedAt?: string;
 }
 
 export interface UserProfile {

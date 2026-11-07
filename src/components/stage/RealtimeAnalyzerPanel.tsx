@@ -41,10 +41,10 @@ export const RealtimeAnalyzerPanel: React.FC<RealtimeAnalyzerPanelProps> = ({
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
-            <h4 className="font-extrabold text-sm text-slate-800">Feynman Analyzer</h4>
+            <h4 className="font-extrabold text-sm text-slate-800">Bộ Phân Tích Feynman</h4>
           </div>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EBF0FC] text-[#5066A1]">
-            Realtime AI
+            Phân Tích Trực Tiếp
           </span>
         </div>
 

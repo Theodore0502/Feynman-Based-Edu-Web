@@ -15,12 +15,14 @@ export const ShareMasteryModal: React.FC = () => {
   const [copied, setCopied] = useState(false);
 
   const isOpen = activeModal === "SHARE_MASTERY";
-  const topic = (modalData?.topic as string) || "Chủ đề bài giảng";
+  const topic = (modalData?.topic as string) || "Cơ chế Docker Container";
   const score = (modalData?.score as number) || 85;
 
   if (!isOpen) return null;
 
-  const shareUrl = typeof window !== "undefined" ? window.location.href : "https://theodore.feynman.app";
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://theodore.feynman.app";
+  const shareToken = `cert-${Date.now().toString(36).toUpperCase()}`;
+  const shareUrl = `${origin}/share/${shareToken}?topic=${encodeURIComponent(topic)}&score=${score}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(shareUrl);
@@ -53,7 +55,7 @@ export const ShareMasteryModal: React.FC = () => {
           <p className="text-xs text-white/90">Tôi vừa vượt qua bài kiểm tra bình dân hóa Feynman với điểm số:</p>
           <div className="text-4xl font-black">{score}%</div>
           <span className="inline-block text-[10px] font-bold px-3 py-1 bg-white/20 backdrop-blur-md rounded-full">
-            Feynman Technique Stage • Theodore
+            Feynman Technique Stage • Elise
           </span>
         </div>
 
@@ -65,11 +67,22 @@ export const ShareMasteryModal: React.FC = () => {
           />
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#7286D3] hover:bg-[#5066A1] text-white text-xs font-semibold transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#7286D3] hover:bg-[#5066A1] text-white text-xs font-semibold transition-colors cursor-pointer"
           >
             {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{copied ? "Đã chép" : "Sao chép"}</span>
           </button>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <a
+            href={shareUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full text-center py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
+          >
+            Xem Trang Thẻ Chứng Nhận Công Khai ↗
+          </a>
         </div>
       </div>
     </div>

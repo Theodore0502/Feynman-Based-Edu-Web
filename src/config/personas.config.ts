@@ -21,13 +21,24 @@ export interface PersonaDefinition {
   worldview: string; // Lăng kính hiểu biết của nhân vật
   socraticStyle: string;
   systemPrompt: string;
+  skepticismLevel?: number; // Mức độ hoài nghi / vặn vẹo (1 - 10)
+  isCustom?: boolean;
 }
+
+export const PRESET_AVATARS: string[] = [
+  "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80",
+  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80",
+  "https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80",
+  "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=200&q=80",
+  "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=200&q=80",
+  "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80",
+];
 
 export const DEFAULT_PERSONAS: PersonaDefinition[] = [
   {
     id: "child_10yo",
-    name: "Bé Bo",
-    title: "Học sinh lớp 4 tò mò",
+    name: "Bé Bắp",
+    title: "Cậu bé 10 tuổi tò mò (Chuẩn ELI5)",
     age: "10 tuổi",
     avatar: "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=200&q=80",
     accentColor: "#F79D9D",
@@ -36,8 +47,8 @@ export const DEFAULT_PERSONAS: PersonaDefinition[] = [
     description: "Thích xếp hình Lego, siêu nhân và truyện tranh Doremon. Hoàn toàn không biết từ đao to búa lớn.",
     worldview: "Chỉ hiểu những thứ sờ được, thấy được như đồ chơi, que kem, sân bóng và gia đình.",
     socraticStyle: "Hỏi 'Tại sao?' liên tục và thắc mắc ngay khi nghe từ lạ.",
-    systemPrompt: `Bạn là Bé Bo, một bé trai 10 tuổi học lớp 4 vô cùng tò mò, lanh lợi.
-Người dùng đang cố gắng giảng giải một khái niệm cho bạn hiểu theo phương pháp Feynman.
+    systemPrompt: `Bạn là Bé Bắp, một bé trai 10 tuổi học lớp 4 vô cùng tò mò, lanh lợi.
+Người dùng đang cố gắng giảng giải một khái niệm cho bạn hiểu theo phương pháp Feynman (ELI5 - Explain Like I'm 5).
 QUY TẮC CỐT LÕI:
 1. Bạn hoàn toàn KHÔNG biết các thuật ngữ chuyên ngành (như API, Container, Lạm phát, Kháng nguyên, Thuật toán, CPU...).
 2. Nếu người dùng dùng bất kỳ từ lạ nào mà chưa giải thích bằng ngôn ngữ của trẻ em 10 tuổi (đồ chơi, đồ ăn, trường học), bạn PHẢI ngơ ngác hỏi ngay từ đó là gì.
@@ -100,7 +111,48 @@ QUY TẮC CỐT LÕI:
   }
 ];
 
+const CUSTOM_PERSONAS_STORAGE_KEY = "feynman_custom_personas";
+
+export const getCustomPersonas = (): PersonaDefinition[] => {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(CUSTOM_PERSONAS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    console.error("Lỗi đọc custom personas từ localStorage:", e);
+    return [];
+  }
+};
+
+export const saveCustomPersona = (persona: PersonaDefinition): PersonaDefinition[] => {
+  const current = getCustomPersonas();
+  const existingIdx = current.findIndex((p) => p.id === persona.id);
+  let updated: PersonaDefinition[];
+  if (existingIdx >= 0) {
+    updated = [...current];
+    updated[existingIdx] = persona;
+  } else {
+    updated = [persona, ...current];
+  }
+  localStorage.setItem(CUSTOM_PERSONAS_STORAGE_KEY, JSON.stringify(updated));
+  return updated;
+};
+
+export const deleteCustomPersona = (personaId: string): PersonaDefinition[] => {
+  const current = getCustomPersonas();
+  const updated = current.filter((p) => p.id !== personaId);
+  localStorage.setItem(CUSTOM_PERSONAS_STORAGE_KEY, JSON.stringify(updated));
+  return updated;
+};
+
+export const getAllPersonas = (): PersonaDefinition[] => {
+  return [...DEFAULT_PERSONAS, ...getCustomPersonas()];
+};
+
 export const getPersonaById = (id: string): PersonaDefinition => {
-  return DEFAULT_PERSONAS.find((p) => p.id === id) || DEFAULT_PERSONAS[0];
+  const foundDefault = DEFAULT_PERSONAS.find((p) => p.id === id);
+  if (foundDefault) return foundDefault;
+  const custom = getCustomPersonas().find((p) => p.id === id);
+  return custom || DEFAULT_PERSONAS[0];
 };
 

@@ -7,20 +7,25 @@
  */
 
 import React, { useState } from "react";
-import { useParams, useSearchParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom";
 import { MasteryCardPreview } from "@/components/shared/MasteryCardPreview";
 import { useModalStore } from "@/hooks/useModalStore";
+import { getSubjectBySlug } from "@/data/three-tier-curriculum.data";
 import type { ReportData } from "@/types/session.types";
-import { ArrowLeft, Share2 } from "lucide-react";
+import { ArrowLeft, Share2, BookOpen, Bookmark, LayoutDashboard } from "lucide-react";
 
 export const MasteryReportCard: React.FC = () => {
   const params = useParams();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sessionId = params.sessionId as string;
   const { openModal } = useModalStore();
 
   const topic = searchParams.get("topic") || "Cơ chế Docker Container";
   const score = parseInt(searchParams.get("score") || "84");
+  const domain = searchParams.get("domain");
+  const subject = searchParams.get("subject");
+  const currentSubject = subject ? getSubjectBySlug(subject) : undefined;
 
   const report: ReportData = {
     id: `rep-${sessionId}`,
@@ -36,25 +41,53 @@ export const MasteryReportCard: React.FC = () => {
     createdAt: new Date().toISOString(),
   };
 
-  return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      {/* Top Navigation */}
-      <div className="flex items-center justify-between">
-        <Link
-          to="/dashboard"
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Quay lại Dashboard</span>
-        </Link>
+  // Điều hướng quay lại theo đúng trình tự cấp bậc
+  const handleGoBack = () => {
+    if (domain && subject) {
+      navigate(`/lectures/${domain}/${subject}`);
+    } else if (domain) {
+      navigate(`/lectures/${domain}`);
+    } else if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/lectures");
+    }
+  };
 
+  return (
+    <div className="w-full space-y-6 pb-12">
+      {/* Top Navigation: Nút quay lại đúng trình tự cấp bậc */}
+      <div className="flex items-center justify-between">
         <button
-          onClick={() => openModal("SHARE_MASTERY", { topic, score: report.clarityScore })}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-[#EEF2FC] text-[#5066A1] hover:bg-[#D8E3FB] font-bold text-xs border border-[#D5E1FA] transition-colors cursor-pointer"
+          type="button"
+          onClick={handleGoBack}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-[#E2EAFD] text-xs font-bold text-slate-600 hover:text-[#5066A1] shadow-2xs transition-all cursor-pointer group"
         >
-          <Share2 className="w-3.5 h-3.5" />
-          <span>Chia Sẻ Thẻ Điểm</span>
+          <ArrowLeft className="w-4 h-4 text-slate-400 group-hover:-translate-x-0.5 transition-transform" />
+          <span>
+            {currentSubject
+              ? `Quay lại ${currentSubject.name}`
+              : "Quay lại danh sách bài giảng"}
+          </span>
         </button>
+
+        <div className="flex items-center gap-2">
+          <Link
+            to="/dashboard"
+            className="hidden sm:inline-flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-slate-600 px-2 py-1 transition-colors"
+          >
+            <LayoutDashboard className="w-3.5 h-3.5" />
+            <span>Tổng Quan</span>
+          </Link>
+
+          <button
+            onClick={() => openModal("SHARE_MASTERY", { topic, score: report.clarityScore })}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-[#EEF2FC] text-[#5066A1] hover:bg-[#D8E3FB] font-bold text-xs border border-[#D5E1FA] transition-colors cursor-pointer"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span>Chia Sẻ Thẻ Điểm</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Feynman Mastery Card */}
@@ -64,19 +97,32 @@ export const MasteryReportCard: React.FC = () => {
         onShare={() => openModal("SHARE_MASTERY", { topic, score: report.clarityScore })}
       />
 
-      {/* Next Actions */}
+      {/* Next Actions: Các hướng đi tiếp hoặc quay lại */}
       <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
-        <Link
-          to="/stage/new"
-          className="w-full sm:flex-1 py-3.5 rounded-2xl bg-[#7286D3] hover:bg-[#5066A1] text-white font-bold text-xs text-center shadow-xs transition-colors"
-        >
-          Giảng Chủ Đề Mới
-        </Link>
+        {domain && subject ? (
+          <Link
+            to={`/lectures/${domain}/${subject}`}
+            className="w-full sm:flex-1 py-3.5 rounded-2xl bg-[#7286D3] hover:bg-[#5066A1] text-white font-bold text-xs text-center shadow-xs transition-colors flex items-center justify-center gap-2"
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>Học Tiếp Bài Khác Trong Môn</span>
+          </Link>
+        ) : (
+          <Link
+            to="/lectures"
+            className="w-full sm:flex-1 py-3.5 rounded-2xl bg-[#7286D3] hover:bg-[#5066A1] text-white font-bold text-xs text-center shadow-xs transition-colors flex items-center justify-center gap-2"
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>Khám Phá Bài Giảng Mới</span>
+          </Link>
+        )}
+
         <Link
           to="/vault"
-          className="w-full sm:flex-1 py-3.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs text-center border border-slate-200/80 shadow-xs transition-colors"
+          className="w-full sm:flex-1 py-3.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs text-center border border-slate-200/80 shadow-xs transition-colors flex items-center justify-center gap-2"
         >
-          Xem Thuật Ngữ Đã Lưu Vào Vault
+          <Bookmark className="w-4 h-4 text-amber-500" />
+          <span>Mở Sổ Tay Thuật Ngữ</span>
         </Link>
       </div>
     </div>

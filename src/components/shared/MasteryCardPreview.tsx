@@ -40,7 +40,7 @@ export const MasteryCardPreview: React.FC<MasteryCardPreviewProps> = ({
         <div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EEF2FC] text-[#5066A1] text-xs font-bold mb-2 border border-[#D5E1FA]">
             <Award className="w-3.5 h-3.5 text-[#7286D3]" />
-            <span>Feynman Mastery Card</span>
+            <span>Thẻ Vinh Danh Feynman</span>
           </div>
           <h3 className="text-xl font-black text-slate-800 tracking-tight">{topic}</h3>
         </div>
@@ -60,7 +60,7 @@ export const MasteryCardPreview: React.FC<MasteryCardPreviewProps> = ({
       <div className="grid grid-cols-2 gap-3">
         <div className="p-4 rounded-2xl bg-[#F0F5FD] border border-[#D5E4FC] text-center">
           <span className="text-3xl font-black text-[#5066A1]">{report.clarityScore}%</span>
-          <p className="text-[11px] font-bold text-slate-500 uppercase mt-1">Độ Bình Dân Hóa</p>
+          <p className="text-[11px] font-bold text-slate-500 uppercase mt-1">Độ Thấu Suốt (Clarity)</p>
         </div>
         <div className="p-4 rounded-2xl bg-[#E8F8F5] border border-[#BDE8D2] text-center">
           <span className="text-3xl font-black text-[#1E7E50]">{report.logicCompleteness}%</span>
