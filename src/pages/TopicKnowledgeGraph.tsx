@@ -34,6 +34,7 @@ import { TOPICS_CATALOG } from "@/data/academic-catalog.data";
 import { GRAPH_EDGES } from "@/data/knowledge-graph.data";
 import { CatalogTopic, GraphEdge } from "@/types/catalog.types";
 import { useStudyStore } from "@/hooks/useStudyStore";
+import TopicHierarchySearch, { SearchFilterState } from "@/components/topics/TopicHierarchySearch";
 
 // Type definitions for Radial Dendrogram Nodes & Links
 export interface RadialGraphNode {
@@ -140,6 +141,64 @@ export const TopicKnowledgeGraph: React.FC = () => {
   const [hoveredNode, setHoveredNode] = useState<RadialGraphNode | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [zoomLevel, setZoomLevel] = useState<number>(0.75);
+
+  // Hierarchical Search Filter State (Phương án C - Hybrid Search)
+  const [filterState, setFilterState] = useState<SearchFilterState>({
+    domainId: "ALL",
+    fieldId: "ALL",
+    keyword: "",
+    selectedTopicId: null,
+  });
+
+  const isNodeHighlighted = useCallback(
+    (node: RadialGraphNode): boolean => {
+      const hasFilters =
+        filterState.domainId !== "ALL" ||
+        filterState.fieldId !== "ALL" ||
+        filterState.keyword.length > 0 ||
+        filterState.selectedTopicId != null;
+
+      if (!hasFilters) return true;
+      if (node.level === 0) return true; // Core stays visible
+
+      // Domain filter
+      if (filterState.domainId !== "ALL" && node.domainId && node.domainId !== filterState.domainId) {
+        return false;
+      }
+
+      // Field filter
+      if (filterState.fieldId !== "ALL") {
+        if (node.level === 1) return true;
+        if (node.level === 2 && node.id !== filterState.fieldId) return false;
+        if (node.level >= 3 && node.fieldId !== filterState.fieldId) return false;
+      }
+
+      // Keyword filter
+      if (filterState.keyword.length > 0) {
+        const kw = filterState.keyword.toLowerCase();
+        if (node.level >= 3) {
+          const matchName = node.name.toLowerCase().includes(kw);
+          const matchSummary = node.summary?.toLowerCase().includes(kw);
+          const matchConcept = node.requiredConcepts?.some((c) => c.toLowerCase().includes(kw));
+          if (!matchName && !matchSummary && !matchConcept) return false;
+        }
+      }
+
+      // Specific topic selection from dropdown
+      if (filterState.selectedTopicId) {
+        if (node.level >= 3) {
+          const matchId =
+            node.id === filterState.selectedTopicId ||
+            node.subjectId === filterState.selectedTopicId ||
+            node.id === `subject-${filterState.selectedTopicId}`;
+          if (!matchId) return false;
+        }
+      }
+
+      return true;
+    },
+    [filterState]
+  );
 
   // Exact measurement of container size
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({
@@ -592,6 +651,28 @@ export const TopicKnowledgeGraph: React.FC = () => {
     }
   };
 
+  // Handler when user selects a topic from search suggestions
+  const handleSelectTopicFromSearch = useCallback(
+    (topic: CatalogTopic) => {
+      setFilterState((prev) => ({
+        ...prev,
+        selectedTopicId: topic.id,
+        domainId: topic.domainId,
+      }));
+      const found = graphData.nodes.find(
+        (n) =>
+          n.id === `subject-${topic.id}` ||
+          n.subjectId === topic.id ||
+          n.id === topic.id
+      );
+      if (found) {
+        setSelectedNode(found);
+        setIsDrawerOpen(true);
+      }
+    },
+    [graphData.nodes]
+  );
+
   // Pre-frame Render: Clean Light System Orbits & Segmented Glowing Rim
   const handleRenderFramePre = useCallback((ctx: CanvasRenderingContext2D, globalScale: number) => {
     ctx.save();
@@ -674,7 +755,22 @@ export const TopicKnowledgeGraph: React.FC = () => {
       const x = node.x ?? 0;
       const y = node.y ?? 0;
 
+      const isMatch = isNodeHighlighted(node);
+      const hasActiveFilter =
+        filterState.domainId !== "ALL" ||
+        filterState.fieldId !== "ALL" ||
+        filterState.keyword.length > 0 ||
+        filterState.selectedTopicId != null;
+
       ctx.save();
+
+      // Spotlight / Dimming effect based on hierarchical search
+      if (hasActiveFilter && !isMatch) {
+        ctx.globalAlpha = 0.14;
+      } else if (hasActiveFilter && isMatch && node.level >= 1) {
+        ctx.shadowColor = node.color || "#2563eb";
+        ctx.shadowBlur = (isSelected ? 16 : 8) / globalScale;
+      }
 
       // ==========================================
       // LEVEL 0: CORE NODE (KHÔNG GIAN FEYNMAN) - Bán Nguyệt Sát Mép Trái
@@ -933,6 +1029,14 @@ export const TopicKnowledgeGraph: React.FC = () => {
         selectedNode != null &&
         (source.id === selectedNode.id || target.id === selectedNode.id);
 
+      const isSourceMatch = isNodeHighlighted(source);
+      const isTargetMatch = isNodeHighlighted(target);
+      const hasActiveFilter =
+        filterState.domainId !== "ALL" ||
+        filterState.fieldId !== "ALL" ||
+        filterState.keyword.length > 0 ||
+        filterState.selectedTopicId != null;
+
       // Radial coordinates
       const r1 = Math.sqrt(source.x * source.x + source.y * source.y);
       const theta1 = Math.atan2(source.y, source.x);
@@ -947,6 +1051,11 @@ export const TopicKnowledgeGraph: React.FC = () => {
       const cp2y = target.y - Math.sin(theta2) * dr;
 
       ctx.save();
+
+      if (hasActiveFilter && (!isSourceMatch || !isTargetMatch)) {
+        ctx.globalAlpha = 0.08;
+      }
+
       ctx.beginPath();
       ctx.moveTo(source.x, source.y);
       ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, target.x, target.y);
@@ -977,10 +1086,18 @@ export const TopicKnowledgeGraph: React.FC = () => {
   );
 
   return (
-    <div
-      ref={containerRef}
-      className="relative w-full flex-1 h-full min-h-0 bg-[#f8fafc] rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden select-none cursor-default"
-    >
+    <div className="flex flex-col flex-1 h-full min-h-0 space-y-2">
+      {/* 3-Level Hierarchical Search Toolbar (Directly beneath Topbar) */}
+      <TopicHierarchySearch
+        onFilterChange={setFilterState}
+        onSelectTopic={handleSelectTopicFromSearch}
+      />
+
+      {/* Main Interactive ForceGraph2D Canvas Container */}
+      <div
+        ref={containerRef}
+        className="relative w-full flex-1 h-full min-h-0 bg-[#f8fafc] rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden select-none cursor-default"
+      >
       {/* 1. Main Interactive ForceGraph2D Canvas */}
       <ForceGraph2D
         ref={fgRef}
@@ -1203,6 +1320,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };
