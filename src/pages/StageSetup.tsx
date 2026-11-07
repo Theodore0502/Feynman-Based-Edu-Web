@@ -14,7 +14,7 @@ import { getSubjectBySlug } from "@/data/three-tier-curriculum.data";
 import { PersonaAvatarCard } from "@/components/shared/PersonaAvatarCard";
 import { SupabaseService } from "@/lib/services/supabase-service";
 import { useStudyStore } from "@/hooks/useStudyStore";
-import { ArrowLeft, ArrowRight, Sparkles, BookOpen, Edit3, Sigma, Network, Eye, Cpu, Layers } from "lucide-react";
+import { ArrowRight, Sparkles, BookOpen, Edit3, Sigma, Network, Eye, Cpu, Layers } from "lucide-react";
 
 export const StageSetup: React.FC = () => {
   const navigate = useNavigate();
@@ -78,19 +78,6 @@ export const StageSetup: React.FC = () => {
     }
   }, [activeTopic, topic]);
 
-  // Điều hướng quay lại đúng trình tự cấp bậc
-  const handleGoBack = () => {
-    if (domain && subject) {
-      navigate(`/lectures/${domain}/${subject}`);
-    } else if (domain) {
-      navigate(`/lectures/${domain}`);
-    } else if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate("/lectures");
-    }
-  };
-
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!topic.trim()) return;
@@ -118,22 +105,6 @@ export const StageSetup: React.FC = () => {
 
   return (
     <div className="w-full space-y-8 pb-12">
-      {/* Nút lùi về cấp trước theo đúng trình tự */}
-      <div>
-        <button
-          type="button"
-          onClick={handleGoBack}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-[#E2EAFD] text-xs font-bold text-slate-600 hover:text-[#5066A1] shadow-2xs transition-all cursor-pointer group"
-        >
-          <ArrowLeft className="w-3.5 h-3.5 text-slate-400 group-hover:-translate-x-0.5 transition-transform" />
-          <span>
-            {currentSubject
-              ? `Quay lại ${currentSubject.name}`
-              : "Quay lại danh sách bài giảng"}
-          </span>
-        </button>
-      </div>
-
       {/* Step Header */}
       <div className="text-center space-y-2">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EEF2FC] text-[#5066A1] text-xs font-bold border border-[#D5E1FA]">
