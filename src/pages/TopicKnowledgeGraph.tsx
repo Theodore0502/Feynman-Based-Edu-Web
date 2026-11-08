@@ -1,11 +1,15 @@
 /**
  * File: src/pages/TopicKnowledgeGraph.tsx
- * Mục đích: Bản Đồ Tri Thức (Knowledge Graph) theo CẤU TRÚC CÂY TỎA TRÒN (Radial Tree / Knowledge Tree)
- *   - Lõi trung tâm (Gốc cây - Root): Không Gian Feynman tại (0, 0)
- *   - Cành cấp 1 (Thân cành chính - 8 Domains): Tỏa đều 8 hướng 360° (mỗi 45°)
+ * Mục đích: Bản Đồ Tri Thức (Knowledge Graph) theo CẤU TRÚC CÂY TỎA TRÒN VẬT LÝ ĐỘNG (Dynamic Physics Radial Tree)
+ *   - Lõi trung tâm (Gốc cây - Root): Không Gian Feynman cố định tại (0, 0)
+ *   - Cành cấp 1 (Thân cành lớn - 8 Domains): Tỏa đều 8 hướng 360° (mỗi 45°)
  *   - Cành cấp 2 (Nhánh môn học - 37 Subjects): Rẽ nhánh hình nan quạt (fork/branch) từ từng Ngành
  *   - Cành cấp 3 & Tán lá (479 Topics): Tỏa thành các chùm tán cây (Canopy Clusters) phân tầng từ Môn học
- *   - Đường nối dạng nhánh cây uốn cong hữu cơ (Organic Branching Curves) mềm mại, thanh thoát
+ *
+ * TÍNH NĂNG ĐỘNG & VẬT LÝ (DYNAMIC PHYSICS):
+ *   - LỰC VA CHẠM (Collision Force): Bắt buộc các node cách nhau 1 khoảng an toàn (Zero-Overlap).
+ *   - NÉ TRÁNH THỜI GIAN THỰC (Real-time Avoidance / Repulsion): Khi kéo thả (drag) 1 node, các node khác lập tức dạt ra né tránh.
+ *   - NÚT TỰ ĐỘNG SẮP XẾP (Auto Layout): 1-click đưa toàn bộ các node về lại vị trí cân bằng đối xứng tối ưu.
  *   - DỮ LIỆU ĐƯỢC LOAD 100% ĐỘNG TỪ SUPABASE (CẤM HARDCODE DỮ LIỆU).
  *
  * Giao diện sáng chuẩn Theodore (#f8fafc / trắng / slate / xanh #8299E0), phong cách nhẹ nhàng, tinh tế.
@@ -13,6 +17,7 @@
 
 import React, { useMemo, useState, useRef, useCallback, useEffect, useLayoutEffect } from "react";
 import ForceGraph2D, { ForceGraphMethods } from "react-force-graph-2d";
+import { forceCollide, forceManyBody, forceRadial } from "d3-force";
 import { useNavigate } from "react-router-dom";
 import {
   Flame,
@@ -29,7 +34,9 @@ import {
   GraduationCap,
   Layers,
   Loader2,
+  Wand2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { CurriculumService } from "@/lib/services/curriculum-service";
 import { CatalogTopic, DomainCategory, AcademicSubject } from "@/types/catalog.types";
 import { useStudyStore } from "@/hooks/useStudyStore";
@@ -51,6 +58,8 @@ export interface RadialTreeNode {
   y?: number;
   fx?: number;
   fy?: number;
+  initialX?: number;
+  initialY?: number;
   targetRadius?: number;
   targetAngle?: number;
   summary?: string;
@@ -277,6 +286,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
 
     // -------------------------------------------------------------
     // TẦNG 0: GỐC CÂY (ROOT - KHÔNG GIAN FEYNMAN TẠI TÂM (0, 0))
+    // Gốc luôn cố định tại tâm (fx=0, fy=0)
     // -------------------------------------------------------------
     nodes.push({
       id: "core-feynman",
@@ -288,6 +298,8 @@ export const TopicKnowledgeGraph: React.FC = () => {
       y: 0,
       fx: 0,
       fy: 0,
+      initialX: 0,
+      initialY: 0,
       targetRadius: 0,
       targetAngle: 0,
     });
@@ -319,8 +331,8 @@ export const TopicKnowledgeGraph: React.FC = () => {
         r: 23,
         x,
         y,
-        fx: x,
-        fy: y,
+        initialX: x,
+        initialY: y,
         targetRadius: domainDist,
         targetAngle: angle,
       };
@@ -365,19 +377,15 @@ export const TopicKnowledgeGraph: React.FC = () => {
       const dAngle = domainAngleMap.get(d.id) ?? 0;
       const dSubs = subjectsByPrimaryDomain.get(d.id) || [];
       const numSubs = dSubs.length;
-
-      // Góc xòe cành của ngành (~28 độ = 0.48 rad)
       const sectorSpread = 0.48;
 
       dSubs.forEach((s, sIdx) => {
-        // Góc của từng nhánh môn học rẽ ra từ ngành
         const sOffset =
           numSubs > 1
             ? (sIdx - (numSubs - 1) / 2) * (sectorSpread / Math.max(1, numSubs - 1))
             : 0;
         const subAngle = dAngle + sOffset;
 
-        // Bán kính so le nhẹ để các nhãn môn học không va chạm nhau
         const subDist = 410 + (sIdx % 2) * 35;
         const sx = subDist * Math.cos(subAngle);
         const sy = subDist * Math.sin(subAngle);
@@ -394,8 +402,8 @@ export const TopicKnowledgeGraph: React.FC = () => {
           r: 12,
           x: sx,
           y: sy,
-          fx: sx,
-          fy: sy,
+          initialX: sx,
+          initialY: sy,
           targetRadius: subDist,
           targetAngle: subAngle,
           summary: s.description,
@@ -411,7 +419,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
           level: 2,
         });
 
-        // Nhánh cầu nối đa ngành (Cross-domain bridge)
+        // Nhánh cầu nối đa ngành
         const allDomains = subjectDomainsMap.get(s.id) || [];
         allDomains.forEach((otherDomainId) => {
           if (otherDomainId !== d.id) {
@@ -447,31 +455,24 @@ export const TopicKnowledgeGraph: React.FC = () => {
       const numTopics = subTopics.length;
       if (numTopics === 0) return;
 
-      // Phân bổ các bài học thành 2 hoặc 3 tầng cánh quạt tỏa ra từ Môn Học
-      // Không bao giờ xếp 1 hàng dài như xâu hạt nữa!
       const numTiers = 2; // 2 tầng cánh quạt
 
       subTopics.forEach((topic, tIdx) => {
-        const tier = tIdx % numTiers; // Tầng 0 (gần môn hơn), Tầng 1 (xa hơn)
+        const tier = tIdx % numTiers;
         const slotInTier = Math.floor(tIdx / numTiers);
         const totalInTier = Math.ceil(numTopics / numTiers);
 
-        // Góc xòe nan quạt quanh trục của môn học (~10 độ)
-        const fanSpread = 0.16; // rad
+        const fanSpread = 0.16;
         const topicOffset =
           totalInTier > 1
             ? (slotInTier - (totalInTier - 1) / 2) * (fanSpread / Math.max(1, totalInTier - 1))
             : 0;
 
-        // Góc riêng biệt cho từng bài học
         const topicAngle = coord.angle + topicOffset + (tier === 1 ? 0.012 : -0.012);
-
-        // Khoảng cách từ Môn học: Tầng 1 cách 95px, Tầng 2 cách 160px
         const branchDist = tier === 0 ? 95 : 160;
         const tx = coord.x + branchDist * Math.cos(topicAngle);
         const ty = coord.y + branchDist * Math.sin(topicAngle);
 
-        // Trạng thái học tập
         let status: RadialTreeNode["status"] = "UNLEARNED";
         const topicStatus = (topic.status as string) || "";
         if (topicStatus === "COMPLETED" || topicStatus === "MASTERED") {
@@ -496,8 +497,8 @@ export const TopicKnowledgeGraph: React.FC = () => {
           r: 6.5,
           x: tx,
           y: ty,
-          fx: tx,
-          fy: ty,
+          initialX: tx,
+          initialY: ty,
           targetRadius: branchDist,
           targetAngle: topicAngle,
           summary: topic.summary,
@@ -506,7 +507,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
 
         nodes.push(tNode);
 
-        // Nhánh cây con (Twig branch) nối từ Môn học đến từng Bài học
+        // Nhánh cây con nối từ Môn học đến Bài học
         links.push({
           id: `link-sub-${s.id}-${topic.id}`,
           source: `subject-${s.id}`,
@@ -518,6 +519,129 @@ export const TopicKnowledgeGraph: React.FC = () => {
 
     return { nodes, links };
   }, [curriculumData]);
+
+  // =========================================================================
+  // CẤU HÌNH D3 FORCE SIMULATION: VA CHẠM, LỰC ĐẨY, NÉ TRÁNH & TỎA TRÒN
+  // =========================================================================
+  useEffect(() => {
+    if (!fgRef.current || graphData.nodes.length === 0) return;
+
+    // 1. Collision Force: Bắt buộc các node cách nhau 1 khoảng an toàn (Zero Overlap)
+    fgRef.current.d3Force(
+      "collide",
+      forceCollide()
+        .radius((node: any) => {
+          if (node.level === 0) return 60; // Gốc
+          if (node.level === 1) return 40; // Ngành
+          if (node.level === 2) return 26; // Môn
+          return 16; // Bài học (level 3)
+        })
+        .iterations(3)
+    );
+
+    // 2. Many-Body Charge Repulsion: Lực đẩy tĩnh điện giúp các node né nhau khi tới gần
+    fgRef.current.d3Force(
+      "charge",
+      forceManyBody()
+        .strength((node: any) => {
+          if (node.level === 0) return -1200;
+          if (node.level === 1) return -450;
+          if (node.level === 2) return -180;
+          return -60;
+        })
+        .distanceMax(650)
+    );
+
+    // 3. Radial Force: Định hướng các tầng duy trì bán kính tỏa tròn cân đối
+    fgRef.current.d3Force(
+      "radial",
+      forceRadial(
+        (node: any) => {
+          if (node.level === 0) return 0;
+          if (node.level === 1) return 220;
+          if (node.level === 2) return 425;
+          return 560;
+        },
+        0,
+        0
+      ).strength((node: any) => {
+        if (node.level === 0) return 1.0;
+        if (node.level === 1) return 0.75;
+        if (node.level === 2) return 0.55;
+        return 0.35;
+      })
+    );
+
+    // 4. Link Force: Chiều dài và độ đàn hồi của cành cây
+    const linkForce: any = fgRef.current.d3Force("link");
+    if (linkForce) {
+      linkForce
+        .distance((link: any) => {
+          if (link.level === 1) return 220;
+          if (link.level === 2) return 160;
+          return 85;
+        })
+        .strength((link: any) => {
+          if (link.isCrossLink) return 0.05;
+          if (link.level === 1) return 0.8;
+          if (link.level === 2) return 0.6;
+          return 0.45;
+        });
+    }
+
+    fgRef.current.d3ReheatSimulation();
+  }, [graphData]);
+
+  // =========================================================================
+  // XỬ LÝ KÉO THẢ NODE (DRAG & REAL-TIME AVOIDANCE)
+  // =========================================================================
+  const handleNodeDrag = useCallback((node: any) => {
+    // Khi đang kéo 1 node, liên tục hâm nóng mô phỏng để các node khác dạt ra né tránh
+    if (fgRef.current) {
+      fgRef.current.d3ReheatSimulation();
+    }
+  }, []);
+
+  const handleNodeDragEnd = useCallback((node: any) => {
+    // Giữ node tại vị trí mới được thả
+    if (node.level !== 0) {
+      node.fx = node.x;
+      node.fy = node.y;
+    }
+    if (fgRef.current) {
+      fgRef.current.d3ReheatSimulation();
+    }
+  }, []);
+
+  // =========================================================================
+  // TÍNH NĂNG AUTO LAYOUT (TỰ ĐỘNG SẮP XẾP LẠI TOÀN BỘ CÂY TRI THỨC)
+  // =========================================================================
+  const handleAutoLayout = useCallback(() => {
+    if (!fgRef.current) return;
+
+    // Tháo gỡ ghim tọa độ của tất cả các node (trừ gốc) và đưa về vị trí cân bằng
+    graphData.nodes.forEach((node) => {
+      if (node.level === 0) {
+        node.fx = 0;
+        node.fy = 0;
+        node.x = 0;
+        node.y = 0;
+      } else {
+        node.fx = undefined;
+        node.fy = undefined;
+        if (node.initialX !== undefined && node.initialY !== undefined) {
+          node.x = node.initialX;
+          node.y = node.initialY;
+        }
+      }
+    });
+
+    // Kích hoạt mô phỏng vật lý thư giãn (Relaxation)
+    fgRef.current.d3ReheatSimulation();
+    centerCamera(0, 0, 0.72, 700);
+
+    toast.success("Đã tự động sắp xếp lại Cây Tri Thức về vị trí cân đối");
+  }, [graphData, centerCamera]);
 
   // Click handler
   const handleNodeClick = useCallback(
@@ -588,7 +712,6 @@ export const TopicKnowledgeGraph: React.FC = () => {
   // Vòng nền tinh tế làm mốc cự ly (Watermark Tree Rings)
   const handleRenderFramePre = useCallback((ctx: CanvasRenderingContext2D, globalScale: number) => {
     ctx.save();
-    // Vòng mốc cự ly thanh mảnh, không có trục đứt đoạn thô ráp
     const rings = [220, 420, 560];
     rings.forEach((r) => {
       ctx.beginPath();
@@ -647,43 +770,35 @@ export const TopicKnowledgeGraph: React.FC = () => {
       ctx.moveTo(source.x, source.y);
 
       if (link.level === 1) {
-        // Gốc -> Thân ngành: Thẳng hoặc uốn nhẹ
         ctx.lineTo(target.x, target.y);
       } else {
-        // Thân -> Môn học hoặc Môn -> Bài học: Uốn cong tự nhiên
         const midX = (source.x + target.x) / 2;
         const midY = (source.y + target.y) / 2;
-        // Điểm uốn cong nhẹ theo hướng bán kính
         const cpX = midX * 1.015;
         const cpY = midY * 1.015;
         ctx.quadraticCurveTo(cpX, cpY, target.x, target.y);
       }
 
       if (isConnected) {
-        // Nhánh cây đang được chọn / hover: Sáng rực nổi bật
         ctx.strokeStyle = "#4F46E5";
         ctx.lineWidth = (link.level === 1 ? 3.0 : link.level === 2 ? 2.4 : 1.8) / globalScale;
         ctx.setLineDash([]);
         ctx.shadowColor = "rgba(79, 70, 229, 0.4)";
         ctx.shadowBlur = 8 / globalScale;
       } else {
-        // Nhánh cây bình thường
         if (link.isCrossLink) {
           ctx.strokeStyle = "rgba(130, 153, 224, 0.35)";
           ctx.lineWidth = 0.8 / globalScale;
           ctx.setLineDash([3 / globalScale, 4 / globalScale]);
         } else if (link.level === 1) {
-          // Thân cành lớn
           ctx.strokeStyle = "rgba(114, 134, 211, 0.65)";
           ctx.lineWidth = 2.2 / globalScale;
           ctx.setLineDash([]);
         } else if (link.level === 2) {
-          // Cành môn học
           ctx.strokeStyle = "rgba(130, 153, 224, 0.55)";
           ctx.lineWidth = 1.4 / globalScale;
           ctx.setLineDash([]);
         } else {
-          // Nhánh tán lá bài học
           ctx.strokeStyle = "rgba(148, 163, 184, 0.45)";
           ctx.lineWidth = 0.9 / globalScale;
           ctx.setLineDash([]);
@@ -741,7 +856,6 @@ export const TopicKnowledgeGraph: React.FC = () => {
         ctx.lineWidth = 2.4 / globalScale;
         ctx.stroke();
 
-        // Vòng tròn trang trí bên trong
         ctx.beginPath();
         ctx.arc(x, y, r - 5, 0, 2 * Math.PI);
         ctx.strokeStyle = isActive ? "rgba(255, 255, 255, 0.4)" : "rgba(114, 134, 211, 0.3)";
@@ -784,14 +898,12 @@ export const TopicKnowledgeGraph: React.FC = () => {
         ctx.stroke();
         ctx.shadowBlur = 0;
 
-        // Mã ngành viết tắt (IT, CS, SE, ACC...)
         ctx.font = `900 ${9.5 / globalScale}px 'Lato', sans-serif`;
         ctx.fillStyle = isActive ? "#ffffff" : (node.color || "#334155");
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(node.shortLabel || "DOM", x, y);
 
-        // Thẻ tên ngành bên dưới node
         ctx.font = `bold ${7.5 / globalScale}px 'Lato', sans-serif`;
         const textMetrics = ctx.measureText(node.name);
         const tw = textMetrics.width;
@@ -840,13 +952,11 @@ export const TopicKnowledgeGraph: React.FC = () => {
         ctx.stroke();
         ctx.shadowBlur = 0;
 
-        // Chấm tâm nhỏ màu xanh
         ctx.beginPath();
         ctx.arc(x, y, (isActive ? 2.8 : 2.0) / globalScale, 0, 2 * Math.PI);
         ctx.fillStyle = isActive ? "#ffffff" : "#7286D3";
         ctx.fill();
 
-        // Thẻ tên môn học thanh lịch
         ctx.font = isActive
           ? `bold ${7.5 / globalScale}px 'Lato', sans-serif`
           : `600 ${6.8 / globalScale}px 'Lato', sans-serif`;
@@ -900,24 +1010,21 @@ export const TopicKnowledgeGraph: React.FC = () => {
         }
         ctx.fill();
 
-        // Màu viền thể hiện trạng thái học tập
-        let strokeColor = "#94a3b8"; // Mặc định xám nhạt
-        if (node.status === "MASTERED") strokeColor = "#10b981"; // Xanh ngọc
-        else if (node.status === "GAP") strokeColor = "#ef4444"; // Đỏ cảnh báo
-        else if (node.status === "ACTIVE") strokeColor = "#f59e0b"; // Vàng cam
+        let strokeColor = "#94a3b8";
+        if (node.status === "MASTERED") strokeColor = "#10b981";
+        else if (node.status === "GAP") strokeColor = "#ef4444";
+        else if (node.status === "ACTIVE") strokeColor = "#f59e0b";
 
         ctx.strokeStyle = isActive ? "#ffffff" : strokeColor;
         ctx.lineWidth = (isActive ? 2.0 : 1.4) / globalScale;
         ctx.stroke();
         ctx.shadowBlur = 0;
 
-        // Chấm tâm nhỏ bên trong
         ctx.beginPath();
         ctx.arc(x, y, (isActive ? 2.4 : 1.6) / globalScale, 0, 2 * Math.PI);
         ctx.fillStyle = isActive ? "#ffffff" : strokeColor;
         ctx.fill();
 
-        // Hiển thị nhãn khi hover hoặc chọn
         if (isActive) {
           ctx.font = `bold ${7.5 / globalScale}px 'Lato', sans-serif`;
           const textMetrics = ctx.measureText(node.name);
@@ -976,7 +1083,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
           </div>
         )}
 
-        {/* ForceGraph2D Canvas */}
+        {/* Dynamic Physics ForceGraph2D Canvas */}
         <ForceGraph2D
           ref={fgRef}
           width={dimensions.width || 800}
@@ -990,10 +1097,14 @@ export const TopicKnowledgeGraph: React.FC = () => {
           onNodeClick={handleNodeClick as any}
           onNodeHover={(node) => setHoveredNode((node as RadialTreeNode) || null)}
           onBackgroundClick={handleBackgroundClick}
-          enableNodeDrag={false}
+          enableNodeDrag={true}
+          onNodeDrag={handleNodeDrag}
+          onNodeDragEnd={handleNodeDragEnd}
           enableZoomInteraction={true}
           enablePanInteraction={true}
-          cooldownTicks={1}
+          cooldownTicks={120}
+          d3AlphaDecay={0.02}
+          d3VelocityDecay={0.3}
         />
 
         {/* Top Right Panel: Quick Metrics & Camera Tools */}
@@ -1031,8 +1142,20 @@ export const TopicKnowledgeGraph: React.FC = () => {
             </div>
           </div>
 
-          {/* Camera Navigation Controls */}
+          {/* Interactive Navigation Controls with Auto Layout */}
           <div className="flex items-center justify-end gap-1.5 bg-white/95 backdrop-blur-md p-1.5 rounded-2xl border border-slate-200/90 shadow-md self-end text-slate-600">
+            {/* Auto Layout Button */}
+            <button
+              onClick={handleAutoLayout}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs transition-colors cursor-pointer border border-indigo-200/60 shadow-sm"
+              title="Tự động sắp xếp lại Cây Tri Thức về vị trí cân đối"
+            >
+              <Wand2 className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Auto Layout</span>
+            </button>
+
+            <div className="w-px h-4 bg-slate-200" />
+
             <button
               onClick={handleZoomIn}
               className="p-1.5 rounded-xl hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
@@ -1047,7 +1170,6 @@ export const TopicKnowledgeGraph: React.FC = () => {
             >
               <ZoomOut className="w-4 h-4" />
             </button>
-            <div className="w-px h-4 bg-slate-200" />
             <button
               onClick={handleResetCamera}
               className="p-1.5 rounded-xl hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
