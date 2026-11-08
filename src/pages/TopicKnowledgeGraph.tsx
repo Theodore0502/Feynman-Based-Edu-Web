@@ -35,6 +35,7 @@ import {
   Layers,
   Loader2,
   Wand2,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { CurriculumService } from "@/lib/services/curriculum-service";
@@ -339,6 +340,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
         initialY: y,
         targetRadius: domainDist,
         targetAngle: angle,
+        summary: d.description,
       };
 
       nodes.push(dNode);
@@ -662,7 +664,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
       if (node.x != null && node.y != null) {
         centerCamera(node.x, node.y, Math.max(zoomLevel, 1.05), 650);
       }
-      if (node.level >= 2) {
+      if (node.level >= 1) {
         setIsDrawerOpen(true);
       }
     },
@@ -672,6 +674,79 @@ export const TopicKnowledgeGraph: React.FC = () => {
   const handleBackgroundClick = useCallback(() => {
     setSelectedNode(null);
   }, []);
+
+  // Danh sách các node con 1 cấp bên dưới của node đang được chọn
+  const childNodes = useMemo(() => {
+    if (!selectedNode) return [];
+
+    // Cấp 0 (Gốc) -> Cấp 1 (8 Ngành)
+    if (selectedNode.level === 0) {
+      return curriculumData.domains.map((d) => {
+        const subCount = curriculumData.domainSubjects.filter((ds) => ds.domain_id === d.id).length;
+        return {
+          id: `domain-${d.id}`,
+          name: d.name,
+          code: DOMAIN_CODE_MAP[d.id] || d.slug.toUpperCase(),
+          subtitle: `${subCount} Môn học trực thuộc`,
+          color: d.colorHex || d.color || "#7286D3",
+          level: 1 as const,
+        };
+      });
+    }
+
+    // Cấp 1 (Ngành) -> Cấp 2 (Môn học)
+    if (selectedNode.level === 1) {
+      const dId = selectedNode.domainId || selectedNode.id.replace("domain-", "");
+      const allowedSubjectIds = new Set(
+        curriculumData.domainSubjects.filter((ds) => ds.domain_id === dId).map((ds) => ds.subject_id)
+      );
+      const subjectsInDomain = curriculumData.subjects.filter(
+        (s) => allowedSubjectIds.has(s.id) || s.domainId === dId
+      );
+      return subjectsInDomain.map((s) => {
+        const topCount = curriculumData.topics.filter((t) => t.subjectId === s.id).length;
+        return {
+          id: `subject-${s.id}`,
+          name: s.name,
+          code: s.slug.toUpperCase(),
+          subtitle: `${topCount} Bài học & Chủ đề`,
+          level: 2 as const,
+        };
+      });
+    }
+
+    // Cấp 2 (Môn học) -> Cấp 3 (Bài học)
+    if (selectedNode.level === 2) {
+      const sId = selectedNode.subjectId || selectedNode.id.replace("subject-", "");
+      const topicsInSubject = curriculumData.topics.filter((t) => t.subjectId === sId);
+      return topicsInSubject.map((t) => {
+        return {
+          id: `topic-${t.id}`,
+          name: t.title,
+          status: t.status,
+          clarityScore: t.highestClarityScore,
+          subtitle: t.summary ? (t.summary.length > 55 ? `${t.summary.slice(0, 52)}…` : t.summary) : undefined,
+          level: 3 as const,
+        };
+      });
+    }
+
+    return [];
+  }, [selectedNode, curriculumData]);
+
+  // Click vào 1 node con trong Drawer để camera bay tới và chọn node đó
+  const handleSelectChildNode = useCallback(
+    (childNodeId: string) => {
+      const found = graphData.nodes.find((n) => n.id === childNodeId);
+      if (found) {
+        setSelectedNode(found);
+        if (found.x != null && found.y != null) {
+          centerCamera(found.x, found.y, Math.max(zoomLevel, 1.1), 650);
+        }
+      }
+    },
+    [graphData.nodes, centerCamera, zoomLevel]
+  );
 
   const handleTeachTopic = (topicName: string) => {
     navigate(`/stage/new?topic=${encodeURIComponent(topicName)}`);
@@ -1282,6 +1357,74 @@ export const TopicKnowledgeGraph: React.FC = () => {
                       >
                         {c}
                       </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Danh sách các Node con 1 cấp bên dưới */}
+              {childNodes.length > 0 && (
+                <div className="space-y-2.5 pt-3 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                      {selectedNode.level === 0
+                        ? `8 Nhóm Ngành Trực Thuộc (${childNodes.length})`
+                        : selectedNode.level === 1
+                        ? `Danh Sách Môn Học (${childNodes.length} Môn)`
+                        : `Danh Sách Bài Học (${childNodes.length} Bài)`}
+                    </h4>
+                    <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200/50">
+                      Bấm để chọn
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-1">
+                    {childNodes.map((child: any) => (
+                      <div
+                        key={child.id}
+                        onClick={() => handleSelectChildNode(child.id)}
+                        className="p-2.5 rounded-xl bg-slate-50/80 hover:bg-indigo-50/80 border border-slate-200/80 hover:border-indigo-300 transition-all cursor-pointer flex items-center justify-between group"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                          <div className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-2xs group-hover:border-indigo-300">
+                            {child.level === 1 && <Sparkles className="w-3 h-3 text-indigo-600" />}
+                            {child.level === 2 && <BookOpen className="w-3 h-3 text-blue-600" />}
+                            {child.level === 3 && (
+                              <div
+                                className={`w-2 h-2 rounded-full ${
+                                  child.status === "COMPLETED" || child.status === "MASTERED"
+                                    ? "bg-emerald-500"
+                                    : child.status === "GAP" || child.status === "NEEDS_REVIEW"
+                                    ? "bg-red-500"
+                                    : child.status === "ACTIVE" || child.status === "IN_PROGRESS"
+                                    ? "bg-amber-500"
+                                    : "bg-slate-300"
+                                }`}
+                              />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-700">
+                              {child.name}
+                            </div>
+                            {child.subtitle && (
+                              <div className="text-[10px] text-slate-400 truncate">
+                                {child.subtitle}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {child.clarityScore !== undefined && child.clarityScore > 0 && (
+                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                              {child.clarityScore}%
+                            </span>
+                          )}
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all" />
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
