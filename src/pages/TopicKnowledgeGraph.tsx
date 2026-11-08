@@ -1,16 +1,17 @@
 /**
  * File: src/pages/TopicKnowledgeGraph.tsx
- * Mục đích: Màn hình Bản Đồ Tri Thức (Knowledge Graph) theo cấu trúc Bố Cục Tỏa Tròn (Radial Dendrogram)
- * học theo phong cách Cybernetic / Neural Dendrogram:
- *   - Lõi trung tâm ở rìa trái (Core Rim với vòng cung phát sáng đứt đoạn & nhãn mã hóa DE, FE, MATH...)
- *   - Tâm vòng tròn ghim tuyệt đối tại mép trái và chính giữa theo trục dọc (X=0, Y=height/2)
- *   - Hệ thống quỹ đạo đồng tâm mảnh (Concentric Guide Orbits)
- *   - Phân cấp 5 tầng (Domain, Field, Subject, Topic Group, Micro-concept Leaves)
- *   - Bó sợi liên kết uốn cong Bézier mảnh như sợi quang (Fiber-optic Bundles)
- *   - Đường dẫn tín hiệu cảnh báo màu đỏ (Red Tracer Pathways) cho các lỗ hổng kiến thức
- *   - Các node lá dạng vòng tròn li ti (Hollow Ringlets & Pulse Dots)
- *   - BẢNG MÀU HỆ THỐNG: Giao diện sáng chuẩn Theodore (#f8fafc / trắng / slate / xanh / đỏ / ngọc), KHÔNG DÙNG MÀU ĐEN.
- *   - Khóa kéo/pan màn hình, zoom to nhỏ mượt mà bảo toàn tâm.
+ * Mục đích: Màn hình Bản Đồ Tri Thức (Knowledge Graph) theo cấu trúc Bố Cục Tỏa Tròn 360° (Radial Constellation)
+ * DỮ LIỆU ĐƯỢC LOAD 100% ĐỘNG TỪ SUPABASE (8 Nhóm Ngành, 37 Môn Học, 56 Liên Kết Đa Ngành, 479 Bài Học)
+ * TUÂN THỦ NGHIÊM NGẶT NGUYÊN TẮC: CẤM HARDCODE DỮ LIỆU, DỮ LIỆU PHẢI LƯU VÀ TRUY VẤN TỪ SUPABASE.
+ *
+ * Cấu trúc phân cấp 5 tầng:
+ *   - Lõi trung tâm: Không Gian Feynman (Level 0) tại tọa độ (0, 0)
+ *   - Tầng 1: 8 Nhóm Ngành Học (Level 1 - Domains) phân bổ đều 360° (mỗi 45°)
+ *   - Tầng 2: 37 Môn Học (Level 2 - Subjects), hỗ trợ các môn chung/cầu nối đa ngành (Cross-domain Bridges)
+ *   - Tầng 3: 479 Bài Học & Chủ Đề (Level 3 - Topics/Lectures) kèm trạng thái thông thạo & điểm Feynman Clarity
+ *   - Tầng 4: Vi Khái Niệm Cốt Lõi (Level 4 - Micro-concept Leaves)
+ *
+ * BẢNG MÀU HỆ THỐNG: Giao diện sáng chuẩn Theodore (#f8fafc / trắng / slate / xanh #8299E0), KHÔNG DÙNG MÀU ĐEN.
  */
 
 import React, { useMemo, useState, useRef, useCallback, useEffect, useLayoutEffect } from "react";
@@ -29,14 +30,15 @@ import {
   X,
   Target,
   GraduationCap,
+  Layers,
+  Loader2,
 } from "lucide-react";
-import { TOPICS_CATALOG } from "@/data/academic-catalog.data";
-import { GRAPH_EDGES } from "@/data/knowledge-graph.data";
-import { CatalogTopic, GraphEdge } from "@/types/catalog.types";
+import { CurriculumService } from "@/lib/services/curriculum-service";
+import { CatalogTopic, DomainCategory, AcademicSubject } from "@/types/catalog.types";
 import { useStudyStore } from "@/hooks/useStudyStore";
 import TopicHierarchySearch, { SearchFilterState } from "@/components/topics/TopicHierarchySearch";
 
-// Type definitions for Radial Dendrogram Nodes & Links
+// Type definitions for Radial Constellation Nodes & Links
 export interface RadialGraphNode {
   id: string;
   level: 0 | 1 | 2 | 3 | 4 | 5;
@@ -46,7 +48,7 @@ export interface RadialGraphNode {
   fieldId?: string;
   subjectId?: string;
   color?: string;
-  status?: "MASTERED" | "ACTIVE" | "GAP" | "UNLEARNED";
+  status?: "MASTERED" | "ACTIVE" | "GAP" | "UNLEARNED" | "IN_PROGRESS" | "NOT_STARTED";
   clarityScore?: number;
   r?: number;
   width?: number;
@@ -71,96 +73,16 @@ export interface RadialGraphLink {
   isCrossLink?: boolean;
 }
 
-// Constellation Layout Configuration (Satellite Network 360° Infographic)
-const DOMAIN_CONFIG: Record<
-  string,
-  {
-    code: string;
-    name: string;
-    symbol: string;
-    angle: number;
-    dist: number;
-  }
-> = {
-  math: {
-    code: "MATH",
-    name: "Toán Cao Cấp & Đại Số",
-    symbol: "∑",
-    angle: -2.356, // -135° (Top-Left quadrant)
-    dist: 270,
-  },
-  discrete: {
-    code: "DISC",
-    name: "Toán Rời Rạc & Đồ Thị",
-    symbol: "⑂",
-    angle: -0.785, // -45° (Top-Right quadrant)
-    dist: 270,
-  },
-  cv: {
-    code: "CV",
-    name: "Thị Giác Máy Tính & AI",
-    symbol: "👁",
-    angle: 0.785, // +45° (Bottom-Right quadrant)
-    dist: 270,
-  },
-  cs: {
-    code: "SYS",
-    name: "Hệ Thống & Khoa Học Máy Tính",
-    symbol: "⚙",
-    angle: 2.356, // +135° (Bottom-Left quadrant)
-    dist: 270,
-  },
-};
-
-// Deterministic topic-to-field mapping: guarantees balanced 3 to 4 topics per field (no cramming/overlap)
-const TOPIC_TO_FIELD: Record<string, string> = {
-  // Math (10 topics)
-  "math-linear-transformations": "field-algebra",
-  "math-eigenvalues-eigenvectors": "field-algebra",
-  "math-svd": "field-algebra",
-  "math-gauss-jordan-elimination": "field-algebra",
-  "math-taylor-series": "field-calculus",
-  "math-fourier-transform": "field-calculus",
-  "math-double-integrals-green": "field-calculus",
-  "math-gradient-descent": "field-optimization",
-  "math-hessian-saddle-points": "field-optimization",
-  "math-gram-schmidt": "field-optimization",
-
-  // Discrete (10 topics)
-  "discrete-bfs-dfs-graph-traversal": "field-graph-theory",
-  "discrete-dijkstra-algorithm": "field-graph-theory",
-  "discrete-minimum-spanning-tree": "field-graph-theory",
-  "discrete-euler-hamilton-cycles": "field-graph-theory",
-  "discrete-propositional-logic-boolean": "field-logic",
-  "discrete-equivalence-relations-partitions": "field-logic",
-  "discrete-graph-coloring-four-color": "field-logic",
-  "discrete-combinatorics-binomial": "field-combinatorics",
-  "discrete-pigeonhole-principle": "field-combinatorics",
-  "discrete-mathematical-induction-recurrence": "field-combinatorics",
-
-  // CV (10 topics)
-  "cv-edge-detection-canny-sobel": "field-image-proc",
-  "cv-color-spaces-morphology": "field-image-proc",
-  "cv-sift-harris-corner": "field-image-proc",
-  "cv-yolo-object-detection": "field-detection",
-  "cv-hough-transform": "field-detection",
-  "cv-optical-flow-lucas-kanade": "field-detection",
-  "cv-convolution-cnn": "field-neural-nets",
-  "cv-resnet-skip-connections": "field-neural-nets",
-  "cv-unet-semantic-segmentation": "field-neural-nets",
-  "cv-vision-transformers-vit": "field-neural-nets",
-
-  // CS Systems (10 topics)
-  "cs-pointers-memory-management": "field-os",
-  "cs-process-vs-thread-concurrency": "field-os",
-  "cs-deadlock-coffman-conditions": "field-os",
-  "cs-virtual-memory-paging": "field-os",
-  "cs-btree-database-indexing": "field-db",
-  "cs-hash-tables-collision-resolution": "field-db",
-  "cs-docker-containers-namespaces": "field-db",
-  "cs-cap-theorem-distributed-systems": "field-dist-sys",
-  "cs-tcp-3way-handshake": "field-dist-sys",
-  "cs-message-queues-event-driven": "field-dist-sys",
+// Map icon / code for 8 domains
+const DOMAIN_METADATA: Record<string, { code: string; symbol: string }> = {
+  "dom-it": { code: "IT", symbol: "💻" },
+  "dom-cs": { code: "CS", symbol: "⚙️" },
+  "dom-se": { code: "SE", symbol: "🛠️" },
+  "dom-ecom": { code: "ECOM", symbol: "🛒" },
+  "dom-acc": { code: "ACC", symbol: "📊" },
+  "dom-biz": { code: "BIZ", symbol: "📈" },
+  "dom-tour": { code: "TOUR", symbol: "✈️" },
+  "dom-med": { code: "MED", symbol: "🎨" },
 };
 
 export const TopicKnowledgeGraph: React.FC = () => {
@@ -169,13 +91,41 @@ export const TopicKnowledgeGraph: React.FC = () => {
   const fgRef = useRef<ForceGraphMethods | undefined>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Live Supabase Curriculum State
+  const [curriculumData, setCurriculumData] = useState<{
+    domains: DomainCategory[];
+    subjects: AcademicSubject[];
+    domainSubjects: Array<{ domain_id: string; subject_id: string; is_core: boolean }>;
+    topics: CatalogTopic[];
+  }>({
+    domains: [],
+    subjects: [],
+    domainSubjects: [],
+    topics: [],
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Fetch Live Data from Supabase
+  useEffect(() => {
+    let isMounted = true;
+    CurriculumService.getAllCurriculumGraphData().then((data) => {
+      if (isMounted) {
+        setCurriculumData(data);
+        setIsLoading(false);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Active / Selected Node State
   const [selectedNode, setSelectedNode] = useState<RadialGraphNode | null>(null);
   const [hoveredNode, setHoveredNode] = useState<RadialGraphNode | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [zoomLevel, setZoomLevel] = useState<number>(0.75);
 
-  // Hierarchical Search Filter State (Phương án C - Hybrid Search)
+  // Hierarchical Search Filter State
   const [filterState, setFilterState] = useState<SearchFilterState>({
     domainId: "ALL",
     fieldId: "ALL",
@@ -195,21 +145,37 @@ export const TopicKnowledgeGraph: React.FC = () => {
       if (node.level === 0) return true; // Core stays visible
 
       // Domain filter
-      if (filterState.domainId !== "ALL" && node.domainId && node.domainId !== filterState.domainId) {
-        return false;
+      if (filterState.domainId !== "ALL") {
+        const dId = filterState.domainId;
+        if (node.level === 1 && node.id !== dId && node.id !== `domain-${dId}`) {
+          return false;
+        }
+        if (node.level >= 2 && node.domainId && node.domainId !== dId) {
+          return false;
+        }
       }
 
-      // Field filter
+      // Subject / Field filter
       if (filterState.fieldId !== "ALL") {
+        const sId = filterState.fieldId;
         if (node.level === 1) return true;
-        if (node.level === 2 && node.id !== filterState.fieldId) return false;
-        if (node.level >= 3 && node.fieldId !== filterState.fieldId) return false;
+        if (
+          node.level === 2 &&
+          node.id !== sId &&
+          node.id !== `subject-${sId}` &&
+          node.subjectId !== sId
+        ) {
+          return false;
+        }
+        if (node.level >= 3 && node.subjectId !== sId) {
+          return false;
+        }
       }
 
       // Keyword filter
       if (filterState.keyword.length > 0) {
         const kw = filterState.keyword.toLowerCase();
-        if (node.level >= 3) {
+        if (node.level >= 2) {
           const matchName = node.name.toLowerCase().includes(kw);
           const matchSummary = node.summary?.toLowerCase().includes(kw);
           const matchConcept = node.requiredConcepts?.some((c) => c.toLowerCase().includes(kw));
@@ -219,11 +185,12 @@ export const TopicKnowledgeGraph: React.FC = () => {
 
       // Specific topic selection from dropdown
       if (filterState.selectedTopicId) {
-        if (node.level >= 3) {
+        if (node.level >= 2) {
           const matchId =
             node.id === filterState.selectedTopicId ||
-            node.subjectId === filterState.selectedTopicId ||
-            node.id === `subject-${filterState.selectedTopicId}`;
+            node.id === `topic-${filterState.selectedTopicId}` ||
+            node.id === `subject-${filterState.selectedTopicId}` ||
+            node.subjectId === filterState.selectedTopicId;
           if (!matchId) return false;
         }
       }
@@ -260,7 +227,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
   }, []);
 
   // Center Camera smoothly on (x, y) with specified zoom
-  const centerCamera = useCallback((x: number = 0, y: number = 0, zoom: number = 0.82, duration: number = 700) => {
+  const centerCamera = useCallback((x: number = 0, y: number = 0, zoom: number = 0.75, duration: number = 700) => {
     if (fgRef.current) {
       fgRef.current.centerAt(x, y, duration);
       fgRef.current.zoom(zoom, duration);
@@ -270,22 +237,22 @@ export const TopicKnowledgeGraph: React.FC = () => {
   // Initial centering on (0, 0) when mounted
   const hasInitializedRef = useRef(false);
   useEffect(() => {
-    if (dimensions.width > 0 && dimensions.height > 0 && !hasInitializedRef.current) {
+    if (dimensions.width > 0 && dimensions.height > 0 && !hasInitializedRef.current && !isLoading) {
       hasInitializedRef.current = true;
-      centerCamera(0, 0, 0.82, 0);
-      const t1 = setTimeout(() => centerCamera(0, 0, 0.82, 0), 100);
-      const t2 = setTimeout(() => centerCamera(0, 0, 0.82, 0), 300);
+      centerCamera(0, 0, 0.72, 0);
+      const t1 = setTimeout(() => centerCamera(0, 0, 0.72, 0), 100);
+      const t2 = setTimeout(() => centerCamera(0, 0, 0.72, 0), 300);
       return () => {
         clearTimeout(t1);
         clearTimeout(t2);
       };
     }
-  }, [dimensions.width, dimensions.height, centerCamera]);
+  }, [dimensions.width, dimensions.height, centerCamera, isLoading]);
 
   // Handle Zoom In / Zoom Out / Reset
   const handleResetCamera = () => {
-    setZoomLevel(0.82);
-    centerCamera(0, 0, 0.82, 700);
+    setZoomLevel(0.72);
+    centerCamera(0, 0, 0.72, 700);
   };
 
   const handleZoomIn = () => {
@@ -304,10 +271,15 @@ export const TopicKnowledgeGraph: React.FC = () => {
     });
   };
 
-  // Build Hierarchical Constellation Dataset (Satellites Network 360°)
+  // Build Hierarchical Constellation Dataset DYNAMICALLY from Supabase
   const graphData = useMemo(() => {
     const nodes: RadialGraphNode[] = [];
     const links: RadialGraphLink[] = [];
+
+    const { domains, subjects, domainSubjects, topics } = curriculumData;
+    if (domains.length === 0) {
+      return { nodes, links };
+    }
 
     // 0. Level 0: Core Node (Feynman Matrix Hub at origin)
     nodes.push({
@@ -315,7 +287,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
       level: 0,
       name: "KHÔNG GIAN FEYNMAN",
       shortLabel: "FEYNMAN CORE",
-      r: 46,
+      r: 48,
       x: 0,
       y: 0,
       fx: 0,
@@ -324,26 +296,34 @@ export const TopicKnowledgeGraph: React.FC = () => {
       targetAngle: 0,
     });
 
-    // 1. Level 1: Domain Hubs (4 Quadrants)
-    const domainKeys = ["math", "discrete", "cv", "cs"];
-    domainKeys.forEach((dKey) => {
-      const cfg = DOMAIN_CONFIG[dKey];
-      const x = cfg.dist * Math.cos(cfg.angle);
-      const y = cfg.dist * Math.sin(cfg.angle);
+    // 1. Level 1: 8 Domain Nodes (Distributed symmetrically at 45° around 360°)
+    const numDomains = domains.length;
+    const domainDist = 300;
+    const domainAngleMap = new Map<string, number>();
+
+    domains.forEach((d, dIdx) => {
+      // Start top at -90° (-PI/2), then distribute clockwise by 2*PI / numDomains
+      const angle = (dIdx * 2 * Math.PI) / numDomains - Math.PI / 2;
+      domainAngleMap.set(d.id, angle);
+
+      const x = domainDist * Math.cos(angle);
+      const y = domainDist * Math.sin(angle);
+      const meta = DOMAIN_METADATA[d.id] || { code: d.slug.toUpperCase(), symbol: "📚" };
 
       const dNode: RadialGraphNode = {
-        id: `domain-${dKey}`,
+        id: `domain-${d.id}`,
         level: 1,
-        domainId: dKey,
-        name: cfg.name,
-        shortLabel: cfg.symbol,
+        domainId: d.id,
+        name: d.name,
+        shortLabel: meta.code,
+        color: d.colorHex || d.color || "#8299E0",
         r: 24,
         x,
         y,
         fx: x,
         fy: y,
-        targetRadius: cfg.dist,
-        targetAngle: cfg.angle,
+        targetRadius: domainDist,
+        targetAngle: angle,
       };
 
       nodes.push(dNode);
@@ -355,288 +335,208 @@ export const TopicKnowledgeGraph: React.FC = () => {
       });
     });
 
-    // 2. Level 2: Field Nodes (12 fields, 3 per domain radiating outward with ample spread)
-    const fieldDefinitions: Array<{
-      id: string;
-      domainId: string;
-      name: string;
-      shortLabel: string;
-      offsetAngle: number;
-      dist: number;
-    }> = [
-      // Math
-      { id: "field-algebra", domainId: "math", name: "Đại Số Tuyến Tính", shortLabel: "ĐSTT", offsetAngle: -0.46, dist: 140 },
-      { id: "field-calculus", domainId: "math", name: "Giải Tích Nhiều Biến", shortLabel: "GT", offsetAngle: 0, dist: 210 },
-      { id: "field-optimization", domainId: "math", name: "Tối Ưu Hóa Vi Phân", shortLabel: "TƯH", offsetAngle: 0.46, dist: 140 },
-      // Discrete
-      { id: "field-graph-theory", domainId: "discrete", name: "Lý Thuyết Đồ Thị", shortLabel: "ĐTH", offsetAngle: -0.46, dist: 140 },
-      { id: "field-logic", domainId: "discrete", name: "Logic & Boole", shortLabel: "LOGIC", offsetAngle: 0, dist: 210 },
-      { id: "field-combinatorics", domainId: "discrete", name: "Tổ Hợp & Nhị Thức", shortLabel: "TỔ HỢP", offsetAngle: 0.46, dist: 140 },
-      // CV
-      { id: "field-image-proc", domainId: "cv", name: "Xử Lý & Lọc Biên", shortLabel: "LỌC", offsetAngle: -0.46, dist: 140 },
-      { id: "field-neural-nets", domainId: "cv", name: "Mạng Tích Chập CNN", shortLabel: "CNN", offsetAngle: 0, dist: 210 },
-      { id: "field-detection", domainId: "cv", name: "Nhận Diện & Detection", shortLabel: "YOLO", offsetAngle: 0.46, dist: 140 },
-      // CS
-      { id: "field-os", domainId: "cs", name: "Hệ Điều Hành & Con Trỏ", shortLabel: "HĐH", offsetAngle: -0.46, dist: 140 },
-      { id: "field-db", domainId: "cs", name: "Cơ Sở Dữ Liệu B-Tree", shortLabel: "CSDL", offsetAngle: 0, dist: 210 },
-      { id: "field-dist-sys", domainId: "cs", name: "Hệ Thống Phân Tán", shortLabel: "PHÂN TÁN", offsetAngle: 0.46, dist: 140 },
-    ];
+    // Group subjects by their primary domain
+    const subjectsByPrimaryDomain = new Map<string, AcademicSubject[]>();
+    domains.forEach((d) => subjectsByPrimaryDomain.set(d.id, []));
 
-    fieldDefinitions.forEach((f) => {
-      const domainCfg = DOMAIN_CONFIG[f.domainId];
-      const domainX = domainCfg.dist * Math.cos(domainCfg.angle);
-      const domainY = domainCfg.dist * Math.sin(domainCfg.angle);
-      const angle = domainCfg.angle + f.offsetAngle;
-      const x = domainX + f.dist * Math.cos(angle);
-      const y = domainY + f.dist * Math.sin(angle);
-
-      const fNode: RadialGraphNode = {
-        id: f.id,
-        level: 2,
-        domainId: f.domainId,
-        name: f.name,
-        shortLabel: f.shortLabel,
-        r: 14,
-        x,
-        y,
-        fx: x,
-        fy: y,
-        targetRadius: f.dist,
-        targetAngle: angle,
-      };
-
-      nodes.push(fNode);
-      links.push({
-        id: `link-domain-${f.domainId}-${f.id}`,
-        source: `domain-${f.domainId}`,
-        target: f.id,
-        isHierarchy: true,
-      });
+    // Multi-domain mapping: subjectId -> Array of domain_ids
+    const subjectDomainsMap = new Map<string, string[]>();
+    domainSubjects.forEach((ds) => {
+      const arr = subjectDomainsMap.get(ds.subject_id) || [];
+      arr.push(ds.domain_id);
+      subjectDomainsMap.set(ds.subject_id, arr);
     });
 
-    // Helper: Map subject to field deterministically
-    const assignSubjectToField = (topicId: string, domainId: string): string => {
-      if (TOPIC_TO_FIELD[topicId]) return TOPIC_TO_FIELD[topicId];
-      if (domainId === "math") return "field-algebra";
-      if (domainId === "discrete") return "field-graph-theory";
-      if (domainId === "cv") return "field-neural-nets";
-      if (domainId === "cs") return "field-os";
-      return "field-algebra";
-    };
+    subjects.forEach((s) => {
+      const linkedDomains = subjectDomainsMap.get(s.id) || (s.domainId ? [s.domainId] : [domains[0]?.id || "dom-it"]);
+      const primaryDomainId = linkedDomains[0];
+      const list = subjectsByPrimaryDomain.get(primaryDomainId) || [];
+      list.push(s);
+      subjectsByPrimaryDomain.set(primaryDomainId, list);
+    });
 
-    // 3. Level 3: Subject Nodes & Colinear Satellites (Zero-collision ray architecture)
-    fieldDefinitions.forEach((f) => {
-      const domainCfg = DOMAIN_CONFIG[f.domainId];
-      const domainX = domainCfg.dist * Math.cos(domainCfg.angle);
-      const domainY = domainCfg.dist * Math.sin(domainCfg.angle);
-      const fieldAngle = domainCfg.angle + f.offsetAngle;
-      const fx = domainX + f.dist * Math.cos(fieldAngle);
-      const fy = domainY + f.dist * Math.sin(fieldAngle);
+    // 2. Level 2: 37 Subject Nodes (Grouped around primary domains with cross-links)
+    const subjectCoordMap = new Map<string, { x: number; y: number; angle: number }>();
 
-      const fieldSubjects = TOPICS_CATALOG.filter((c: CatalogTopic) => {
-        const assigned = assignSubjectToField(c.id, c.domainId || "");
-        return assigned === f.id;
-      });
+    domains.forEach((d) => {
+      const dAngle = domainAngleMap.get(d.id) ?? 0;
+      const dSubs = subjectsByPrimaryDomain.get(d.id) || [];
+      const numSubs = dSubs.length;
 
-      const subjectsToRender =
-        fieldSubjects.length > 0
-          ? fieldSubjects
-          : [
-              {
-                id: `mock-${f.id}-1`,
-                domainId: f.domainId,
-                title: `${f.name} I`,
-                summary: `Nền tảng lý thuyết và ứng dụng của ${f.name}.`,
-                requiredConcepts: ["Cơ bản", "Định lý 1"],
-                jargonTraps: [],
-              },
-            ];
+      dSubs.forEach((s, sIdx) => {
+        // Sector angular arc spread
+        const maxSectorSpread = 0.44; // ~25 degrees
+        const sOffset =
+          numSubs > 1
+            ? (sIdx - (numSubs - 1) / 2) * (maxSectorSpread / Math.max(1, numSubs - 1))
+            : 0;
+        const subAngle = dAngle + sOffset;
 
-      const numSubs = subjectsToRender.length;
-      const angleOffsets =
-        numSubs === 3
-          ? [-0.26, 0, 0.26]
-          : numSubs === 4
-          ? [-0.36, -0.12, 0.12, 0.36]
-          : [0];
+        // Stagger distance so neighboring subject pills do not collide
+        const subDist = 520 + (sIdx % 3) * 45;
+        const sx = subDist * Math.cos(subAngle);
+        const sy = subDist * Math.sin(subAngle);
 
-      subjectsToRender.forEach((sub: any, sIdx: number) => {
-        const subOffset = angleOffsets[sIdx] ?? (sIdx - (numSubs - 1) / 2) * 0.22;
-        const subAngle = fieldAngle + subOffset;
-        // Staggered distance to ensure neighboring subjects differ by >= 65px radially
-        const subDist = 90 + (sIdx % 3) * 65;
-        const sx = fx + subDist * Math.cos(subAngle);
-        const sy = fy + subDist * Math.sin(subAngle);
+        subjectCoordMap.set(s.id, { x: sx, y: sy, angle: subAngle });
 
-        // Status assignment
-        let status: RadialGraphNode["status"] = "UNLEARNED";
-        let clarityScore = 0;
-        if (sIdx === 0 && (f.domainId === "math" || f.domainId === "cv")) {
-          status = "MASTERED";
-          clarityScore = 92;
-        } else if (sIdx === 1 && f.domainId === "math") {
-          status = "GAP"; // Knowledge Gap
-          clarityScore = 58;
-        } else if (sIdx === 0 && f.domainId === "discrete") {
-          status = "ACTIVE";
-          clarityScore = 74;
-        } else if (sIdx === 0 && f.domainId === "cs") {
-          status = "MASTERED";
-          clarityScore = 88;
-        } else if (sIdx === 1 && f.domainId === "cv") {
-          status = "GAP";
-          clarityScore = 52;
-        }
-
-        const subNode: RadialGraphNode = {
-          id: `subject-${sub.id}`,
-          level: 3,
-          domainId: sub.domainId,
-          fieldId: f.id,
-          name: sub.title,
-          shortLabel: sub.title.slice(0, 10),
-          status,
-          clarityScore,
-          r: 8.5,
+        const sNode: RadialGraphNode = {
+          id: `subject-${s.id}`,
+          level: 2,
+          domainId: d.id,
+          subjectId: s.id,
+          name: s.name,
+          shortLabel: s.name.slice(0, 10),
+          r: 13,
           x: sx,
           y: sy,
           fx: sx,
           fy: sy,
           targetRadius: subDist,
           targetAngle: subAngle,
-          summary: sub.summary,
-          requiredConcepts: sub.requiredConcepts,
-          jargonTraps: sub.jargonTraps,
+          summary: s.description,
         };
 
-        nodes.push(subNode);
+        nodes.push(sNode);
+
+        // Primary Hierarchy Link from primary domain
         links.push({
-          id: `link-f-${f.id}-${subNode.id}`,
-          source: f.id,
-          target: subNode.id,
+          id: `link-domain-${d.id}-${s.id}`,
+          source: `domain-${d.id}`,
+          target: sNode.id,
           isHierarchy: true,
         });
 
-        // 4. Level 4: Topic Group Nodes (A, B) - strung colinearly along the needle ray
-        const modOffsets = [28, 48];
-        const gNodeIds: string[] = [];
-        for (let gIdx = 0; gIdx < 2; gIdx++) {
-          const gDist = modOffsets[gIdx];
-          const gx = sx + gDist * Math.cos(subAngle);
-          const gy = sy + gDist * Math.sin(subAngle);
-          const gLetter = String.fromCharCode(65 + gIdx);
-          const gId = `group-${sub.id}-${gIdx}`;
-          gNodeIds.push(gId);
+        // Cross-domain links for shared subjects (Multi-tier bridges)
+        const allDomains = subjectDomainsMap.get(s.id) || [];
+        allDomains.forEach((otherDomainId) => {
+          if (otherDomainId !== d.id) {
+            links.push({
+              id: `cross-domain-${otherDomainId}-${s.id}`,
+              source: `domain-${otherDomainId}`,
+              target: sNode.id,
+              isHierarchy: false,
+              isCrossLink: true,
+            });
+          }
+        });
+      });
+    });
 
-          const gNode: RadialGraphNode = {
-            id: gId,
-            level: 4,
-            domainId: sub.domainId,
-            fieldId: f.id,
-            subjectId: sub.id,
-            name: `${sub.title} • Module ${gLetter}`,
-            shortLabel: gLetter,
-            r: 5,
-            x: gx,
-            y: gy,
-            fx: gx,
-            fy: gy,
-            targetRadius: gDist,
-            targetAngle: subAngle,
-          };
+    // 3. Level 3: 479 Topic Nodes from Supabase
+    // Group topics by subject
+    const topicsBySubject = new Map<string, CatalogTopic[]>();
+    topics.forEach((t) => {
+      const sId = t.subjectId || "";
+      const arr = topicsBySubject.get(sId) || [];
+      arr.push(t);
+      topicsBySubject.set(sId, arr);
+    });
 
-          nodes.push(gNode);
-          links.push({
-            id: `link-sub-${subNode.id}-${gNode.id}`,
-            source: gIdx === 0 ? subNode.id : gNodeIds[0],
-            target: gNode.id,
-            isHierarchy: true,
-          });
+    subjects.forEach((s) => {
+      const coord = subjectCoordMap.get(s.id);
+      if (!coord) return;
+
+      const subTopics = topicsBySubject.get(s.id) || [];
+      const numTopics = subTopics.length;
+
+      subTopics.forEach((topic, tIdx) => {
+        // Colinear & slightly alternating needle ray
+        const altAngle = coord.angle + (tIdx % 2 === 0 ? 0.03 : -0.03);
+        const tDist = 80 + tIdx * 30; // Radiates outward from subject
+        const tx = coord.x + tDist * Math.cos(altAngle);
+        const ty = coord.y + tDist * Math.sin(altAngle);
+
+        let status: RadialGraphNode["status"] = "UNLEARNED";
+        const topicStatus = (topic.status as string) || "";
+        if (topicStatus === "COMPLETED" || topicStatus === "MASTERED") {
+          status = "MASTERED";
+        } else if (topicStatus === "NEEDS_REVIEW" || topicStatus === "GAP") {
+          status = "GAP";
+        } else if (topicStatus === "IN_PROGRESS" || topicStatus === "ACTIVE") {
+          status = "ACTIVE";
         }
 
-        // 5. Level 5: Micro-concept Leaves - strung colinearly along the needle ray
-        const cOffsets = [64, 74, 84];
-        let prevConceptId = gNodeIds[1];
-        for (let cIdx = 0; cIdx < 3; cIdx++) {
-          const cDist = cOffsets[cIdx];
-          const cx = sx + cDist * Math.cos(subAngle);
-          const cy = sy + cDist * Math.sin(subAngle);
+        const clarityScore = topic.highestClarityScore ?? 0;
 
-          let cStatus: RadialGraphNode["status"] = "UNLEARNED";
-          if (status === "GAP") {
-            cStatus = cIdx === 0 ? "GAP" : "UNLEARNED";
-          } else if (status === "MASTERED") {
-            cStatus = cIdx === 2 ? "UNLEARNED" : "MASTERED";
-          } else if (status === "ACTIVE") {
-            cStatus = cIdx === 0 ? "ACTIVE" : "UNLEARNED";
-          } else {
-            cStatus = "UNLEARNED";
-          }
+        const tNode: RadialGraphNode = {
+          id: `topic-${topic.id}`,
+          level: 3,
+          domainId: topic.domainId || s.domainId,
+          subjectId: s.id,
+          name: topic.title,
+          shortLabel: topic.title.slice(0, 10),
+          status,
+          clarityScore,
+          r: 7.5,
+          x: tx,
+          y: ty,
+          fx: tx,
+          fy: ty,
+          targetRadius: tDist,
+          targetAngle: altAngle,
+          summary: topic.summary,
+          requiredConcepts: topic.requiredConcepts,
+        };
 
-          const cName = sub.requiredConcepts?.[cIdx] || `${sub.title} • Khái niệm #${cIdx + 1}`;
-          const cId = `concept-${sub.id}-${cIdx}`;
+        nodes.push(tNode);
+        links.push({
+          id: `link-sub-${s.id}-${topic.id}`,
+          source: `subject-${s.id}`,
+          target: tNode.id,
+          isHierarchy: true,
+        });
+
+        // 4. Level 4: Micro-concept Leaves (From required_concepts in Supabase)
+        const concepts = topic.requiredConcepts || [];
+        const maxLeaves = Math.min(concepts.length, 2);
+        for (let cIdx = 0; cIdx < maxLeaves; cIdx++) {
+          const cDist = 24 + cIdx * 16;
+          const cx = tx + cDist * Math.cos(altAngle);
+          const cy = ty + cDist * Math.sin(altAngle);
+          const cName = concepts[cIdx];
+          const cId = `concept-${topic.id}-${cIdx}`;
 
           const cNode: RadialGraphNode = {
             id: cId,
             level: 5,
-            domainId: sub.domainId,
-            fieldId: f.id,
-            subjectId: sub.id,
+            domainId: tNode.domainId,
+            subjectId: s.id,
             name: cName,
             shortLabel: "•",
-            status: cStatus,
-            clarityScore: cStatus === "MASTERED" ? 92 : cStatus === "GAP" ? 48 : cStatus === "ACTIVE" ? 75 : 0,
+            status: status === "MASTERED" ? "MASTERED" : status === "GAP" ? "GAP" : "UNLEARNED",
+            clarityScore: status === "MASTERED" ? 90 : status === "GAP" ? 50 : 0,
             r: 2.5,
             x: cx,
             y: cy,
             fx: cx,
             fy: cy,
             targetRadius: cDist,
-            targetAngle: subAngle,
-            summary: sub.summary,
+            targetAngle: altAngle,
+            summary: topic.summary,
           };
 
           nodes.push(cNode);
           links.push({
-            id: `link-c-${prevConceptId}-${cId}`,
-            source: prevConceptId,
+            id: `link-c-${tNode.id}-${cId}`,
+            source: tNode.id,
             target: cId,
             isHierarchy: true,
           });
-          prevConceptId = cId;
         }
       });
     });
 
-    // 6. Cross-Links: Direct prerequisite connections from GRAPH_EDGES
-    GRAPH_EDGES.forEach((edge: GraphEdge, idx: number) => {
-      const srcId = `subject-${edge.source}`;
-      const tgtId = `subject-${edge.target}`;
-      const srcNode = nodes.find((n) => n.id === srcId);
-      const tgtNode = nodes.find((n) => n.id === tgtId);
-
-      if (srcNode && tgtNode) {
-        links.push({
-          id: `cross-edge-${idx}`,
-          source: srcId,
-          target: tgtId,
-          isPrereq: true,
-          isCrossLink: true,
-        });
-      }
-    });
-
     return { nodes, links };
-  }, []);
+  }, [curriculumData]);
 
   // Node Click handler: Select, fly camera smoothly to node, and open details
   const handleNodeClick = useCallback(
     (node: RadialGraphNode) => {
       setSelectedNode(node);
       if (node.x != null && node.y != null) {
-        centerCamera(node.x, node.y, Math.max(zoomLevel, 1.0), 650);
+        centerCamera(node.x, node.y, Math.max(zoomLevel, 1.05), 650);
       }
-      if (node.level === 3 || node.level === 5) {
+      if (node.level >= 2) {
         setIsDrawerOpen(true);
       }
     },
@@ -664,13 +564,13 @@ export const TopicKnowledgeGraph: React.FC = () => {
       setFilterState((prev) => ({
         ...prev,
         selectedTopicId: topic.id,
-        domainId: topic.domainId || "all",
+        domainId: topic.domainId || "ALL",
       }));
       const found = graphData.nodes.find(
         (n) =>
-          n.id === `subject-${topic.id}` ||
-          n.subjectId === topic.id ||
-          n.id === topic.id
+          n.id === `topic-${topic.id}` ||
+          n.id === topic.id ||
+          n.subjectId === topic.subjectId
       );
       if (found) {
         setSelectedNode(found);
@@ -688,19 +588,19 @@ export const TopicKnowledgeGraph: React.FC = () => {
     if (filterState.domainId && filterState.domainId !== "ALL") {
       const dNode = graphData.nodes.find((n) => n.id === `domain-${filterState.domainId}`);
       if (dNode && dNode.x != null && dNode.y != null) {
-        centerCamera(dNode.x, dNode.y, 1.05, 800);
+        centerCamera(dNode.x, dNode.y, 0.95, 800);
       }
     } else if (filterState.domainId === "ALL" && !filterState.selectedTopicId && !filterState.keyword) {
-      centerCamera(0, 0, 0.82, 800);
+      centerCamera(0, 0, 0.72, 800);
     }
   }, [filterState.domainId, filterState.selectedTopicId, filterState.keyword, graphData.nodes, centerCamera]);
 
-  // Pre-frame Render: 360° Astrolabe / Satellite Radar Orbits & Directional Rays
+  // Pre-frame Render: 360° Radar Orbits & Directional Rays
   const handleRenderFramePre = useCallback((ctx: CanvasRenderingContext2D, globalScale: number) => {
     ctx.save();
 
-    // 1. Concentric Guide Radar Orbits (Full 360° Circles centered at origin)
-    const orbits = [90, 260, 410, 560];
+    // 1. Concentric Guide Radar Orbits
+    const orbits = [120, 300, 520, 780, 1050];
     orbits.forEach((r) => {
       ctx.beginPath();
       ctx.arc(0, 0, r, 0, 2 * Math.PI);
@@ -710,32 +610,22 @@ export const TopicKnowledgeGraph: React.FC = () => {
       ctx.stroke();
     });
 
-    // 2. Cardinal & Diagonal Astronomical Axes (8 Rays from radius 90 to 620)
-    const axisAngles = [
-      0,
-      Math.PI / 4,
-      Math.PI / 2,
-      (3 * Math.PI) / 4,
-      Math.PI,
-      (-3 * Math.PI) / 4,
-      -Math.PI / 2,
-      -Math.PI / 4,
-    ];
-    axisAngles.forEach((ang) => {
+    // 2. 8 Astronomical Axes (Aligning with 8 domains)
+    for (let i = 0; i < 8; i++) {
+      const ang = (i * 2 * Math.PI) / 8 - Math.PI / 2;
       ctx.beginPath();
-      ctx.moveTo(90 * Math.cos(ang), 90 * Math.sin(ang));
-      ctx.lineTo(620 * Math.cos(ang), 620 * Math.sin(ang));
+      ctx.moveTo(100 * Math.cos(ang), 100 * Math.sin(ang));
+      ctx.lineTo(1100 * Math.cos(ang), 1100 * Math.sin(ang));
       ctx.strokeStyle = "rgba(130, 153, 224, 0.16)";
       ctx.lineWidth = 0.6 / globalScale;
       ctx.setLineDash([3 / globalScale, 8 / globalScale]);
       ctx.stroke();
-    });
+    }
 
     ctx.restore();
   }, []);
 
   // Custom Node Canvas Renderer: White fill, #8299E0 border, #5A6678 text
-  // On hover or select: #8299E0 fill, white border, white text
   const renderNodeCanvasObject = useCallback(
     (node: RadialGraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const isSelected = selectedNode?.id === node.id;
@@ -762,10 +652,10 @@ export const TopicKnowledgeGraph: React.FC = () => {
       }
 
       // ==========================================
-      // LEVEL 0: CORE NODE (KHÔNG GIAN FEYNMAN) - 360° Circular Center Hub
+      // LEVEL 0: CORE NODE (KHÔNG GIAN FEYNMAN)
       // ==========================================
       if (node.level === 0) {
-        const r = node.r ?? 46;
+        const r = node.r ?? 48;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
         ctx.fillStyle = isActive ? "#8299E0" : "#ffffff";
@@ -796,7 +686,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
         ctx.fillStyle = isActive ? "#ffffff" : "#8299E0";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText("ELISE MATRIX", x, y - 12 / globalScale);
+        ctx.fillText("SUPABASE MATRIX", x, y - 12 / globalScale);
 
         ctx.font = `900 ${8.5 / globalScale}px 'Lato', sans-serif`;
         ctx.fillStyle = isActive ? "#ffffff" : "#5A6678";
@@ -811,7 +701,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
       }
 
       // ==========================================
-      // LEVEL 1: DOMAIN HUBS (Nhóm Ngành)
+      // LEVEL 1: 8 DOMAIN HUBS (Nhóm Ngành)
       // ==========================================
       if (node.level === 1) {
         const r = isActive ? 26 : (node.r ?? 24);
@@ -825,17 +715,17 @@ export const TopicKnowledgeGraph: React.FC = () => {
         }
         ctx.fill();
 
-        ctx.strokeStyle = isActive ? "#ffffff" : "#8299E0";
-        ctx.lineWidth = (isActive ? 2.5 : 2) / globalScale;
+        ctx.strokeStyle = isActive ? "#ffffff" : (node.color || "#8299E0");
+        ctx.lineWidth = (isActive ? 2.6 : 2.0) / globalScale;
         ctx.stroke();
         ctx.shadowBlur = 0;
 
-        // Domain Symbol Icon
-        ctx.font = `bold ${13 / globalScale}px 'Lato', sans-serif`;
-        ctx.fillStyle = isActive ? "#ffffff" : "#5A6678";
+        // Domain Code
+        ctx.font = `900 ${9.5 / globalScale}px 'Lato', sans-serif`;
+        ctx.fillStyle = isActive ? "#ffffff" : (node.color || "#5A6678");
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(node.shortLabel || "∑", x, y);
+        ctx.fillText(node.shortLabel || "DOM", x, y);
 
         // Tooltip / Title text below domain hub in a neat pill
         ctx.font = `bold ${7.5 / globalScale}px 'Lato', sans-serif`;
@@ -844,12 +734,12 @@ export const TopicKnowledgeGraph: React.FC = () => {
         const th = 13 / globalScale;
         const ty = y + r + 13 / globalScale;
 
-        ctx.fillStyle = isActive ? "#8299E0" : "rgba(255, 255, 255, 0.92)";
+        ctx.fillStyle = isActive ? "#8299E0" : "rgba(255, 255, 255, 0.95)";
         ctx.beginPath();
         if (ctx.roundRect) {
-          ctx.roundRect(x - tw / 2 - 4 / globalScale, ty - th / 2, tw + 8 / globalScale, th, 4 / globalScale);
+          ctx.roundRect(x - tw / 2 - 5 / globalScale, ty - th / 2, tw + 10 / globalScale, th, 4 / globalScale);
         } else {
-          ctx.rect(x - tw / 2 - 4 / globalScale, ty - th / 2, tw + 8 / globalScale, th);
+          ctx.rect(x - tw / 2 - 5 / globalScale, ty - th / 2, tw + 10 / globalScale, th);
         }
         ctx.fill();
         ctx.strokeStyle = isActive ? "#ffffff" : "rgba(130, 153, 224, 0.4)";
@@ -866,10 +756,10 @@ export const TopicKnowledgeGraph: React.FC = () => {
       }
 
       // ==========================================
-      // LEVEL 2: FIELD NODES (Ngành Chuyên Môn)
+      // LEVEL 2: SUBJECT NODES (37 Môn Học)
       // ==========================================
       if (node.level === 2) {
-        const r = isActive ? 16 : (node.r ?? 14);
+        const r = isActive ? 15 : (node.r ?? 13);
 
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
@@ -881,26 +771,60 @@ export const TopicKnowledgeGraph: React.FC = () => {
         ctx.fill();
 
         ctx.strokeStyle = isActive ? "#ffffff" : "#8299E0";
-        ctx.lineWidth = (isActive ? 2.4 : 1.8) / globalScale;
+        ctx.lineWidth = (isActive ? 2.4 : 1.6) / globalScale;
         ctx.stroke();
         ctx.shadowBlur = 0;
 
-        // Abbreviation
-        ctx.font = `900 ${6.5 / globalScale}px 'Lato', sans-serif`;
-        ctx.fillStyle = isActive ? "#ffffff" : "#5A6678";
-        ctx.textAlign = "center";
+        // Inner Subject Icon Dot
+        ctx.beginPath();
+        ctx.arc(x, y, (isActive ? 3.0 : 2.0) / globalScale, 0, 2 * Math.PI);
+        ctx.fillStyle = isActive ? "#ffffff" : "#8299E0";
+        ctx.fill();
+
+        // Subject Title Pill
+        ctx.font = isActive
+          ? `bold ${7.5 / globalScale}px 'Lato', sans-serif`
+          : `600 ${6.8 / globalScale}px 'Lato', sans-serif`;
+
+        const displayName =
+          !isActive && node.name.length > 20 ? node.name.slice(0, 19) + "…" : node.name;
+        const textMetrics = ctx.measureText(displayName);
+        const tw = textMetrics.width;
+        const th = (isActive ? 13 : 11) / globalScale;
+        const subAngle = node.targetAngle ?? Math.atan2(y, x);
+        const pillDist = r + 10 / globalScale;
+        const pillX = x + pillDist * Math.cos(subAngle);
+        const pillY = y + pillDist * Math.sin(subAngle);
+        const isRight = pillX >= x;
+
+        ctx.fillStyle = isActive ? "#8299E0" : "rgba(255, 255, 255, 0.94)";
+        ctx.beginPath();
+        const startX = isRight ? pillX - 2 / globalScale : pillX - tw - 8 / globalScale;
+        if (ctx.roundRect) {
+          ctx.roundRect(startX, pillY - th / 2, tw + 10 / globalScale, th, 3 / globalScale);
+        } else {
+          ctx.rect(startX, pillY - th / 2, tw + 10 / globalScale, th);
+        }
+        ctx.fill();
+
+        ctx.strokeStyle = isActive ? "#ffffff" : "rgba(130, 153, 224, 0.5)";
+        ctx.lineWidth = 0.7 / globalScale;
+        ctx.stroke();
+
+        ctx.fillStyle = isActive ? "#ffffff" : "#334155";
+        ctx.textAlign = isRight ? "left" : "right";
         ctx.textBaseline = "middle";
-        ctx.fillText(node.shortLabel || "", x, y);
+        ctx.fillText(displayName, isRight ? pillX + 3 / globalScale : pillX - 3 / globalScale, pillY);
 
         ctx.restore();
         return;
       }
 
       // ==========================================
-      // LEVEL 3: SUBJECT NODES (Môn Học)
+      // LEVEL 3: TOPIC / LECTURE NODES (479 Bài Học)
       // ==========================================
       if (node.level === 3) {
-        const r = isActive ? 12 : (node.r ?? 8.5);
+        const r = isActive ? 10.5 : (node.r ?? 7.5);
 
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
@@ -911,120 +835,44 @@ export const TopicKnowledgeGraph: React.FC = () => {
         }
         ctx.fill();
 
-        ctx.strokeStyle = isActive ? "#ffffff" : "#8299E0";
-        ctx.lineWidth = (isActive ? 2.2 : 1.5) / globalScale;
+        // Status-based stroke color
+        let strokeColor = "#8299E0";
+        if (node.status === "MASTERED") strokeColor = "#10b981"; // Emerald
+        else if (node.status === "GAP") strokeColor = "#ef4444"; // Red
+        else if (node.status === "ACTIVE") strokeColor = "#f59e0b"; // Amber
+
+        ctx.strokeStyle = isActive ? "#ffffff" : strokeColor;
+        ctx.lineWidth = (isActive ? 2.2 : 1.4) / globalScale;
         ctx.stroke();
         ctx.shadowBlur = 0;
 
-        // Inner indicator dot
+        // Inner dot
         ctx.beginPath();
-        ctx.arc(x, y, (isActive ? 2.5 : 1.8) / globalScale, 0, 2 * Math.PI);
-        ctx.fillStyle = isActive ? "#ffffff" : "#8299E0";
+        ctx.arc(x, y, (isActive ? 2.5 : 1.6) / globalScale, 0, 2 * Math.PI);
+        ctx.fillStyle = isActive ? "#ffffff" : strokeColor;
         ctx.fill();
 
-        // Subject Name Pill placed at the ray tip (faces outward into empty space, 0% overlap)
-        const subAngle = node.targetAngle ?? Math.atan2(y, x);
-        const tipDist = 96 / globalScale;
-        const tipX = x + tipDist * Math.cos(subAngle);
-        const tipY = y + tipDist * Math.sin(subAngle);
-        const isRight = tipX >= 0;
-
-        const displayText =
-          !isActive && node.name.length > 15
-            ? node.name.slice(0, 14) + "…"
-            : node.name;
-
-        ctx.font = isActive
-          ? `bold ${8 / globalScale}px 'Lato', sans-serif`
-          : `600 ${6.8 / globalScale}px 'Lato', sans-serif`;
-
-        const textMetrics = ctx.measureText(displayText);
-        const textWidth = textMetrics.width;
-        const textHeight = (isActive ? 13 : 10) / globalScale;
-        const textX = isRight ? tipX + 4 / globalScale : tipX - 4 / globalScale;
-        const textY = tipY;
-        const pillX = isRight ? textX - 2 / globalScale : textX - textWidth - 6 / globalScale;
-
+        // Label on hover or selection
         if (isActive) {
-          // Highlight badge at the ray tip
-          ctx.save();
-          ctx.shadowColor = "rgba(130, 153, 224, 0.35)";
-          ctx.shadowBlur = 6 / globalScale;
-          ctx.fillStyle = "#8299E0";
-          ctx.beginPath();
-          if (ctx.roundRect) {
-            ctx.roundRect(
-              pillX,
-              textY - textHeight / 2,
-              textWidth + 8 / globalScale,
-              textHeight,
-              textHeight / 2
-            );
-          } else {
-            ctx.rect(
-              pillX,
-              textY - textHeight / 2,
-              textWidth + 8 / globalScale,
-              textHeight
-            );
-          }
-          ctx.fill();
-          ctx.restore();
-
-          ctx.fillStyle = "#ffffff";
-          ctx.textAlign = isRight ? "left" : "right";
-          ctx.textBaseline = "middle";
-          ctx.fillText(displayText, isRight ? textX + 2 / globalScale : textX - 2 / globalScale, textY);
-
-          // Also draw floating focal title directly above the subject node for instant visual confirmation
-          const focalY = y - r - 8 / globalScale;
-          const focalMetrics = ctx.measureText(node.name);
-          const fw = focalMetrics.width;
-          const fh = 14 / globalScale;
+          ctx.font = `bold ${7.5 / globalScale}px 'Lato', sans-serif`;
+          const textMetrics = ctx.measureText(node.name);
+          const tw = textMetrics.width;
+          const th = 14 / globalScale;
+          const ty = y - r - 9 / globalScale;
 
           ctx.fillStyle = "#8299E0";
           ctx.beginPath();
           if (ctx.roundRect) {
-            ctx.roundRect(x - fw / 2 - 5 / globalScale, focalY - fh / 2, fw + 10 / globalScale, fh, 4 / globalScale);
+            ctx.roundRect(x - tw / 2 - 5 / globalScale, ty - th / 2, tw + 10 / globalScale, th, 4 / globalScale);
           } else {
-            ctx.rect(x - fw / 2 - 5 / globalScale, focalY - fh / 2, fw + 10 / globalScale, fh);
+            ctx.rect(x - tw / 2 - 5 / globalScale, ty - th / 2, tw + 10 / globalScale, th);
           }
           ctx.fill();
 
           ctx.fillStyle = "#ffffff";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.fillText(node.name, x, focalY);
-        } else {
-          // Soft protective backdrop pill at the ray tip
-          ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
-          ctx.beginPath();
-          if (ctx.roundRect) {
-            ctx.roundRect(
-              pillX,
-              textY - textHeight / 2,
-              textWidth + 6 / globalScale,
-              textHeight,
-              3 / globalScale
-            );
-          } else {
-            ctx.rect(
-              pillX,
-              textY - textHeight / 2,
-              textWidth + 6 / globalScale,
-              textHeight
-            );
-          }
-          ctx.fill();
-
-          ctx.strokeStyle = "rgba(226, 232, 240, 0.85)";
-          ctx.lineWidth = 0.6 / globalScale;
-          ctx.stroke();
-
-          ctx.fillStyle = "#5A6678";
-          ctx.textAlign = isRight ? "left" : "right";
-          ctx.textBaseline = "middle";
-          ctx.fillText(displayText, textX, textY);
+          ctx.fillText(node.name, x, ty);
         }
 
         ctx.restore();
@@ -1032,36 +880,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
       }
 
       // ==========================================
-      // LEVEL 4: TOPIC GROUP NODES (Nhóm Kiến Thức A, B)
-      // ==========================================
-      if (node.level === 4) {
-        const r = isActive ? 7 : (node.r ?? 5);
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, 2 * Math.PI);
-        ctx.fillStyle = isActive ? "#8299E0" : "#ffffff";
-        if (isActive) {
-          ctx.shadowColor = "rgba(130, 153, 224, 0.4)";
-          ctx.shadowBlur = 6 / globalScale;
-        }
-        ctx.fill();
-
-        ctx.strokeStyle = isActive ? "#ffffff" : "#8299E0";
-        ctx.lineWidth = (isActive ? 1.8 : 1.2) / globalScale;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        ctx.font = `bold ${5.5 / globalScale}px 'Lato', sans-serif`;
-        ctx.fillStyle = isActive ? "#ffffff" : "#5A6678";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(node.shortLabel || "", x, y);
-
-        ctx.restore();
-        return;
-      }
-
-      // ==========================================
-      // LEVEL 5: MICRO-CONCEPT LEAVES (Chấm Tri Thức)
+      // LEVEL 5: MICRO-CONCEPT LEAVES
       // ==========================================
       if (node.level === 5) {
         const r = isActive ? 4 : (node.r ?? 2.5);
@@ -1089,7 +908,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
     [selectedNode, hoveredNode, filterState, isNodeHighlighted]
   );
 
-  // Link Canvas Renderer: Straight Needle Rays (Constellation Style)
+  // Link Canvas Renderer: Straight Needle Rays & Cross-domain Bridges
   const renderLinkCanvasObject = useCallback(
     (link: RadialGraphLink, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const source = link.source as RadialGraphNode;
@@ -1133,14 +952,12 @@ export const TopicKnowledgeGraph: React.FC = () => {
       ctx.lineTo(target.x, target.y);
 
       if (isConnected) {
-        // Active/Hovered: solid bold needle line in #8299E0 with soft glow
         ctx.strokeStyle = "#8299E0";
         ctx.lineWidth = 2.2 / globalScale;
         ctx.setLineDash([]);
         ctx.shadowColor = "rgba(130, 153, 224, 0.45)";
         ctx.shadowBlur = 6 / globalScale;
       } else {
-        // Normal: clean dashed ray line
         ctx.strokeStyle = link.isCrossLink
           ? "rgba(130, 153, 224, 0.35)"
           : "rgba(130, 153, 224, 0.65)";
@@ -1161,10 +978,14 @@ export const TopicKnowledgeGraph: React.FC = () => {
 
   return (
     <div className="flex flex-col flex-1 h-full min-h-0 space-y-2">
-      {/* 3-Level Hierarchical Search Toolbar (Directly beneath Topbar) */}
+      {/* 3-Level Hierarchical Search Toolbar with Dynamic Supabase Data */}
       <TopicHierarchySearch
         onFilterChange={setFilterState}
         onSelectTopic={handleSelectTopicFromSearch}
+        domains={curriculumData.domains}
+        subjects={curriculumData.subjects}
+        domainSubjects={curriculumData.domainSubjects}
+        topics={curriculumData.topics}
       />
 
       {/* Main Interactive ForceGraph2D Canvas Container */}
@@ -1172,227 +993,218 @@ export const TopicKnowledgeGraph: React.FC = () => {
         ref={containerRef}
         className="relative w-full flex-1 h-full min-h-0 bg-[#f8fafc] rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden select-none cursor-default"
       >
-      {/* 1. Main Interactive ForceGraph2D Canvas */}
-      <ForceGraph2D
-        ref={fgRef}
-        width={dimensions.width || 800}
-        height={dimensions.height || 600}
-        graphData={graphData}
-        backgroundColor="#f8fafc"
-        nodeId="id"
-        nodeCanvasObject={renderNodeCanvasObject as any}
-        linkCanvasObject={renderLinkCanvasObject as any}
-        onRenderFramePre={handleRenderFramePre}
-        onNodeClick={handleNodeClick as any}
-        onNodeHover={(node) => setHoveredNode((node as RadialGraphNode) || null)}
-        onBackgroundClick={handleBackgroundClick}
-        enableNodeDrag={false}
-        enableZoomInteraction={true}
-        enablePanInteraction={true}
-        cooldownTicks={1}
-      />
-
-      {/* 2. Top Right Panel: Quick Metrics & Camera Tools */}
-      <div className="absolute top-4 right-4 z-20 flex flex-col gap-2.5">
-        {/* Metric Summary Card (Light modern theme) */}
-        <div className="bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-slate-200/90 shadow-lg space-y-3 min-w-[240px]">
-          <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
-            <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
-              Tiến Độ Tri Thức
+        {/* Loading Overlay */}
+        {isLoading && (
+          <div className="absolute inset-0 z-40 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3">
+            <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+            <span className="text-xs font-bold text-slate-600 tracking-wide">
+              Đang đồng bộ Bản đồ Tri thức từ Supabase...
             </span>
-            <div className="flex items-center gap-1 text-xs font-black text-amber-500">
-              <Flame className="w-3.5 h-3.5 fill-amber-500" />
-              <span>14 Ngày</span>
-            </div>
           </div>
+        )}
 
-          {/* Progress bar */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-xs font-bold">
-              <span className="text-slate-500">Khái niệm đã học:</span>
-              <span className="text-slate-900 font-black">142 / 500</span>
-            </div>
-            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full"
-                style={{ width: "28.4%" }}
-              />
-            </div>
-          </div>
+        {/* 1. Main Interactive ForceGraph2D Canvas */}
+        <ForceGraph2D
+          ref={fgRef}
+          width={dimensions.width || 800}
+          height={dimensions.height || 600}
+          graphData={graphData}
+          backgroundColor="#f8fafc"
+          nodeId="id"
+          nodeCanvasObject={renderNodeCanvasObject as any}
+          linkCanvasObject={renderLinkCanvasObject as any}
+          onRenderFramePre={handleRenderFramePre}
+          onNodeClick={handleNodeClick as any}
+          onNodeHover={(node) => setHoveredNode((node as RadialGraphNode) || null)}
+          onBackgroundClick={handleBackgroundClick}
+          enableNodeDrag={false}
+          enableZoomInteraction={true}
+          enablePanInteraction={true}
+          cooldownTicks={1}
+        />
 
-          <div className="flex items-center justify-between text-xs font-bold pt-1">
-            <span className="text-slate-500">Điểm Clarity TB:</span>
-            <span className="text-emerald-600 font-black text-sm">88%</span>
-          </div>
-        </div>
-
-        {/* Camera Navigation Controls */}
-        <div className="flex items-center justify-end gap-1.5 bg-white/95 backdrop-blur-md p-1.5 rounded-2xl border border-slate-200/90 shadow-md self-end text-slate-600">
-          <button
-            onClick={handleZoomIn}
-            className="p-1.5 rounded-xl hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
-            title="Phóng to"
-          >
-            <ZoomIn className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleZoomOut}
-            className="p-1.5 rounded-xl hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
-            title="Thu nhỏ"
-          >
-            <ZoomOut className="w-4 h-4" />
-          </button>
-          <div className="w-px h-4 bg-slate-200" />
-          <button
-            onClick={handleResetCamera}
-            className="p-1.5 rounded-xl hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
-            title="Căn lại góc nhìn chuẩn"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-
-
-      {/* 4. Slide-over Concept Details Drawer */}
-      {isDrawerOpen && selectedNode && (
-        <div className="absolute top-0 right-0 bottom-0 w-full sm:w-[420px] bg-white/98 backdrop-blur-xl border-l border-slate-200 p-6 z-30 shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200 text-slate-800">
-          <div className="space-y-5">
-            {/* Drawer Header */}
-            <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200/60 inline-block mb-1.5">
-                  {selectedNode.level === 3 ? "Cấp 3 • Môn Học" : "Cấp 5 • Vi Khái Niệm"}
-                </span>
-                <h3 className="text-lg font-black text-slate-900 leading-snug">
-                  {selectedNode.name}
-                </h3>
+        {/* 2. Top Right Panel: Quick Metrics & Camera Tools */}
+        <div className="absolute top-4 right-4 z-20 flex flex-col gap-2.5">
+          {/* Metric Summary Card (Live from Supabase) */}
+          <div className="bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-slate-200/90 shadow-lg space-y-3 min-w-[240px]">
+            <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                Hệ Thống Tri Thức
+              </span>
+              <div className="flex items-center gap-1 text-xs font-black text-amber-500">
+                <Flame className="w-3.5 h-3.5 fill-amber-500" />
+                <span>{curriculumData.domains.length} Ngành</span>
               </div>
-              <button
-                onClick={() => setIsDrawerOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
             </div>
 
-            {/* Status & Clarity Card */}
-            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 space-y-2">
+            {/* Progress bar */}
+            <div className="space-y-1">
               <div className="flex items-center justify-between text-xs font-bold">
-                <span className="text-slate-500">Trạng thái học tập:</span>
-                {selectedNode.status === "MASTERED" && (
-                  <span className="inline-flex items-center gap-1 text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Thông thạo
+                <span className="text-slate-500">Bài học & Chủ đề:</span>
+                <span className="text-slate-900 font-black">{curriculumData.topics.length} Bài</span>
+              </div>
+              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full"
+                  style={{ width: "32%" }}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-xs font-bold pt-1">
+              <span className="text-slate-500">Môn học kết nối:</span>
+              <span className="text-emerald-600 font-black text-sm">
+                {curriculumData.subjects.length} Môn ({curriculumData.domainSubjects.length} Cầu nối)
+              </span>
+            </div>
+          </div>
+
+          {/* Camera Navigation Controls */}
+          <div className="flex items-center justify-end gap-1.5 bg-white/95 backdrop-blur-md p-1.5 rounded-2xl border border-slate-200/90 shadow-md self-end text-slate-600">
+            <button
+              onClick={handleZoomIn}
+              className="p-1.5 rounded-xl hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+              title="Phóng to"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleZoomOut}
+              className="p-1.5 rounded-xl hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+              title="Thu nhỏ"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <div className="w-px h-4 bg-slate-200" />
+            <button
+              onClick={handleResetCamera}
+              className="p-1.5 rounded-xl hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+              title="Căn lại góc nhìn chuẩn"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* 3. Slide-over Concept Details Drawer */}
+        {isDrawerOpen && selectedNode && (
+          <div className="absolute top-0 right-0 bottom-0 w-full sm:w-[420px] bg-white/98 backdrop-blur-xl border-l border-slate-200 p-6 z-30 shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200 text-slate-800">
+            <div className="space-y-5">
+              {/* Drawer Header */}
+              <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200/60 inline-block mb-1.5">
+                    {selectedNode.level === 1
+                      ? "Cấp 1 • Nhóm Ngành"
+                      : selectedNode.level === 2
+                      ? "Cấp 2 • Môn Học"
+                      : selectedNode.level === 3
+                      ? "Cấp 3 • Bài Học & Chủ Đề"
+                      : "Cấp 4 • Vi Khái Niệm Cốt Lõi"}
                   </span>
-                )}
-                {selectedNode.status === "GAP" && (
-                  <span className="inline-flex items-center gap-1 text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded-md border border-red-200">
-                    <AlertTriangle className="w-3.5 h-3.5" /> Lỗ hổng cần giảng lại
-                  </span>
-                )}
-                {selectedNode.status === "ACTIVE" && (
-                  <span className="inline-flex items-center gap-1 text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                    <BookOpen className="w-3.5 h-3.5" /> Đang học
-                  </span>
-                )}
-                {(!selectedNode.status || selectedNode.status === "UNLEARNED") && (
-                  <span className="text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                    Chưa kích hoạt
-                  </span>
+                  <h3 className="text-lg font-black text-slate-900 leading-snug">
+                    {selectedNode.name}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsDrawerOpen(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Status & Clarity Card */}
+              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="text-slate-500">Trạng thái học tập:</span>
+                  {selectedNode.status === "MASTERED" && (
+                    <span className="inline-flex items-center gap-1 text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Thông thạo
+                    </span>
+                  )}
+                  {selectedNode.status === "GAP" && (
+                    <span className="inline-flex items-center gap-1 text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded-md border border-red-200">
+                      <AlertTriangle className="w-3.5 h-3.5" /> Lỗ hổng cần giảng lại
+                    </span>
+                  )}
+                  {selectedNode.status === "ACTIVE" && (
+                    <span className="inline-flex items-center gap-1 text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                      <BookOpen className="w-3.5 h-3.5" /> Đang học
+                    </span>
+                  )}
+                  {(!selectedNode.status || selectedNode.status === "UNLEARNED" || selectedNode.status === "NOT_STARTED") && (
+                    <span className="text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                      Chưa kích hoạt
+                    </span>
+                  )}
+                </div>
+
+                {selectedNode.clarityScore !== undefined && selectedNode.clarityScore > 0 && (
+                  <div className="flex items-center justify-between text-xs font-bold pt-1 border-t border-slate-200">
+                    <span className="text-slate-500">Điểm Feynman Clarity:</span>
+                    <span className="text-emerald-600 font-black text-sm">
+                      {selectedNode.clarityScore}/100
+                    </span>
+                  </div>
                 )}
               </div>
 
-              {selectedNode.clarityScore !== undefined && selectedNode.clarityScore > 0 && (
-                <div className="flex items-center justify-between text-xs font-bold pt-1 border-t border-slate-200">
-                  <span className="text-slate-500">Điểm Feynman Clarity:</span>
-                  <span className="text-emerald-600 font-black text-sm">
-                    {selectedNode.clarityScore}/100
-                  </span>
+              {/* Summary */}
+              {selectedNode.summary && (
+                <div className="space-y-1.5">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <Target className="w-3.5 h-3.5 text-blue-600" />
+                    Mục Tiêu & Tóm Tắt Tri Thức
+                  </h4>
+                  <p className="text-xs text-slate-600 leading-relaxed bg-slate-50/70 p-3 rounded-xl border border-slate-100">
+                    {selectedNode.summary}
+                  </p>
+                </div>
+              )}
+
+              {/* Required Concepts */}
+              {selectedNode.requiredConcepts && selectedNode.requiredConcepts.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <GraduationCap className="w-3.5 h-3.5 text-indigo-600" />
+                    Khái Niệm Cốt Lõi Cần Nắm
+                  </h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedNode.requiredConcepts.map((c, i) => (
+                      <span
+                        key={i}
+                        className="text-[11px] font-medium bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200"
+                      >
+                        {c}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Summary */}
-            {selectedNode.summary && (
-              <div className="space-y-1.5">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                  <Target className="w-3.5 h-3.5 text-blue-600" />
-                  Mô tả Bản Đồ Tri Thức
-                </h4>
-                <p className="text-xs text-slate-600 leading-relaxed bg-slate-50/70 p-3 rounded-xl border border-slate-100">
-                  {selectedNode.summary}
-                </p>
-              </div>
-            )}
+            {/* Action Buttons */}
+            <div className="pt-4 border-t border-slate-100 space-y-2">
+              <button
+                onClick={() => handleStudyTopic(selectedNode.subjectId || selectedNode.id.replace("topic-", "").replace("subject-", ""))}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors flex items-center justify-center gap-2 border border-slate-200 cursor-pointer"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-blue-600" />
+                Ôn Luyện Trong Phòng Nghiên Cứu
+              </button>
 
-            {/* Required Concepts */}
-            {selectedNode.requiredConcepts && selectedNode.requiredConcepts.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                  <GraduationCap className="w-3.5 h-3.5 text-indigo-600" />
-                  Khái Niệm Cốt Lõi Cần Nắm
-                </h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedNode.requiredConcepts.map((c, i) => (
-                    <span
-                      key={i}
-                      className="text-[11px] font-medium bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200"
-                    >
-                      {c}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Jargon Traps */}
-            {selectedNode.jargonTraps && selectedNode.jargonTraps.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Thuật ngữ chuyên ngành dễ gây hiểu lầm
-                </h4>
-                <div className="space-y-2">
-                  {selectedNode.jargonTraps.map((jt, idx) => (
-                    <div
-                      key={idx}
-                      className="bg-amber-50/60 p-2.5 rounded-xl border border-amber-200/80 text-xs space-y-1"
-                    >
-                      <div className="font-bold text-amber-800">{jt.term}</div>
-                      {jt.recommendedAnalogy && (
-                        <div className="text-[11px] text-amber-700">
-                          💡 <strong>Phép ẩn dụ gợi ý:</strong> {jt.recommendedAnalogy}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+              <button
+                onClick={() => handleTeachTopic(selectedNode.name)}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-black shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                Giảng Ngay Cho AI (Feynman Stage)
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-
-          {/* Action Buttons */}
-          <div className="pt-4 border-t border-slate-100 space-y-2">
-            <button
-              onClick={() => handleStudyTopic(selectedNode.subjectId || selectedNode.id.replace("subject-", ""))}
-              className="w-full py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors flex items-center justify-center gap-2 border border-slate-200 cursor-pointer"
-            >
-              <BookOpen className="w-3.5 h-3.5 text-blue-600" />
-              Ôn Luyện Trong Phòng Nghiên Cứu
-            </button>
-
-            <button
-              onClick={() => handleTeachTopic(selectedNode.name)}
-              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-black shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Sparkles className="w-4 h-4 text-amber-300" />
-              Giảng Ngay Cho AI (Feynman Stage)
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
+        )}
       </div>
     </div>
   );

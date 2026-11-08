@@ -25,11 +25,12 @@ import {
   X,
 } from "lucide-react";
 import { TOPICS_CATALOG } from "@/data/academic-catalog.data";
-import { CatalogTopic } from "@/types/catalog.types";
+import { THREE_TIER_DOMAINS, THREE_TIER_SUBJECTS, THREE_TIER_DOMAIN_SUBJECTS, THREE_TIER_LECTURES } from "@/data/three-tier-curriculum.data";
+import { CatalogTopic, DomainCategory, AcademicSubject } from "@/types/catalog.types";
 
 export interface SearchFilterState {
   domainId: string; // "ALL" or specific domain
-  fieldId: string;  // "ALL" or specific field
+  fieldId: string;  // "ALL" or specific field/subject
   keyword: string;
   selectedTopicId: string | null;
 }
@@ -37,6 +38,10 @@ export interface SearchFilterState {
 interface TopicHierarchySearchProps {
   onFilterChange: (filter: SearchFilterState) => void;
   onSelectTopic: (topic: CatalogTopic) => void;
+  domains?: DomainCategory[];
+  subjects?: AcademicSubject[];
+  domainSubjects?: Array<{ domain_id: string; subject_id: string; is_core?: boolean }>;
+  topics?: CatalogTopic[];
 }
 
 // 4 Nhóm Ngành Chuẩn
@@ -122,6 +127,10 @@ const SEMANTIC_INTENTS: Array<{
 export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
   onFilterChange,
   onSelectTopic,
+  domains = THREE_TIER_DOMAINS,
+  subjects = THREE_TIER_SUBJECTS,
+  domainSubjects = THREE_TIER_DOMAIN_SUBJECTS,
+  topics = THREE_TIER_LECTURES,
 }) => {
   const [domainId, setDomainId] = useState<string>("ALL");
   const [fieldId, setFieldId] = useState<string>("ALL");
@@ -129,18 +138,53 @@ export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
-  // Available Fields cascade based on selected Domain
+  // Danh sách các Domain (bao gồm lựa chọn "Tất cả")
+  const activeDomainsList = useMemo(() => {
+    return [
+      { id: "ALL", name: "Tất cả 8 Nhóm Ngành", symbol: "🌐", color: "#64748b" },
+      ...domains.map((d) => ({
+        id: d.id,
+        name: d.name,
+        symbol: d.iconName || "📚",
+        color: d.colorHex || d.color || "#3B82F6",
+      })),
+    ];
+  }, [domains]);
+
+  // Available Subjects cascade based on selected Domain
   const filteredFields = useMemo(() => {
-    if (domainId === "ALL") return FIELDS_LIST;
-    return FIELDS_LIST.filter((f) => f.domainId === domainId);
-  }, [domainId]);
+    if (domainId === "ALL") {
+      return subjects.map((s) => ({
+        id: s.id,
+        domainId: s.domainId || "ALL",
+        name: s.name,
+      }));
+    }
+
+    // Lọc các môn thuộc domainId đã chọn qua quan hệ domainSubjects
+    const allowedSubjectIds = new Set(
+      domainSubjects.filter((ds) => ds.domain_id === domainId).map((ds) => ds.subject_id)
+    );
+
+    return subjects
+      .filter((s) => allowedSubjectIds.has(s.id) || s.domainId === domainId)
+      .map((s) => ({
+        id: s.id,
+        domainId,
+        name: s.name,
+      }));
+  }, [domainId, subjects, domainSubjects]);
 
   // When domain changes, reset field if it no longer belongs
   const handleDomainSelect = (dId: string) => {
     setDomainId(dId);
     if (dId !== "ALL" && fieldId !== "ALL") {
-      const match = FIELDS_LIST.find((f) => f.id === fieldId && f.domainId === dId);
-      if (!match) setFieldId("ALL");
+      const allowedSubjectIds = new Set(
+        domainSubjects.filter((ds) => ds.domain_id === dId).map((ds) => ds.subject_id)
+      );
+      if (!allowedSubjectIds.has(fieldId)) {
+        setFieldId("ALL");
+      }
     }
   };
 
@@ -172,9 +216,9 @@ export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
 
     // 1. Exact / Substring Matches
     const exactMatches: Array<{ topic: CatalogTopic; matchType: string }> = [];
-    TOPICS_CATALOG.forEach((topic) => {
+    topics.forEach((topic) => {
       // Check domain / field constraint
-      if (domainId !== "ALL" && topic.domainId !== domainId) return;
+      if (fieldId !== "ALL" && topic.subjectId !== fieldId) return;
 
       const titleMatch = topic.title.toLowerCase().includes(q);
       const conceptMatch = topic.requiredConcepts?.some((c) => c.toLowerCase().includes(q));
@@ -183,7 +227,7 @@ export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
       if (titleMatch || conceptMatch || summaryMatch) {
         exactMatches.push({
           topic,
-          matchType: titleMatch ? "Tên môn học" : conceptMatch ? "Khái niệm con" : "Tóm tắt lý thuyết",
+          matchType: titleMatch ? "Tên bài học" : conceptMatch ? "Khái niệm cốt lõi" : "Tóm tắt lý thuyết",
         });
       }
     });
@@ -263,7 +307,7 @@ export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
             onChange={(e) => handleDomainSelect(e.target.value)}
             className="w-full appearance-none bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3 py-2 pr-8 text-xs font-bold text-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
           >
-            {DOMAINS_LIST.map((d) => (
+            {activeDomainsList.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.symbol} {d.name}
               </option>
@@ -274,11 +318,11 @@ export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
       </div>
 
       {/* ========================================================
-          Ô 2: Ngành Chuyên Môn (Cấp 2 - Field Selector Cascade)
+          Ô 2: Môn Học (Cấp 2 - Subject Selector Cascade)
       ======================================================== */}
       <div className="flex-1 min-w-[220px] relative">
         <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 block px-1 mb-1">
-          2. Ngành Chuyên Môn (Cấp 2)
+          2. Môn Học (Cấp 2)
         </label>
         <div className="relative">
           <select
