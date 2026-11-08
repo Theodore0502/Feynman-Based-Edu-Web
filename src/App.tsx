@@ -24,6 +24,10 @@ import SettingsAndAIConfig from "./pages/SettingsAndAIConfig";
 import PublicMasteryShareView from "./pages/PublicMasteryShareView";
 import LecturesExplorer from "./pages/LecturesExplorer";
 import AboutPage from "./pages/AboutPage";
+import MaterialUploadHub from "./pages/MaterialUploadHub";
+
+// Curator / Submitter Suite Pages
+import CuratorValidationCenter from "./pages/curator/CuratorValidationCenter";
 
 // Admin Moderator Suite Pages
 import AdminRubricStudio from "./pages/admin/AdminRubricStudio";
@@ -55,8 +59,19 @@ export function App() {
         <Route path="/personas" element={<PersonaStudio />} />
         <Route path="/topics" element={<TopicKnowledgeGraph />} />
         <Route path="/vault" element={<AnalogyJargonVault />} />
+        <Route path="/materials/upload" element={<MaterialUploadHub />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/settings" element={<SettingsAndAIConfig />} />
+
+        {/* Curator / Submitter & Admin Protected Route */}
+        <Route
+          path="/curator/validation"
+          element={
+            <RoleGuard allowedRoles={["curator", "admin"]}>
+              <CuratorValidationCenter />
+            </RoleGuard>
+          }
+        />
 
         {/* Admin Moderator Protected Routes */}
         <Route

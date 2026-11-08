@@ -8,7 +8,7 @@
 
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { LEARNER_NAVIGATION, ADMIN_NAVIGATION } from "@/config/routes.config";
+import { LEARNER_NAVIGATION, ADMIN_NAVIGATION, CURATOR_NAVIGATION } from "@/config/routes.config";
 import { useModalStore } from "@/hooks/useModalStore";
 import { useAuthStore } from "@/hooks/useAuthStore";
 import { useSidebarStore } from "@/hooks/useSidebarStore";
@@ -36,6 +36,8 @@ import {
   Info,
   ChevronLeft,
   ChevronRight,
+  UploadCloud,
+  FileCheck,
 } from "lucide-react";
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -53,6 +55,8 @@ const ICON_MAP: Record<string, React.ElementType> = {
   ShieldAlert,
   FileText,
   ArrowLeft,
+  UploadCloud,
+  FileCheck,
 };
 
 export const AppSidebar: React.FC = () => {
@@ -63,6 +67,7 @@ export const AppSidebar: React.FC = () => {
   const { isCollapsed, toggleCollapse } = useSidebarStore();
 
   const isAdmin = user?.role === "admin";
+  const isCurator = user?.role === "curator";
 
   return (
     <aside
@@ -166,7 +171,84 @@ export const AppSidebar: React.FC = () => {
             );
           })}
 
-          {/* Admin Moderator Section (Only visible or emphasized for Admin) */}
+          {/* Curator / Submitter Section (For Curator role) */}
+          {isCurator && !isAdmin && (
+            <div className="pt-4 space-y-1.5">
+              {!isCollapsed ? (
+                <div
+                  className={cn(
+                    "px-3 pb-1 text-[10px] font-black uppercase tracking-wider text-indigo-600 flex items-center justify-between transition-all overflow-hidden whitespace-nowrap",
+                    isCollapsed
+                      ? "opacity-0 max-h-0 pointer-events-none duration-100 delay-0"
+                      : "opacity-100 max-h-8 delay-150 duration-200"
+                  )}
+                >
+                  <span>Thẩm Định Tri Thức</span>
+                  <span className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.2 rounded-md font-bold">
+                    Curator
+                  </span>
+                </div>
+              ) : (
+                <div className="w-full border-t border-indigo-100 my-2" />
+              )}
+              {CURATOR_NAVIGATION.filter((i) => i.href !== "/dashboard").map((item) => {
+                const Icon = ICON_MAP[item.icon] || FileCheck;
+                const isActive = pathname === item.href;
+
+                return (
+                  <Link
+                    key={item.href}
+                    to={item.href}
+                    title={isCollapsed ? item.label : undefined}
+                    className={cn(
+                      "flex items-center w-full h-11 rounded-2xl text-xs font-bold transition-all relative group overflow-hidden whitespace-nowrap",
+                      isActive
+                        ? "bg-indigo-100/70 text-indigo-800 shadow-2xs font-extrabold"
+                        : "text-slate-600 hover:bg-indigo-50/50 hover:text-indigo-900"
+                    )}
+                  >
+                    <div className="w-11 h-11 flex items-center justify-center shrink-0">
+                      <Icon
+                        className={cn(
+                          "w-4 h-4 shrink-0 transition-colors",
+                          isActive ? "text-indigo-600" : "text-indigo-400"
+                        )}
+                      />
+                    </div>
+
+                    <span
+                      className={cn(
+                        "whitespace-nowrap overflow-hidden transition-all ease-out pl-0.5",
+                        isCollapsed
+                          ? "opacity-0 max-w-0 -translate-x-3 pointer-events-none duration-100 delay-0"
+                          : "opacity-100 max-w-[150px] translate-x-0 delay-150 duration-200"
+                      )}
+                    >
+                      {item.label}
+                    </span>
+
+                    {item.badge && (
+                      <span
+                        className={cn(
+                          "ml-auto mr-2.5 text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap transition-all ease-out shrink-0",
+                          isActive
+                            ? "bg-indigo-600 text-white"
+                            : "bg-indigo-100 text-indigo-700",
+                          isCollapsed
+                            ? "opacity-0 max-w-0 scale-75 pointer-events-none duration-100 delay-0 overflow-hidden"
+                            : "opacity-100 max-w-[60px] scale-100 delay-150 duration-200"
+                        )}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Admin Moderator Section (Only visible for Admin, inherits all Curator features + System Config) */}
           {isAdmin && (
             <div className="pt-4 space-y-1.5">
               {!isCollapsed ? (

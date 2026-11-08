@@ -183,12 +183,14 @@ export const LecturesExplorer: React.FC = () => {
 
   // Counts for status tabs
   const statusCounts = useMemo(() => {
-    const counts = {
+    const counts: Record<string, number> = {
       ALL: subjectLectures.length,
       COMPLETED: 0,
       IN_PROGRESS: 0,
       NEEDS_REVIEW: 0,
       NOT_STARTED: 0,
+      VALIDATED: 0,
+      PENDING_VALIDATION: 0,
     };
     subjectLectures.forEach((l) => {
       const s = l.status || "NOT_STARTED";

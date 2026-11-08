@@ -33,3 +33,4 @@ Tất cả các AI Agent và thành viên phát triển dự án Theodore **BẮ
 ### 2.3 Khi Thay Đổi Cấu Trúc Dữ Liệu
 - Mọi bổ sung ngành học, môn học, bài học mới phải đi qua migration SQL hoặc API upsert lên Supabase.
 - Không được thêm trực tiếp vào file `.ts` mà không cập nhật Supabase.
+

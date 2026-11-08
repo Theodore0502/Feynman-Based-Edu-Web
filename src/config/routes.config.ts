@@ -23,6 +23,12 @@ export const APP_ROUTES = {
   ABOUT: "/about",
   SETTINGS: "/settings",
 
+  // Tuyến đường Tải tài liệu & AI Agent bóc tách
+  MATERIALS_UPLOAD: "/materials/upload",
+
+  // Tuyến đường Thẩm Định Viên (Knowledge Curator) & Quản trị viên
+  CURATOR_VALIDATION: "/curator/validation",
+
   // Tuyến đường Quản trị viên (Admin Moderator)
   ADMIN_RUBRICS: "/admin/rubrics",
   ADMIN_AUDITS: "/admin/audits",
@@ -40,6 +46,7 @@ export interface NavItem {
 export const LEARNER_NAVIGATION: NavItem[] = [
   { label: "Tổng quan", href: APP_ROUTES.DASHBOARD, icon: "LayoutDashboard" },
   { label: "Bài giảng", href: APP_ROUTES.LECTURES, icon: "BookOpen" },
+  { label: "Tải tài liệu", href: APP_ROUTES.MATERIALS_UPLOAD, icon: "UploadCloud", badge: "AI Agent" },
   { label: "Luyện tập", href: APP_ROUTES.STAGE, icon: "Mic" },
   { label: "Thư viện AI", href: APP_ROUTES.PERSONAS, icon: "Bot" },
   { label: "Bản đồ kiến thức", href: APP_ROUTES.TOPICS, icon: "Network" },
@@ -48,7 +55,15 @@ export const LEARNER_NAVIGATION: NavItem[] = [
   { label: "Cài đặt", href: APP_ROUTES.SETTINGS, icon: "Settings" },
 ];
 
+export const CURATOR_NAVIGATION: NavItem[] = [
+  { label: "Thẩm Định Tri Thức", href: APP_ROUTES.CURATOR_VALIDATION, icon: "FileCheck", badge: "Validate" },
+  { label: "Kho Tri Thức", href: APP_ROUTES.ADMIN_CURRICULUM, icon: "FileText", badge: "Dữ liệu" },
+  { label: "Kiểm Duyệt Phản Biện", href: APP_ROUTES.ADMIN_AUDITS, icon: "ShieldAlert", badge: "Kiểm duyệt" },
+  { label: "Về Trang Học Tập", href: APP_ROUTES.DASHBOARD, icon: "ArrowLeft" },
+];
+
 export const ADMIN_NAVIGATION: NavItem[] = [
+  { label: "Thẩm Định Tri Thức", href: APP_ROUTES.CURATOR_VALIDATION, icon: "FileCheck", badge: "Validate" },
   { label: "Cấu Hình Rubric", href: APP_ROUTES.ADMIN_RUBRICS, icon: "Sliders", badge: "Quản trị" },
   { label: "Kiểm Duyệt Phản Biện", href: APP_ROUTES.ADMIN_AUDITS, icon: "ShieldAlert", badge: "Kiểm duyệt" },
   { label: "Quản Lý Kho Tri Thức", href: APP_ROUTES.ADMIN_CURRICULUM, icon: "FileText", badge: "Dữ liệu" },

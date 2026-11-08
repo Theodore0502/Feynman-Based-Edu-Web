@@ -23,6 +23,7 @@ import {
   User,
   Mail,
   AlertCircle,
+  Sparkles,
 } from "lucide-react";
 import { UserRole } from "@/types/auth.types";
 
@@ -54,6 +55,8 @@ export const AuthAndOnboarding: React.FC = () => {
       });
       if (username.trim().toLowerCase() === "admin123") {
         navigate("/admin/rubrics");
+      } else if (username.trim().toLowerCase() === "curator123") {
+        navigate("/curator/validation");
       } else {
         navigate("/dashboard");
       }
@@ -87,6 +90,8 @@ export const AuthAndOnboarding: React.FC = () => {
       });
       if (regRole === "admin") {
         navigate("/admin/rubrics");
+      } else if (regRole === "curator") {
+        navigate("/curator/validation");
       } else {
         navigate("/dashboard");
       }
@@ -95,7 +100,7 @@ export const AuthAndOnboarding: React.FC = () => {
     }
   };
 
-  const fillQuickAccount = (userKey: "learn123" | "admin123") => {
+  const fillQuickAccount = (userKey: "learn123" | "curator123" | "admin123") => {
     setUsername(userKey);
     setPassword("123123");
     setLocalError(null);
@@ -218,37 +223,53 @@ export const AuthAndOnboarding: React.FC = () => {
                 <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block text-center">
                   Tài Khoản Kiểm Thử Nhanh (Mật khẩu: 123123)
                 </span>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-1.5">
                   <button
                     type="button"
                     onClick={() => fillQuickAccount("learn123")}
-                    className={`p-2 rounded-xl border text-left transition-all cursor-pointer space-y-0.5 ${
+                    className={`p-1.5 rounded-xl border text-left transition-all cursor-pointer space-y-0.5 ${
                       username === "learn123"
                         ? "bg-blue-50/80 border-[#7286D3] ring-1 ring-[#7286D3]/30"
                         : "bg-[#F8FAFD] hover:bg-blue-50/40 border-[#E2EAFD]"
                     }`}
                   >
-                    <div className="flex items-center gap-1 text-[11px] font-black text-blue-700">
-                      <GraduationCap className="w-3 h-3 text-blue-600" />
+                    <div className="flex items-center gap-1 text-[10px] font-black text-blue-700 truncate">
+                      <GraduationCap className="w-3 h-3 text-blue-600 shrink-0" />
                       <span>learn123</span>
                     </div>
-                    <p className="text-[9px] text-slate-500">🎓 Người học</p>
+                    <p className="text-[8.5px] text-slate-500 truncate">🎓 Học viên</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => fillQuickAccount("curator123")}
+                    className={`p-1.5 rounded-xl border text-left transition-all cursor-pointer space-y-0.5 ${
+                      username === "curator123"
+                        ? "bg-indigo-50/80 border-indigo-500 ring-1 ring-indigo-500/30"
+                        : "bg-[#F8FAFD] hover:bg-indigo-50/40 border-[#E2EAFD]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1 text-[10px] font-black text-indigo-700 truncate">
+                      <Sparkles className="w-3 h-3 text-indigo-600 shrink-0" />
+                      <span>curator123</span>
+                    </div>
+                    <p className="text-[8.5px] text-slate-500 truncate">📜 Thẩm định</p>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => fillQuickAccount("admin123")}
-                    className={`p-2 rounded-xl border text-left transition-all cursor-pointer space-y-0.5 ${
+                    className={`p-1.5 rounded-xl border text-left transition-all cursor-pointer space-y-0.5 ${
                       username === "admin123"
                         ? "bg-purple-50/80 border-purple-500 ring-1 ring-purple-500/30"
                         : "bg-[#F8FAFD] hover:bg-purple-50/40 border-[#E2EAFD]"
                     }`}
                   >
-                    <div className="flex items-center gap-1 text-[11px] font-black text-purple-700">
-                      <ShieldCheck className="w-3 h-3 text-purple-600" />
+                    <div className="flex items-center gap-1 text-[10px] font-black text-purple-700 truncate">
+                      <ShieldCheck className="w-3 h-3 text-purple-600 shrink-0" />
                       <span>admin123</span>
                     </div>
-                    <p className="text-[9px] text-slate-500">🛡️ Quản trị viên</p>
+                    <p className="text-[8.5px] text-slate-500 truncate">🛡️ Quản trị</p>
                   </button>
                 </div>
               </div>
@@ -371,11 +392,11 @@ export const AuthAndOnboarding: React.FC = () => {
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
                   Vai trò mục tiêu
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-1.5">
                   <button
                     type="button"
                     onClick={() => setRegRole("learner")}
-                    className={`py-1.5 px-2 rounded-xl border text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                    className={`py-1.5 px-1.5 rounded-xl border text-[10px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
                       regRole === "learner"
                         ? "bg-purple-50 text-purple-700 border-purple-400 ring-1 ring-purple-400/30"
                         : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
@@ -386,15 +407,27 @@ export const AuthAndOnboarding: React.FC = () => {
                   </button>
                   <button
                     type="button"
+                    onClick={() => setRegRole("curator")}
+                    className={`py-1.5 px-1.5 rounded-xl border text-[10px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                      regRole === "curator"
+                        ? "bg-indigo-50 text-indigo-700 border-indigo-400 ring-1 ring-indigo-400/30"
+                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>Thẩm Định</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setRegRole("admin")}
-                    className={`py-1.5 px-2 rounded-xl border text-[11px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                    className={`py-1.5 px-1.5 rounded-xl border text-[10px] font-bold transition-all cursor-pointer flex items-center justify-center gap-1 ${
                       regRole === "admin"
                         ? "bg-purple-50 text-purple-700 border-purple-400 ring-1 ring-purple-400/30"
                         : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
                     }`}
                   >
                     <ShieldCheck className="w-3 h-3" />
-                    <span>Quản Trị Viên</span>
+                    <span>Quản Trị</span>
                   </button>
                 </div>
               </div>

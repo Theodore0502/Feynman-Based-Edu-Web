@@ -7,7 +7,7 @@
  *   - GraphNode / KnowledgeGraphNode & GraphEdge / KnowledgeGraphEdge: Cấu trúc Topology Đồ thị tri thức (Nodes & Edges).
  */
 
-export type LectureStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "NEEDS_REVIEW";
+export type LectureStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "NEEDS_REVIEW" | "PENDING_VALIDATION" | "VALIDATED";
 
 export interface AcademicSubject {
   id: string;

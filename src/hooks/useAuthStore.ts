@@ -43,6 +43,21 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
       createdAt: "2026-11-01T08:00:00Z",
     },
   },
+  curator123: {
+    password: "123123",
+    profile: {
+      id: "usr-curator-777",
+      username: "curator123",
+      email: "curator123@theodore.edu",
+      fullName: "Lê Thẩm Định (Knowledge Curator)",
+      role: "curator",
+      fieldOfStudy: "Kiểm Định & Gán Nhãn Tri Thức",
+      assignedDomains: ["dom-it", "dom-cs", "dom-se"],
+      masteryPoints: 1600,
+      clarityAverage: 94,
+      createdAt: "2026-11-05T08:00:00Z",
+    },
+  },
   admin123: {
     password: "123123",
     profile: {
@@ -52,6 +67,16 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
       fullName: "Trần Kiểm Chuẩn (Moderator Admin)",
       role: "admin",
       fieldOfStudy: "Quản Trị Học Thuật & Đánh Giá AI",
+      assignedDomains: [
+        "dom-it",
+        "dom-cs",
+        "dom-se",
+        "dom-ecom",
+        "dom-acc",
+        "dom-biz",
+        "dom-tour",
+        "dom-med",
+      ],
       masteryPoints: 2500,
       clarityAverage: 98,
       createdAt: "2026-10-15T00:00:00Z",
@@ -78,7 +103,7 @@ export const useAuthStore = create<AuthState>()(
         );
 
         if (!targetEntry) {
-          set({ loginError: "Tài khoản không tồn tại. Dùng learn123 hoặc admin123." });
+          set({ loginError: "Tài khoản không tồn tại. Dùng learn123, curator123 hoặc admin123." });
           return false;
         }
 
@@ -136,10 +161,15 @@ export const useAuthStore = create<AuthState>()(
       },
 
       switchRole: (newRole: UserRole) => {
-        const currentUser = get().user;
         if (newRole === "admin") {
           set({
             user: PRECONFIGURED_USERS.admin123.profile,
+            isAuthenticated: true,
+            loginError: null,
+          });
+        } else if (newRole === "curator") {
+          set({
+            user: PRECONFIGURED_USERS.curator123.profile,
             isAuthenticated: true,
             loginError: null,
           });

@@ -7,16 +7,18 @@
  *   - AuditReportItem: Student challenge reports on AI evaluation inaccuracies.
  */
 
-export type UserRole = "learner" | "admin";
+export type UserRole = "learner" | "curator" | "admin";
 
 export interface UserProfile {
   id: string;
   username: string;
   email: string;
   fullName: string;
+  displayName?: string;
   role: UserRole;
   avatarUrl?: string;
   fieldOfStudy?: string;
+  assignedDomains?: string[]; // IDs của các Nhóm Ngành phụ trách (Dành riêng cho Curator)
   masteryPoints?: number;
   clarityAverage?: number;
   createdAt: string;
