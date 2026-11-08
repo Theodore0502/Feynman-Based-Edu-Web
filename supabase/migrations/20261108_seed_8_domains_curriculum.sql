@@ -686,4 +686,69 @@ INSERT INTO public.academic_topics (id, subject_id, title, slug, summary, diffic
 INSERT INTO public.academic_topics (id, subject_id, title, slug, summary, difficulty_level, order_index, estimated_reading_minutes, required_concepts, status, highest_clarity_score, active_session_id) VALUES ('top-benh-hoc-noi-khoa-13', 'sub-med-internal', 'Bệnh Học Nội Khoa Cơ Bản - Chuyên Đề Nâng Cao #3', 'benh-hoc-noi-khoa-13', 'Bài học ''Bệnh Học Nội Khoa Cơ Bản - Chuyên Đề Nâng Cao #3'' thuộc môn Bệnh Học Nội Khoa Cơ Bản. Nghiên cứu chuyên sâu và tình huống ứng dụng thực tế trong Bệnh Học Nội Khoa Cơ Bản. Nội dung trọng tâm gồm việc hiểu rõ bản chất của Khái niệm nâng cao #3A, Kỹ thuật tối ưu #3B, vận dụng phương pháp giải thích đơn giản hóa của Feynman để liên kết với các ứng dụng thực tế.', 3, 13, 14, '["Khái niệm nâng cao #3A", "Kỹ thuật tối ưu #3B", "Phân tích tình huống", "Ứng dụng thực tiễn"]'::jsonb, 'NOT_STARTED', NULL, NULL);
 INSERT INTO public.academic_topics (id, subject_id, title, slug, summary, difficulty_level, order_index, estimated_reading_minutes, required_concepts, status, highest_clarity_score, active_session_id) VALUES ('top-benh-hoc-noi-khoa-14', 'sub-med-internal', 'Bệnh Học Nội Khoa Cơ Bản - Chuyên Đề Nâng Cao #4', 'benh-hoc-noi-khoa-14', 'Bài học ''Bệnh Học Nội Khoa Cơ Bản - Chuyên Đề Nâng Cao #4'' thuộc môn Bệnh Học Nội Khoa Cơ Bản. Nghiên cứu chuyên sâu và tình huống ứng dụng thực tế trong Bệnh Học Nội Khoa Cơ Bản. Nội dung trọng tâm gồm việc hiểu rõ bản chất của Khái niệm nâng cao #4A, Kỹ thuật tối ưu #4B, vận dụng phương pháp giải thích đơn giản hóa của Feynman để liên kết với các ứng dụng thực tế.', 2, 14, 8, '["Khái niệm nâng cao #4A", "Kỹ thuật tối ưu #4B", "Phân tích tình huống", "Ứng dụng thực tiễn"]'::jsonb, 'NOT_STARTED', NULL, NULL);
 COMMIT;
+
+-- ==============================================================================
+-- 8. THIẾT LẬP RÀNG BUỘC KHÓA NGOẠI (FOREIGN KEYS) VỚI CÁC BẢNG KHÁC TRONG HỆ THỐNG
+-- ==============================================================================
+DO $$
+BEGIN
+    -- 8.1 Liên kết bảng sessions (phiên học thật) với academic_topics và academic_domains
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'sessions') THEN
+        ALTER TABLE public.sessions DROP CONSTRAINT IF EXISTS fk_sessions_topic;
+        ALTER TABLE public.sessions DROP CONSTRAINT IF EXISTS fk_sessions_domain;
+        
+        ALTER TABLE public.sessions
+            ADD CONSTRAINT fk_sessions_topic
+            FOREIGN KEY (topic_id) REFERENCES public.academic_topics(id) ON DELETE SET NULL;
+            
+        ALTER TABLE public.sessions
+            ADD CONSTRAINT fk_sessions_domain
+            FOREIGN KEY (domain_id) REFERENCES public.academic_domains(id) ON DELETE SET NULL;
+    END IF;
+
+    -- 8.2 Liên kết bảng topic_edges (Đồ thị tri thức Knowledge Graph)
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'topic_edges') THEN
+        ALTER TABLE public.topic_edges DROP CONSTRAINT IF EXISTS fk_topic_edges_source;
+        ALTER TABLE public.topic_edges DROP CONSTRAINT IF EXISTS fk_topic_edges_target;
+        ALTER TABLE public.topic_edges ALTER COLUMN source_topic_id TYPE TEXT USING source_topic_id::text;
+        ALTER TABLE public.topic_edges ALTER COLUMN target_topic_id TYPE TEXT USING target_topic_id::text;
+        
+        ALTER TABLE public.topic_edges
+            ADD CONSTRAINT fk_topic_edges_source
+            FOREIGN KEY (source_topic_id) REFERENCES public.academic_topics(id) ON DELETE CASCADE;
+            
+        ALTER TABLE public.topic_edges
+            ADD CONSTRAINT fk_topic_edges_target
+            FOREIGN KEY (target_topic_id) REFERENCES public.academic_topics(id) ON DELETE CASCADE;
+    END IF;
+
+    -- 8.3 Liên kết bảng academic_materials (Tài liệu học tập RAG / Embeddings)
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'academic_materials') THEN
+        ALTER TABLE public.academic_materials DROP CONSTRAINT IF EXISTS fk_academic_materials_topic;
+        ALTER TABLE public.academic_materials ALTER COLUMN topic_id TYPE TEXT USING topic_id::text;
+        
+        ALTER TABLE public.academic_materials
+            ADD CONSTRAINT fk_academic_materials_topic
+            FOREIGN KEY (topic_id) REFERENCES public.academic_topics(id) ON DELETE CASCADE;
+    END IF;
+
+    -- 8.4 Liên kết bảng profiles (Hồ sơ người dùng)
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'profiles') THEN
+        ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS fk_profiles_primary_domain;
+        ALTER TABLE public.profiles ALTER COLUMN primary_domain_id TYPE TEXT USING primary_domain_id::text;
+        
+        ALTER TABLE public.profiles
+            ADD CONSTRAINT fk_profiles_primary_domain
+            FOREIGN KEY (primary_domain_id) REFERENCES public.academic_domains(id) ON DELETE SET NULL;
+    END IF;
+END $$;
+
+-- Tạo các Indexes cho các khóa ngoại liên kết hệ thống
+CREATE INDEX IF NOT EXISTS idx_sessions_topic_id ON public.sessions(topic_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_domain_id ON public.sessions(domain_id);
+CREATE INDEX IF NOT EXISTS idx_topic_edges_source ON public.topic_edges(source_topic_id);
+CREATE INDEX IF NOT EXISTS idx_topic_edges_target ON public.topic_edges(target_topic_id);
+CREATE INDEX IF NOT EXISTS idx_academic_materials_topic ON public.academic_materials(topic_id);
+CREATE INDEX IF NOT EXISTS idx_profiles_primary_domain ON public.profiles(primary_domain_id);
+
 -- Hoàn tất seed dữ liệu thành công!
