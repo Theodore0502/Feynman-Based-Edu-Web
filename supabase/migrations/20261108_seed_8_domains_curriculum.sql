@@ -692,10 +692,22 @@ COMMIT;
 -- ==============================================================================
 DO $$
 BEGIN
-    -- 8.1 Liên kết bảng sessions (phiên học thật) với academic_topics và academic_domains
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'sessions') THEN
+    -- 8.1 Liên kết bảng learning_sessions (bảng gốc lưu phiên học)
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'learning_sessions' AND table_type = 'BASE TABLE') THEN
+        ALTER TABLE public.learning_sessions DROP CONSTRAINT IF EXISTS fk_learning_sessions_topic;
+        ALTER TABLE public.learning_sessions ALTER COLUMN topic_id TYPE TEXT USING topic_id::text;
+        
+        ALTER TABLE public.learning_sessions
+            ADD CONSTRAINT fk_learning_sessions_topic
+            FOREIGN KEY (topic_id) REFERENCES public.academic_topics(id) ON DELETE SET NULL;
+    END IF;
+
+    -- 8.2 Trường hợp bảng sessions là BASE TABLE (không phải VIEW)
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'sessions' AND table_type = 'BASE TABLE') THEN
         ALTER TABLE public.sessions DROP CONSTRAINT IF EXISTS fk_sessions_topic;
         ALTER TABLE public.sessions DROP CONSTRAINT IF EXISTS fk_sessions_domain;
+        ALTER TABLE public.sessions ALTER COLUMN topic_id TYPE TEXT USING topic_id::text;
+        ALTER TABLE public.sessions ALTER COLUMN domain_id TYPE TEXT USING domain_id::text;
         
         ALTER TABLE public.sessions
             ADD CONSTRAINT fk_sessions_topic
@@ -706,8 +718,8 @@ BEGIN
             FOREIGN KEY (domain_id) REFERENCES public.academic_domains(id) ON DELETE SET NULL;
     END IF;
 
-    -- 8.2 Liên kết bảng topic_edges (Đồ thị tri thức Knowledge Graph)
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'topic_edges') THEN
+    -- 8.3 Liên kết bảng topic_edges (Đồ thị tri thức Knowledge Graph)
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'topic_edges' AND table_type = 'BASE TABLE') THEN
         ALTER TABLE public.topic_edges DROP CONSTRAINT IF EXISTS fk_topic_edges_source;
         ALTER TABLE public.topic_edges DROP CONSTRAINT IF EXISTS fk_topic_edges_target;
         ALTER TABLE public.topic_edges ALTER COLUMN source_topic_id TYPE TEXT USING source_topic_id::text;
@@ -722,8 +734,8 @@ BEGIN
             FOREIGN KEY (target_topic_id) REFERENCES public.academic_topics(id) ON DELETE CASCADE;
     END IF;
 
-    -- 8.3 Liên kết bảng academic_materials (Tài liệu học tập RAG / Embeddings)
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'academic_materials') THEN
+    -- 8.4 Liên kết bảng academic_materials (Tài liệu học tập RAG / Embeddings)
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'academic_materials' AND table_type = 'BASE TABLE') THEN
         ALTER TABLE public.academic_materials DROP CONSTRAINT IF EXISTS fk_academic_materials_topic;
         ALTER TABLE public.academic_materials ALTER COLUMN topic_id TYPE TEXT USING topic_id::text;
         
@@ -732,8 +744,8 @@ BEGIN
             FOREIGN KEY (topic_id) REFERENCES public.academic_topics(id) ON DELETE CASCADE;
     END IF;
 
-    -- 8.4 Liên kết bảng profiles (Hồ sơ người dùng)
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'profiles') THEN
+    -- 8.5 Liên kết bảng profiles (Hồ sơ người dùng)
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'profiles' AND table_type = 'BASE TABLE') THEN
         ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS fk_profiles_primary_domain;
         ALTER TABLE public.profiles ALTER COLUMN primary_domain_id TYPE TEXT USING primary_domain_id::text;
         
@@ -743,12 +755,44 @@ BEGIN
     END IF;
 END $$;
 
+-- 8.6 Cập nhật VIEW public.sessions để ánh xạ chuẩn từ learning_sessions
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.views WHERE table_schema = 'public' AND table_name = 'sessions') THEN
+        CREATE OR REPLACE VIEW public.sessions AS
+        SELECT
+            id,
+            COALESCE(custom_topic_title, 'General') AS topic,
+            topic_id,
+            persona_id,
+            difficulty,
+            status,
+            current_clarity AS clarity_score,
+            started_at AS created_at
+        FROM public.learning_sessions;
+    END IF;
+END $$;
+
 -- Tạo các Indexes cho các khóa ngoại liên kết hệ thống
-CREATE INDEX IF NOT EXISTS idx_sessions_topic_id ON public.sessions(topic_id);
-CREATE INDEX IF NOT EXISTS idx_sessions_domain_id ON public.sessions(domain_id);
-CREATE INDEX IF NOT EXISTS idx_topic_edges_source ON public.topic_edges(source_topic_id);
-CREATE INDEX IF NOT EXISTS idx_topic_edges_target ON public.topic_edges(target_topic_id);
-CREATE INDEX IF NOT EXISTS idx_academic_materials_topic ON public.academic_materials(topic_id);
-CREATE INDEX IF NOT EXISTS idx_profiles_primary_domain ON public.profiles(primary_domain_id);
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'learning_sessions' AND table_type = 'BASE TABLE') THEN
+        CREATE INDEX IF NOT EXISTS idx_learning_sessions_topic_id ON public.learning_sessions(topic_id);
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'sessions' AND table_type = 'BASE TABLE') THEN
+        CREATE INDEX IF NOT EXISTS idx_sessions_topic_id ON public.sessions(topic_id);
+        CREATE INDEX IF NOT EXISTS idx_sessions_domain_id ON public.sessions(domain_id);
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'topic_edges' AND table_type = 'BASE TABLE') THEN
+        CREATE INDEX IF NOT EXISTS idx_topic_edges_source ON public.topic_edges(source_topic_id);
+        CREATE INDEX IF NOT EXISTS idx_topic_edges_target ON public.topic_edges(target_topic_id);
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'academic_materials' AND table_type = 'BASE TABLE') THEN
+        CREATE INDEX IF NOT EXISTS idx_academic_materials_topic ON public.academic_materials(topic_id);
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'profiles' AND table_type = 'BASE TABLE') THEN
+        CREATE INDEX IF NOT EXISTS idx_profiles_primary_domain ON public.profiles(primary_domain_id);
+    END IF;
+END $$;
 
 -- Hoàn tất seed dữ liệu thành công!
