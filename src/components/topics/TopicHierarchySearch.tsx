@@ -141,11 +141,10 @@ export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
   // Danh sách các Domain (bao gồm lựa chọn "Tất cả")
   const activeDomainsList = useMemo(() => {
     return [
-      { id: "ALL", name: "Tất cả 8 Nhóm Ngành", symbol: "🌐", color: "#64748b" },
+      { id: "ALL", name: "Tất cả 8 Nhóm Ngành", color: "#64748b" },
       ...domains.map((d) => ({
         id: d.id,
         name: d.name,
-        symbol: d.iconName || "📚",
         color: d.colorHex || d.color || "#3B82F6",
       })),
     ];
@@ -309,7 +308,7 @@ export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
           >
             {activeDomainsList.map((d) => (
               <option key={d.id} value={d.id}>
-                {d.symbol} {d.name}
+                {d.name}
               </option>
             ))}
           </select>
