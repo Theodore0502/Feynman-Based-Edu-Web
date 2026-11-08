@@ -694,6 +694,7 @@ DO $$
 BEGIN
     -- 8.1 Liên kết bảng learning_sessions (bảng gốc lưu phiên học)
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'learning_sessions' AND table_type = 'BASE TABLE') THEN
+        ALTER TABLE public.learning_sessions DROP CONSTRAINT IF EXISTS learning_sessions_topic_id_fkey;
         ALTER TABLE public.learning_sessions DROP CONSTRAINT IF EXISTS fk_learning_sessions_topic;
         ALTER TABLE public.learning_sessions ALTER COLUMN topic_id TYPE TEXT USING topic_id::text;
         
@@ -720,10 +721,20 @@ BEGIN
 
     -- 8.3 Liên kết bảng topic_edges (Đồ thị tri thức Knowledge Graph)
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'topic_edges' AND table_type = 'BASE TABLE') THEN
+        -- Phải drop check constraint chk_no_self_loop trước khi alter để tránh lỗi so sánh text <> uuid
+        ALTER TABLE public.topic_edges DROP CONSTRAINT IF EXISTS chk_no_self_loop;
+        ALTER TABLE public.topic_edges DROP CONSTRAINT IF EXISTS uq_topic_edge;
+        ALTER TABLE public.topic_edges DROP CONSTRAINT IF EXISTS topic_edges_source_topic_id_fkey;
+        ALTER TABLE public.topic_edges DROP CONSTRAINT IF EXISTS topic_edges_target_topic_id_fkey;
         ALTER TABLE public.topic_edges DROP CONSTRAINT IF EXISTS fk_topic_edges_source;
         ALTER TABLE public.topic_edges DROP CONSTRAINT IF EXISTS fk_topic_edges_target;
+        
         ALTER TABLE public.topic_edges ALTER COLUMN source_topic_id TYPE TEXT USING source_topic_id::text;
         ALTER TABLE public.topic_edges ALTER COLUMN target_topic_id TYPE TEXT USING target_topic_id::text;
+        
+        -- Tái tạo lại ràng buộc sau khi cả 2 cột đã cùng kiểu TEXT
+        ALTER TABLE public.topic_edges ADD CONSTRAINT chk_no_self_loop CHECK (source_topic_id <> target_topic_id);
+        ALTER TABLE public.topic_edges ADD CONSTRAINT uq_topic_edge UNIQUE (source_topic_id, target_topic_id);
         
         ALTER TABLE public.topic_edges
             ADD CONSTRAINT fk_topic_edges_source
@@ -736,6 +747,7 @@ BEGIN
 
     -- 8.4 Liên kết bảng academic_materials (Tài liệu học tập RAG / Embeddings)
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'academic_materials' AND table_type = 'BASE TABLE') THEN
+        ALTER TABLE public.academic_materials DROP CONSTRAINT IF EXISTS academic_materials_topic_id_fkey;
         ALTER TABLE public.academic_materials DROP CONSTRAINT IF EXISTS fk_academic_materials_topic;
         ALTER TABLE public.academic_materials ALTER COLUMN topic_id TYPE TEXT USING topic_id::text;
         
