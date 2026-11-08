@@ -771,7 +771,8 @@ END $$;
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.views WHERE table_schema = 'public' AND table_name = 'sessions') THEN
-        CREATE OR REPLACE VIEW public.sessions AS
+        DROP VIEW public.sessions CASCADE;
+        CREATE VIEW public.sessions AS
         SELECT
             id,
             COALESCE(custom_topic_title, 'General') AS topic,
@@ -782,6 +783,8 @@ BEGIN
             current_clarity AS clarity_score,
             started_at AS created_at
         FROM public.learning_sessions;
+        
+        GRANT SELECT ON public.sessions TO anon, authenticated;
     END IF;
 END $$;
 
