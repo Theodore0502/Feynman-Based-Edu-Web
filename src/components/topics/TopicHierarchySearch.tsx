@@ -42,6 +42,7 @@ interface TopicHierarchySearchProps {
   subjects?: AcademicSubject[];
   domainSubjects?: Array<{ domain_id: string; subject_id: string; is_core?: boolean }>;
   topics?: CatalogTopic[];
+  externalFilter?: SearchFilterState;
 }
 
 // 4 Nhóm Ngành Chuẩn
@@ -131,12 +132,28 @@ export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
   subjects = THREE_TIER_SUBJECTS,
   domainSubjects = THREE_TIER_DOMAIN_SUBJECTS,
   topics = THREE_TIER_LECTURES,
+  externalFilter,
 }) => {
-  const [domainId, setDomainId] = useState<string>("ALL");
-  const [fieldId, setFieldId] = useState<string>("ALL");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [domainId, setDomainId] = useState<string>(externalFilter?.domainId || "ALL");
+  const [fieldId, setFieldId] = useState<string>(externalFilter?.fieldId || "ALL");
+  const [searchQuery, setSearchQuery] = useState<string>(externalFilter?.keyword || "");
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Đồng bộ với externalFilter từ bên ngoài (khi người dùng click node trên Cây Tri Thức)
+  useEffect(() => {
+    if (!externalFilter) return;
+
+    if (externalFilter.domainId !== undefined && externalFilter.domainId !== domainId) {
+      setDomainId(externalFilter.domainId);
+    }
+    if (externalFilter.fieldId !== undefined && externalFilter.fieldId !== fieldId) {
+      setFieldId(externalFilter.fieldId);
+    }
+    if (externalFilter.keyword !== undefined && externalFilter.keyword !== searchQuery) {
+      setSearchQuery(externalFilter.keyword);
+    }
+  }, [externalFilter?.domainId, externalFilter?.fieldId, externalFilter?.keyword]);
 
   // Danh sách các Domain (bao gồm lựa chọn "Tất cả")
   const activeDomainsList = useMemo(() => {
@@ -193,9 +210,9 @@ export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
       domainId,
       fieldId,
       keyword: searchQuery.trim(),
-      selectedTopicId: null,
+      selectedTopicId: externalFilter?.selectedTopicId || null,
     });
-  }, [domainId, fieldId, searchQuery, onFilterChange]);
+  }, [domainId, fieldId, searchQuery, onFilterChange, externalFilter?.selectedTopicId]);
 
   // Close search suggestions when clicking outside
   useEffect(() => {
@@ -329,7 +346,7 @@ export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
             onChange={(e) => setFieldId(e.target.value)}
             className="w-full appearance-none bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3 py-2 pr-8 text-xs font-bold text-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
           >
-            <option value="ALL">Toàn bộ Ngành Chuyên Môn</option>
+            <option value="ALL">Toàn bộ Môn Học</option>
             {filteredFields.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.name}

@@ -760,3 +760,4 @@ export const CuratorValidationCenter: React.FC = () => {
 };
 
 export default CuratorValidationCenter;
+

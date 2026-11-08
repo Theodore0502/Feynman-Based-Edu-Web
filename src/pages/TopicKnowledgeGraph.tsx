@@ -136,8 +136,95 @@ export const TopicKnowledgeGraph: React.FC = () => {
     selectedTopicId: null,
   });
 
+  // Tính toán chuỗi liên kết và nốt dẫn truyền từ nốt đang chọn (hoặc hover) về tận Gốc Cây Feynman (Level 0)
+  const activeAncestry = useMemo(() => {
+    const target = selectedNode || hoveredNode;
+    if (!target) {
+      return {
+        nodeIds: new Set<string>(),
+        linkIds: new Set<string>(),
+        linkEndpoints: new Set<string>(),
+      };
+    }
+
+    const nodeIds = new Set<string>();
+    const linkIds = new Set<string>();
+    const linkEndpoints = new Set<string>();
+
+    const addLink = (id: string, a: string, b: string) => {
+      linkIds.add(id);
+      linkEndpoints.add(a < b ? `${a}__${b}` : `${b}__${a}`);
+    };
+
+    nodeIds.add(target.id);
+
+    if (target.level === 3) {
+      // 1. Nốt Cấp 3 (Bài học): Nối về Subject -> Domain -> Root
+      const topicId = target.id.replace("topic-", "");
+      const subjectId = target.subjectId;
+      if (subjectId) {
+        const subNodeId = `subject-${subjectId}`;
+        nodeIds.add(subNodeId);
+        addLink(`link-sub-${subjectId}-${topicId}`, subNodeId, target.id);
+
+        let domainId = target.domainId;
+        if (!domainId) {
+          const sObj = curriculumData.subjects.find((s) => s.id === subjectId);
+          domainId = sObj?.domainId;
+          if (!domainId) {
+            const dsObj = curriculumData.domainSubjects.find((ds) => ds.subject_id === subjectId);
+            domainId = dsObj?.domain_id;
+          }
+        }
+
+        if (domainId) {
+          const domNodeId = `domain-${domainId}`;
+          nodeIds.add(domNodeId);
+          addLink(`link-domain-${domainId}-${subjectId}`, domNodeId, subNodeId);
+
+          nodeIds.add("core-feynman");
+          addLink(`link-root-${domNodeId}`, "core-feynman", domNodeId);
+        }
+      }
+    } else if (target.level === 2) {
+      // 2. Nốt Cấp 2 (Môn học): Nối về Domain -> Root
+      const subjectId = target.subjectId || target.id.replace("subject-", "");
+      let domainId = target.domainId;
+      if (!domainId) {
+        const sObj = curriculumData.subjects.find((s) => s.id === subjectId);
+        domainId = sObj?.domainId;
+        if (!domainId) {
+          const dsObj = curriculumData.domainSubjects.find((ds) => ds.subject_id === subjectId);
+          domainId = dsObj?.domain_id;
+        }
+      }
+
+      if (domainId) {
+        const domNodeId = `domain-${domainId}`;
+        nodeIds.add(domNodeId);
+        addLink(`link-domain-${domainId}-${subjectId}`, domNodeId, target.id);
+
+        nodeIds.add("core-feynman");
+        addLink(`link-root-${domNodeId}`, "core-feynman", domNodeId);
+      }
+    } else if (target.level === 1) {
+      // 3. Nốt Cấp 1 (Ngành): Nối thẳng về Root
+      nodeIds.add("core-feynman");
+      addLink(`link-root-${target.id}`, "core-feynman", target.id);
+    } else if (target.level === 0) {
+      nodeIds.add("core-feynman");
+    }
+
+    return { nodeIds, linkIds, linkEndpoints };
+  }, [selectedNode, hoveredNode, curriculumData]);
+
   const isNodeHighlighted = useCallback(
     (node: RadialTreeNode): boolean => {
+      // Luôn làm nổi bật các node nằm trên đường truyền về gốc
+      if (activeAncestry.nodeIds.has(node.id)) {
+        return true;
+      }
+
       const hasFilters =
         filterState.domainId !== "ALL" ||
         filterState.fieldId !== "ALL" ||
@@ -200,7 +287,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
 
       return true;
     },
-    [filterState]
+    [filterState, activeAncestry]
   );
 
   // Track container dimensions via ResizeObserver
@@ -667,8 +754,64 @@ export const TopicKnowledgeGraph: React.FC = () => {
       if (node.level >= 1) {
         setIsDrawerOpen(true);
       }
+
+      // ĐỒNG BỘ BỘ LỌC TÌM KIẾM THEO CÁC NODE THỪA KẾ
+      if (node.level === 3) {
+        // Cấp 3 (Bài học): gán domainId của bài, fieldId là subjectId của bài
+        const sId = node.subjectId || "ALL";
+        let dId = node.domainId;
+        if (!dId && sId !== "ALL") {
+          const sObj = curriculumData.subjects.find((s) => s.id === sId);
+          dId = sObj?.domainId;
+          if (!dId) {
+            const dsObj = curriculumData.domainSubjects.find((ds) => ds.subject_id === sId);
+            dId = dsObj?.domain_id;
+          }
+        }
+        setFilterState({
+          domainId: dId || "ALL",
+          fieldId: sId,
+          keyword: "",
+          selectedTopicId: node.id.replace("topic-", ""),
+        });
+      } else if (node.level === 2) {
+        // Cấp 2 (Môn học): gán domainId của môn, fieldId là subjectId của môn
+        const sId = node.subjectId || node.id.replace("subject-", "");
+        let dId = node.domainId;
+        if (!dId) {
+          const sObj = curriculumData.subjects.find((s) => s.id === sId);
+          dId = sObj?.domainId;
+          if (!dId) {
+            const dsObj = curriculumData.domainSubjects.find((ds) => ds.subject_id === sId);
+            dId = dsObj?.domain_id;
+          }
+        }
+        setFilterState({
+          domainId: dId || "ALL",
+          fieldId: sId,
+          keyword: "",
+          selectedTopicId: null,
+        });
+      } else if (node.level === 1) {
+        // Cấp 1 (Ngành): gán domainId, reset fieldId về "ALL"
+        const dId = node.domainId || node.id.replace("domain-", "");
+        setFilterState({
+          domainId: dId,
+          fieldId: "ALL",
+          keyword: "",
+          selectedTopicId: null,
+        });
+      } else if (node.level === 0) {
+        // Cấp 0 (Gốc Cây): reset về tất cả
+        setFilterState({
+          domainId: "ALL",
+          fieldId: "ALL",
+          keyword: "",
+          selectedTopicId: null,
+        });
+      }
     },
-    [centerCamera, zoomLevel]
+    [centerCamera, zoomLevel, curriculumData]
   );
 
   const handleBackgroundClick = useCallback(() => {
@@ -739,13 +882,10 @@ export const TopicKnowledgeGraph: React.FC = () => {
     (childNodeId: string) => {
       const found = graphData.nodes.find((n) => n.id === childNodeId);
       if (found) {
-        setSelectedNode(found);
-        if (found.x != null && found.y != null) {
-          centerCamera(found.x, found.y, Math.max(zoomLevel, 1.1), 650);
-        }
+        handleNodeClick(found);
       }
     },
-    [graphData.nodes, centerCamera, zoomLevel]
+    [graphData.nodes, handleNodeClick]
   );
 
   const handleTeachTopic = (topicName: string) => {
@@ -830,13 +970,15 @@ export const TopicKnowledgeGraph: React.FC = () => {
         return;
       }
 
-      const isConnectedToSelected =
-        selectedNode != null &&
-        (source.id === selectedNode.id || target.id === selectedNode.id);
-      const isConnectedToHovered =
-        hoveredNode != null &&
-        (source.id === hoveredNode.id || target.id === hoveredNode.id);
-      const isConnected = isConnectedToSelected || isConnectedToHovered;
+      const sourceId = typeof link.source === "object" ? (link.source as any).id : link.source;
+      const targetId = typeof link.target === "object" ? (link.target as any).id : link.target;
+      const pairKey = sourceId < targetId ? `${sourceId}__${targetId}` : `${targetId}__${sourceId}`;
+
+      // Đường dẫn phát sáng nối từ node được chọn (hoặc hover) về tận Gốc Cây Feynman
+      const isInActivePath =
+        activeAncestry.linkIds.has(link.id) ||
+        activeAncestry.linkEndpoints.has(pairKey) ||
+        (selectedNode != null && (source.id === selectedNode.id || target.id === selectedNode.id));
 
       const isSourceMatch = isNodeHighlighted(source);
       const isTargetMatch = isNodeHighlighted(target);
@@ -847,10 +989,6 @@ export const TopicKnowledgeGraph: React.FC = () => {
         filterState.selectedTopicId != null;
 
       ctx.save();
-
-      if (hasActiveFilter && (!isSourceMatch || !isTargetMatch)) {
-        ctx.globalAlpha = 0.08;
-      }
 
       // Đường cong nhánh cây hữu cơ (Smooth Quadratic Curve)
       ctx.beginPath();
@@ -866,13 +1004,22 @@ export const TopicKnowledgeGraph: React.FC = () => {
         ctx.quadraticCurveTo(cpX, cpY, target.x, target.y);
       }
 
-      if (isConnected) {
-        ctx.strokeStyle = "#4F46E5";
-        ctx.lineWidth = (link.level === 1 ? 3.0 : link.level === 2 ? 2.4 : 1.8) / globalScale;
+      if (isInActivePath) {
+        // ĐƯỜNG NỐI TỪ NODE VỀ TẬN GỐC SÁNG RỰC RỠ (ELECTRIC GLOWING PATH TO ROOT)
+        ctx.strokeStyle = "#4338CA";
+        ctx.lineWidth = (link.level === 1 ? 4.2 : link.level === 2 ? 3.4 : 2.6) / globalScale;
         ctx.setLineDash([]);
-        ctx.shadowColor = "rgba(79, 70, 229, 0.4)";
-        ctx.shadowBlur = 8 / globalScale;
+        ctx.shadowColor = "rgba(67, 56, 202, 0.9)";
+        ctx.shadowBlur = 14 / globalScale;
+        ctx.globalAlpha = 1.0;
       } else {
+        // Làm mờ các nhánh không nằm trên đường dẫn truyền để làm nổi bật luồng sáng về gốc
+        if (selectedNode != null || hoveredNode != null) {
+          ctx.globalAlpha = 0.12;
+        } else if (hasActiveFilter && (!isSourceMatch || !isTargetMatch)) {
+          ctx.globalAlpha = 0.08;
+        }
+
         if (link.isCrossLink) {
           ctx.strokeStyle = "rgba(130, 153, 224, 0.35)";
           ctx.lineWidth = 0.8 / globalScale;
@@ -896,7 +1043,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
       ctx.stroke();
       ctx.restore();
     },
-    [selectedNode, hoveredNode, filterState, isNodeHighlighted]
+    [selectedNode, hoveredNode, filterState, isNodeHighlighted, activeAncestry]
   );
 
   // =========================================================================
@@ -907,6 +1054,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
       const isSelected = selectedNode?.id === node.id;
       const isHovered = hoveredNode?.id === node.id;
       const isActive = isSelected || isHovered;
+      const isOnActivePath = activeAncestry.nodeIds.has(node.id);
       const x = node.x ?? 0;
       const y = node.y ?? 0;
 
@@ -920,11 +1068,13 @@ export const TopicKnowledgeGraph: React.FC = () => {
       ctx.save();
 
       // Spotlight / Dimming
-      if (hasActiveFilter && !isMatch) {
+      if (hasActiveFilter && !isMatch && !isOnActivePath) {
         ctx.globalAlpha = 0.12;
-      } else if (hasActiveFilter && isMatch && node.level >= 1) {
-        ctx.shadowColor = "#8299E0";
-        ctx.shadowBlur = (isSelected ? 16 : 8) / globalScale;
+      } else if ((hasActiveFilter && isMatch) || isOnActivePath) {
+        if (node.level >= 1) {
+          ctx.shadowColor = isOnActivePath ? "#4338CA" : "#8299E0";
+          ctx.shadowBlur = (isSelected || isOnActivePath ? 14 : 8) / globalScale;
+        }
       }
 
       // -------------------------------------------------------------
@@ -932,33 +1082,46 @@ export const TopicKnowledgeGraph: React.FC = () => {
       // -------------------------------------------------------------
       if (node.level === 0) {
         const r = node.r ?? 44;
+
+        // Vòng hào quang phát sáng khi có nhánh con đang được chọn
+        if (isOnActivePath && activeAncestry.nodeIds.size > 1) {
+          ctx.beginPath();
+          ctx.arc(x, y, r + 5 / globalScale, 0, 2 * Math.PI);
+          ctx.strokeStyle = "#4338CA";
+          ctx.lineWidth = 2.6 / globalScale;
+          ctx.shadowColor = "rgba(67, 56, 202, 0.7)";
+          ctx.shadowBlur = 12 / globalScale;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
+
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
-        ctx.fillStyle = isActive ? "#7286D3" : "#ffffff";
+        ctx.fillStyle = isActive || isOnActivePath ? "#7286D3" : "#ffffff";
         ctx.shadowColor = "rgba(114, 134, 211, 0.35)";
         ctx.shadowBlur = 12 / globalScale;
         ctx.fill();
 
-        ctx.strokeStyle = isActive ? "#ffffff" : "#7286D3";
+        ctx.strokeStyle = isActive || isOnActivePath ? "#ffffff" : "#7286D3";
         ctx.lineWidth = 2.4 / globalScale;
         ctx.stroke();
 
         ctx.beginPath();
         ctx.arc(x, y, r - 5, 0, 2 * Math.PI);
-        ctx.strokeStyle = isActive ? "rgba(255, 255, 255, 0.4)" : "rgba(114, 134, 211, 0.3)";
+        ctx.strokeStyle = isActive || isOnActivePath ? "rgba(255, 255, 255, 0.4)" : "rgba(114, 134, 211, 0.3)";
         ctx.lineWidth = 1 / globalScale;
         ctx.stroke();
 
         ctx.shadowBlur = 0;
 
         ctx.font = `900 ${7.5 / globalScale}px 'Lato', sans-serif`;
-        ctx.fillStyle = isActive ? "#ffffff" : "#475569";
+        ctx.fillStyle = isActive || isOnActivePath ? "#ffffff" : "#475569";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText("CÂY TRI THỨC", x, y - 5 / globalScale);
 
         ctx.font = `900 ${9.0 / globalScale}px 'Lato', sans-serif`;
-        ctx.fillStyle = isActive ? "#ffffff" : "#1E293B";
+        ctx.fillStyle = isActive || isOnActivePath ? "#ffffff" : "#1E293B";
         ctx.fillText("FEYNMAN", x, y + 8 / globalScale);
 
         ctx.restore();
@@ -970,6 +1133,18 @@ export const TopicKnowledgeGraph: React.FC = () => {
       // -------------------------------------------------------------
       if (node.level === 1) {
         const r = isActive ? 25 : (node.r ?? 23);
+
+        // Vòng phát sáng nếu thuộc chuỗi liên kết về gốc
+        if (isOnActivePath) {
+          ctx.beginPath();
+          ctx.arc(x, y, r + 4 / globalScale, 0, 2 * Math.PI);
+          ctx.strokeStyle = "#4338CA";
+          ctx.lineWidth = 2.4 / globalScale;
+          ctx.shadowColor = "rgba(67, 56, 202, 0.7)";
+          ctx.shadowBlur = 10 / globalScale;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
 
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
@@ -1024,6 +1199,18 @@ export const TopicKnowledgeGraph: React.FC = () => {
       // -------------------------------------------------------------
       if (node.level === 2) {
         const r = isActive ? 14 : (node.r ?? 12);
+
+        // Vòng phát sáng nếu thuộc chuỗi liên kết về gốc
+        if (isOnActivePath) {
+          ctx.beginPath();
+          ctx.arc(x, y, r + 3 / globalScale, 0, 2 * Math.PI);
+          ctx.strokeStyle = "#4338CA";
+          ctx.lineWidth = 2.2 / globalScale;
+          ctx.shadowColor = "rgba(67, 56, 202, 0.7)";
+          ctx.shadowBlur = 8 / globalScale;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
 
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
@@ -1088,6 +1275,18 @@ export const TopicKnowledgeGraph: React.FC = () => {
       if (node.level === 3) {
         const r = isActive ? 9.5 : (node.r ?? 6.5);
 
+        // Vòng phát sáng nổi bật cho bài học được chọn
+        if (isSelected || isOnActivePath) {
+          ctx.beginPath();
+          ctx.arc(x, y, r + 3 / globalScale, 0, 2 * Math.PI);
+          ctx.strokeStyle = "#4338CA";
+          ctx.lineWidth = 2.0 / globalScale;
+          ctx.shadowColor = "rgba(67, 56, 202, 0.9)";
+          ctx.shadowBlur = 10 / globalScale;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
+
         ctx.beginPath();
         ctx.arc(x, y, r, 0, 2 * Math.PI);
         ctx.fillStyle = isActive ? "#7286D3" : "#ffffff";
@@ -1140,7 +1339,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
 
       ctx.restore();
     },
-    [selectedNode, hoveredNode, filterState, isNodeHighlighted]
+    [selectedNode, hoveredNode, filterState, isNodeHighlighted, activeAncestry]
   );
 
   return (
@@ -1153,6 +1352,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
         subjects={curriculumData.subjects}
         domainSubjects={curriculumData.domainSubjects}
         topics={curriculumData.topics}
+        externalFilter={filterState}
       />
 
       {/* Main Interactive ForceGraph2D Canvas Container */}
