@@ -17,7 +17,7 @@
 
 import React, { useMemo, useState, useRef, useCallback, useEffect, useLayoutEffect } from "react";
 import ForceGraph2D, { ForceGraphMethods } from "react-force-graph-2d";
-import { forceCollide, forceManyBody, forceRadial } from "d3-force";
+import { forceCollide, forceManyBody, forceX, forceY } from "d3-force";
 import { useNavigate } from "react-router-dom";
 import {
   Flame,
@@ -309,6 +309,10 @@ export const TopicKnowledgeGraph: React.FC = () => {
     // Phân bổ đối xứng 360° (mỗi ngành chiếm rẻ quạt 45°)
     // -------------------------------------------------------------
     const numDomains = domains.length;
+    // Tỷ lệ co dãn hình Oval / Ellipse sang trái - phải (Widescreen landscape layout)
+    const ELLIPSE_SCALE_X = 1.48; // Giãn rộng trục ngang (trái - phải)
+    const ELLIPSE_SCALE_Y = 0.82; // Thu gọn nhẹ trục dọc (trên - dưới)
+
     const domainDist = 220; // Bán kính thân cành lớn
     const domainAngleMap = new Map<string, number>();
 
@@ -317,8 +321,8 @@ export const TopicKnowledgeGraph: React.FC = () => {
       const angle = (dIdx * 2 * Math.PI) / numDomains - Math.PI / 2;
       domainAngleMap.set(d.id, angle);
 
-      const x = domainDist * Math.cos(angle);
-      const y = domainDist * Math.sin(angle);
+      const x = domainDist * ELLIPSE_SCALE_X * Math.cos(angle);
+      const y = domainDist * ELLIPSE_SCALE_Y * Math.sin(angle);
       const code = DOMAIN_CODE_MAP[d.id] || d.slug.toUpperCase();
 
       const dNode: RadialTreeNode = {
@@ -387,8 +391,8 @@ export const TopicKnowledgeGraph: React.FC = () => {
         const subAngle = dAngle + sOffset;
 
         const subDist = 410 + (sIdx % 2) * 35;
-        const sx = subDist * Math.cos(subAngle);
-        const sy = subDist * Math.sin(subAngle);
+        const sx = subDist * ELLIPSE_SCALE_X * Math.cos(subAngle);
+        const sy = subDist * ELLIPSE_SCALE_Y * Math.sin(subAngle);
 
         subjectCoordMap.set(s.id, { x: sx, y: sy, angle: subAngle });
 
@@ -470,8 +474,8 @@ export const TopicKnowledgeGraph: React.FC = () => {
 
         const topicAngle = coord.angle + topicOffset + (tier === 1 ? 0.012 : -0.012);
         const branchDist = tier === 0 ? 95 : 160;
-        const tx = coord.x + branchDist * Math.cos(topicAngle);
-        const ty = coord.y + branchDist * Math.sin(topicAngle);
+        const tx = coord.x + branchDist * ELLIPSE_SCALE_X * Math.cos(topicAngle);
+        const ty = coord.y + branchDist * ELLIPSE_SCALE_Y * Math.sin(topicAngle);
 
         let status: RadialTreeNode["status"] = "UNLEARNED";
         const topicStatus = (topic.status as string) || "";
@@ -552,40 +556,48 @@ export const TopicKnowledgeGraph: React.FC = () => {
         .distanceMax(650)
     );
 
-    // 3. Radial Force: Định hướng các tầng duy trì bán kính tỏa tròn cân đối
+    // 3. Elliptical Anchor Forces: Lực hút định hướng theo hình Oval (Widescreen landscape)
     fgRef.current.d3Force(
-      "radial",
-      forceRadial(
-        (node: any) => {
-          if (node.level === 0) return 0;
-          if (node.level === 1) return 220;
-          if (node.level === 2) return 425;
-          return 560;
-        },
-        0,
-        0
-      ).strength((node: any) => {
+      "x",
+      forceX((node: any) => node.initialX ?? 0).strength((node: any) => {
         if (node.level === 0) return 1.0;
-        if (node.level === 1) return 0.75;
-        if (node.level === 2) return 0.55;
-        return 0.35;
+        if (node.level === 1) return 0.85;
+        if (node.level === 2) return 0.65;
+        return 0.45;
       })
     );
 
-    // 4. Link Force: Chiều dài và độ đàn hồi của cành cây
+    fgRef.current.d3Force(
+      "y",
+      forceY((node: any) => node.initialY ?? 0).strength((node: any) => {
+        if (node.level === 0) return 1.0;
+        if (node.level === 1) return 0.85;
+        if (node.level === 2) return 0.65;
+        return 0.45;
+      })
+    );
+
+    // 4. Link Force: Chiều dài và độ đàn hồi của cành cây thích ứng theo khoảng cách tự nhiên
     const linkForce: any = fgRef.current.d3Force("link");
     if (linkForce) {
       linkForce
         .distance((link: any) => {
+          const src = link.source as RadialTreeNode;
+          const tgt = link.target as RadialTreeNode;
+          if (src && tgt && src.initialX != null && tgt.initialX != null) {
+            const dx = tgt.initialX - src.initialX;
+            const dy = (tgt.initialY ?? 0) - (src.initialY ?? 0);
+            return Math.hypot(dx, dy);
+          }
           if (link.level === 1) return 220;
-          if (link.level === 2) return 160;
-          return 85;
+          if (link.level === 2) return 150;
+          return 80;
         })
         .strength((link: any) => {
-          if (link.isCrossLink) return 0.05;
-          if (link.level === 1) return 0.8;
-          if (link.level === 2) return 0.6;
-          return 0.45;
+          if (link.isCrossLink) return 0.04;
+          if (link.level === 1) return 0.75;
+          if (link.level === 2) return 0.55;
+          return 0.4;
         });
     }
 
@@ -709,13 +721,13 @@ export const TopicKnowledgeGraph: React.FC = () => {
     }
   }, [filterState.domainId, filterState.selectedTopicId, filterState.keyword, graphData.nodes, centerCamera]);
 
-  // Vòng nền tinh tế làm mốc cự ly (Watermark Tree Rings)
+  // Vòng nền tinh tế làm mốc cự ly hình Oval (Watermark Oval Tree Rings)
   const handleRenderFramePre = useCallback((ctx: CanvasRenderingContext2D, globalScale: number) => {
     ctx.save();
     const rings = [220, 420, 560];
     rings.forEach((r) => {
       ctx.beginPath();
-      ctx.arc(0, 0, r, 0, 2 * Math.PI);
+      ctx.ellipse(0, 0, r * 1.48, r * 0.82, 0, 0, 2 * Math.PI);
       ctx.strokeStyle = "rgba(130, 153, 224, 0.12)";
       ctx.lineWidth = 0.8 / globalScale;
       ctx.setLineDash([3 / globalScale, 6 / globalScale]);
