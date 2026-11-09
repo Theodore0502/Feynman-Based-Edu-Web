@@ -127,3 +127,52 @@ export interface GraphEdge {
 }
 
 export type KnowledgeGraphEdge = GraphEdge;
+
+// ==========================================
+// Strict Closed-Set Academic Taxonomy Types
+// ==========================================
+
+export interface TaxonomySubjectItem {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  difficultyLevel: number;
+  keywords: string[];
+  allowed_concepts: string[];
+  allowed_jargons: string[];
+}
+
+export interface TaxonomyDomainItem {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  keywords: string[];
+  subjects: TaxonomySubjectItem[];
+}
+
+export interface AcademicTaxonomyState {
+  version: string;
+  updated_at: string;
+  total_domains: number;
+  total_subjects: number;
+  domains: TaxonomyDomainItem[];
+}
+
+export interface TaxonomyClassificationResult {
+  domainId: string;
+  domainSlug: string;
+  domainName: string;
+  subjectId: string;
+  subjectSlug: string;
+  subjectName: string;
+  confidenceScore: number; // 0 - 100%
+  matchedKeywords: string[];
+  suggestedTitle: string;
+  canonicalSlug: string;
+  refLink: string;
+  allowedConcepts: string[];
+  allowedJargons: string[];
+}
+

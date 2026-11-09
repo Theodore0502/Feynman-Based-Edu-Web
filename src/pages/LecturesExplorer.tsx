@@ -21,7 +21,6 @@ import { CurriculumService } from "@/lib/services/curriculum-service";
 import { DomainCard } from "@/components/lectures/DomainCard";
 import { SubjectCard } from "@/components/lectures/SubjectCard";
 import { LectureRow } from "@/components/lectures/LectureRow";
-import { PageHeroBanner } from "@/components/shared/PageHeroBanner";
 import type { DomainCategory, AcademicSubject, CatalogTopic, LectureStatus } from "@/types/catalog.types";
 import {
   Search,
@@ -213,31 +212,50 @@ export const LecturesExplorer: React.FC = () => {
       {currentLevel === 1 && (
         <div className="space-y-6">
           <div>
-            {/* Page Title Header (Cấp 1: Kho Bài Giảng Tinh Giản) */}
-            <PageHeroBanner
-              title="Kho Bài Giảng Học Thuật"
-              description="Lựa chọn nhóm ngành chuyên môn để khám phá các môn học thành phần và bắt đầu chu trình giảng giải bình dân hóa cùng khán giả AI."
-              rightWidget={
-                <div className="flex items-center gap-3">
-                  <div className="text-center px-1">
-                    <div className="text-lg font-black text-slate-800">8</div>
-                    <div className="text-[10px] text-slate-400 font-bold uppercase">Nhóm Ngành</div>
+            {/* Page Title Header (Cấp 1: Kho Bài Giảng) */}
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#EEF2FC] via-[#F5F2FB] to-[#FFF5F5] p-4 sm:p-6 border border-[#E8EEF8] shadow-xs">
+              {/* Dreamy Hero Background Image (mờ nhẹ) */}
+              <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+                <img
+                  src="/images/hero-banner-bg.png"
+                  alt="Hero background"
+                  className="w-full h-full object-cover object-center opacity-30"
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-white/50 via-white/30 to-white/50 backdrop-blur-[0.5px]" />
+              </div>
+
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
+                {/* Lớp blur trắng ở dưới các chữ để nhìn rõ chữ */}
+                <div className="space-y-2 p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs max-w-2xl">
+                  <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
+                    Kho Bài Giảng Học Thuật
+                  </h1>
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                    Lựa chọn nhóm ngành chuyên môn để khám phá các môn học thành phần và bắt đầu chu trình giảng giải bình dân hóa cùng khán giả AI.
+                  </p>
+                </div>
+
+                {/* Global Quick Metrics (Lớp blur trắng) */}
+                <div className="flex items-center gap-4 bg-white/85 backdrop-blur-md p-4 rounded-2xl border border-white/80 shadow-xs shrink-0">
+                  <div className="text-center px-2">
+                    <div className="text-xl font-black text-slate-800">8</div>
+                    <div className="text-[10px] text-slate-500 font-bold uppercase">Nhóm Ngành</div>
                   </div>
-                  <div className="w-px h-6 bg-slate-200" />
-                  <div className="text-center px-1">
-                    <div className="text-lg font-black text-slate-800">{THREE_TIER_SUBJECTS.length}</div>
-                    <div className="text-[10px] text-slate-400 font-bold uppercase">Môn Học</div>
+                  <div className="w-px h-8 bg-slate-200" />
+                  <div className="text-center px-2">
+                    <div className="text-xl font-black text-slate-800">{THREE_TIER_SUBJECTS.length}</div>
+                    <div className="text-[10px] text-slate-500 font-bold uppercase">Môn Học</div>
                   </div>
-                  <div className="w-px h-6 bg-slate-200" />
-                  <div className="text-center px-1">
-                    <div className="text-lg font-black text-[#5066A1]">
+                  <div className="w-px h-8 bg-slate-200" />
+                  <div className="text-center px-2">
+                    <div className="text-xl font-black text-[#5066A1]">
                       {totalCompletedGlobal}/{THREE_TIER_LECTURES.length}
                     </div>
-                    <div className="text-[10px] text-slate-400 font-bold uppercase">Hoàn Thành</div>
+                    <div className="text-[10px] text-slate-500 font-bold uppercase">Đã Hoàn Thành</div>
                   </div>
                 </div>
-              }
-            />
+              </div>
+            </div>
           </div>
 
           {/* Grid 4 Cột: 8 Nhóm Ngành */}

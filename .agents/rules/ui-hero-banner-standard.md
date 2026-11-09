@@ -1,36 +1,40 @@
 ---
-description: Tiêu chuẩn thiết kế Hero Banner tinh giản, gọn gàng, tiết kiệm chiều cao cho toàn bộ các trang trong hệ thống Theodore
+description: Tiêu chuẩn thiết kế & cấu trúc Hero Banner đồng bộ cho toàn bộ các trang trong hệ thống Theodore
 globs: ["src/pages/**/*.tsx", "src/components/**/*.tsx"]
 ---
 
-# Tiêu Chuẩn Hero Banner Tinh Giản Toàn Hệ Thống Theodore (Simplified Hero Banner Standard)
+# Tiêu Chuẩn Hero Banner Toàn Hệ Thống Theodore (Hero Banner Standard)
 
-Mọi trang chức năng trong hệ thống Theodore khi có phần đầu trang (Hero Banner) đều **BẮT BUỘC** tuân thủ cấu trúc thiết kế tinh giản, hiện đại và tiết kiệm chiều cao giao diện (Vertical Space).
+Mọi trang chức năng chính (Dashboard, Materials Upload, Curator Validation, Topics, Lectures, v.v.) khi có phần đầu trang (Hero Banner) đều **BẮT BUỘC** tuân thủ cấu trúc thiết kế 3 khối chuẩn mực và thẩm mỹ đồng nhất với trang `Dashboard` (`/dashboard`).
 
-## 1. Triết Lý Thiết Kế: Phẳng, Tinh Giản & Không Lồng Thẻ (No Nested Cards)
-- **Không tạo thẻ lồng trong thẻ (No nested card layers)**: Tránh việc bọc một container lớn rồi lại đặt thẻ con bên trong, gây cảm giác nặng nề, cồng kềnh.
-- **Tiết kiệm chiều dọc (Compact Height)**: Chiều cao toàn khối nên ở mức vừa phải (~110px – 140px) để người dùng nhìn thấy ngay nội dung chức năng chính (bảng, form, sơ đồ) mà không cần cuộn trang.
-- **Khung chứa thống nhất**:
-  - `relative overflow-hidden bg-white rounded-2xl border border-[#E2EAFD] p-5 sm:p-6 shadow-2xs`
-  - Lớp phủ gradient mỏng nhẹ làm dịu mắt: `bg-gradient-to-r from-blue-50/40 via-indigo-50/20 to-purple-50/30 pointer-events-none`.
+## 1. Thiết Kế Trực Quan & Màu Sắc Nền (Visual Palette)
+- **Container**: `relative overflow-hidden bg-gradient-to-r from-[#F0F4FC] via-[#F6F3FC] to-[#FCF4F7] border border-[#E2EAFD] rounded-3xl p-4 sm:p-6 shadow-xs`
+- **Ảnh nền mờ nghệ thuật (Dreamy Layer)**:
+  - Ảnh nền: `/images/hero-banner-bg.png` đặt ở lớp `z-0 pointer-events-none` với `opacity-35 object-cover object-center`.
+  - Lớp phủ gradient làm dịu: `bg-gradient-to-r from-white/50 via-white/30 to-white/50 backdrop-blur-[0.5px]`.
 
-## 2. Bố Cục 2 Phía Hiện Đại (2-Column Responsive Layout)
-`flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10`:
+## 2. Bố Cục 3 Khối Chuẩn Mực (3-Block Layout)
+Bố cục trên màn hình lớn sử dụng `flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10`:
 
-1. **Phía Trái (Nội Dung Chính)**:
-   - **Tuyệt đối không dùng Eyebrow Pill / Badge trên tiêu đề**: Không gắn các pill tag bo tròn (như `✨ AI Curriculum Digestion Agent`, `Hội Đồng Thẩm Định`, v.v.) bên trên tiêu đề Hero Bar. Bắt đầu ngay bằng Tiêu đề chính.
-   - **Tiêu đề (`h1`/`h2`)**: `text-xl sm:text-2xl font-black text-slate-800 tracking-tight leading-snug`.
-   - **Mô tả (`p`)**: `text-xs sm:text-sm text-slate-500 max-w-3xl leading-relaxed` (1–2 dòng súc tích).
-   - **Nút hành động (Tùy chọn)**: Nút thao tác nhanh bo góc `rounded-xl` với `shadow-2xs`.
+1. **Khối 1 - Bên Trái (Thẻ Nội Dung & Hành Động)**:
+   - Thẻ frosted-glass: `max-w-xl lg:max-w-lg xl:max-w-xl space-y-3 p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs shrink-0`.
+   - **Eyebrow Badge**: Nhãn danh mục nhỏ gọn, bo tròn `rounded-full`.
+   - **Tiêu đề chính (`h1`/`h2`)**: `text-2xl sm:text-3xl font-black text-slate-800 tracking-tight leading-snug`.
+   - **Mô tả (`p`)**: `text-xs sm:text-sm text-slate-600 leading-relaxed`.
+   - **Nút hành động**: Các nút chuyển trang, thao tác nhanh bo góc `rounded-2xl` hoặc `rounded-xl`.
 
-2. **Phía Phải (Tiện Ích & Linh Vật Nhỏ Gọn)**:
-   - **Widget tóm tắt (`rightWidget`)**: Thẻ thông số tóm tắt gọn gàng (`p-3 rounded-xl bg-slate-50/90 border border-slate-200/70 text-xs`).
-   - **Linh vật (`mascotSrc`)**: Kích thước nhỏ gọn tinh tế (`w-16 h-16 sm:w-20 sm:h-20`), không choán diện tích màn hình.
+2. **Khối 2 - Ở Giữa (Linh Vật Cú Theodore Bay Nổi)**:
+   - Đặt ở trung tâm: `flex items-center justify-center flex-1 my-1 lg:my-0 relative`.
+   - Ảnh linh vật: `/images/theodore-mascot.png` với kích thước `w-36 h-36 sm:w-48 sm:h-48 lg:w-56 lg:h-56 xl:w-60 xl:h-60`.
+   - Hiệu ứng: `filter drop-shadow-[0_16px_32px_rgba(114,134,211,0.32)] animate-float select-none pointer-events-none`.
 
-## 3. Thành Phần Tái Sử Dụng Chuẩn Mực
-Luôn sử dụng component chuẩn:
-```tsx
-import { PageHeroBanner } from "@/components/shared/PageHeroBanner";
-```
+3. **Khối 3 - Bên Phải (Thẻ Widget / Chỉ Số Tóm Tắt)**:
+   - Thẻ frosted-glass: `shrink-0 bg-white/80 backdrop-blur-md p-5 rounded-3xl border border-white/80 shadow-xs flex flex-col items-center justify-center self-center lg:self-auto min-w-[190px]`.
+   - Chứa thông số quan trọng của trang (ví dụ: Clarity Meter, thống kê bài chờ duyệt, định dạng tệp hỗ trợ, v.v.).
 
-Tuyệt đối không tự ý dùng các container tối màu (dark solid gradient) hoặc chèn mascot quá khổ làm đẩy nội dung xuống sâu.
+## 3. Thành Phần Tái Sử Dụng
+Sử dụng component chung:
+`import { PageHeroBanner } from "@/components/shared/PageHeroBanner";`
+
+Không tự ý tạo các Hero nền tối đậm màu (dark solid gradient) không ăn nhập với phong cách chung của hệ thống.
+

@@ -426,6 +426,11 @@ export const CuratorValidationCenter: React.FC = () => {
           <PageHeroBanner
             mascotSrc="/images/theodore-curator-owl.png"
             mascotAlt="Linh vật Thẩm định viên Theodore"
+            badge={
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-200/60 shadow-2xs">
+                <span>Hội Đồng Thẩm Định Tri Thức (Curator Studio)</span>
+              </div>
+            }
             title={
               <>
                 Bàn Thẩm Định &amp; Chuẩn Hóa{" "}
@@ -778,6 +783,17 @@ export const CuratorValidationCenter: React.FC = () => {
                     onChange={(e) => setEditReadingMinutes(Number(e.target.value))}
                     className="w-full bg-[#F8FAFD] border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-indigo-500 focus:bg-white"
                   />
+                </div>
+
+                {/* Reference Link (No icons rule maintained) */}
+                <div className="sm:col-span-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-0.5">
+                    URL Reference Link Học Thuật (Đóng Gói Tự Động)
+                  </span>
+                  <span className="font-mono text-xs text-indigo-700 block truncate select-all">
+                    {selectedDraft.refLink ||
+                      `https://theodore.edu.vn/materials/${selectedDraft.domainId}/${selectedDraft.subjectId}/${editSlug}`}
+                  </span>
                 </div>
               </div>
             </div>

@@ -24,6 +24,9 @@ import {
   BookOpen,
   X,
   FileCheck,
+  Copy,
+  Check,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/hooks/useAuthStore";
@@ -32,7 +35,8 @@ import {
   DocumentExtractionAgent,
   ExtractedLessonDraft,
 } from "@/lib/services/document-extraction-agent";
-import { DomainCategory, AcademicSubject } from "@/types/catalog.types";
+import { TaxonomyClassifier } from "@/lib/services/taxonomy-classifier";
+import { DomainCategory, AcademicSubject, TaxonomyClassificationResult } from "@/types/catalog.types";
 import { PageHeroBanner } from "@/components/shared/PageHeroBanner";
 
 const ALLOWED_EXTENSIONS = [".pdf", ".pdfa", ".doc", ".docx", ".pptx"];
@@ -52,6 +56,8 @@ export const MaterialUploadHub: React.FC = () => {
 
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [aiClassification, setAiClassification] = useState<TaxonomyClassificationResult | null>(null);
+  const [isCopied, setIsCopied] = useState<boolean>(false);
 
   // Agent State
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -99,7 +105,7 @@ export const MaterialUploadHub: React.FC = () => {
     }
   }, [selectedDomainId, availableSubjects]);
 
-  // File Validation
+  // File Validation & AI Auto-Classification
   const validateAndSetFile = (file: File) => {
     setFileError(null);
     const fileName = file.name.toLowerCase();
@@ -112,6 +118,7 @@ export const MaterialUploadHub: React.FC = () => {
         )}`
       );
       setUploadedFile(null);
+      setAiClassification(null);
       toast.error("Vui lòng tải lên đúng định dạng .pdf, .pdfa, .doc, .docx hoặc .pptx");
       return;
     }
@@ -119,12 +126,26 @@ export const MaterialUploadHub: React.FC = () => {
     if (file.size > 25 * 1024 * 1024) {
       setFileError("Dung lượng file vượt quá giới hạn cho phép (tối đa 25MB)");
       setUploadedFile(null);
+      setAiClassification(null);
       toast.error("Dung lượng tệp quá lớn!");
       return;
     }
 
     setUploadedFile(file);
-    toast.success(`Đã tiếp nhận tài liệu: ${file.name}`);
+
+    // AI Semantic Taxonomy Classifier: Tự động phân loại dựa trên Closed-Set JSON State
+    const classification = TaxonomyClassifier.classifyDocument(file.name);
+    setAiClassification(classification);
+
+    // Tự động gán Nhóm Ngành và Môn Học tương ứng
+    setSelectedDomainId(classification.domainId);
+    setTimeout(() => {
+      setSelectedSubjectId(classification.subjectId);
+    }, 50);
+
+    toast.success(
+      `AI đã nhận diện: ${classification.domainName} › ${classification.subjectName} (${classification.confidenceScore}% khớp)`
+    );
   };
 
   const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -183,6 +204,7 @@ export const MaterialUploadHub: React.FC = () => {
     setUploadedFile(null);
     setFileError(null);
     setExtractedDraft(null);
+    setAiClassification(null);
     setCurrentStage(0);
     setStageMessage("");
   };
@@ -231,10 +253,70 @@ export const MaterialUploadHub: React.FC = () => {
           <div className="lg:col-span-2 space-y-5">
             {/* Classification Card */}
             <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-4">
-              <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                <Layers className="w-4 h-4 text-indigo-600" />
-                1. Phân loại Học thuật (Academic Taxonomy)
-              </h2>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-indigo-600" />
+                  1. Phân loại Học thuật (Academic Taxonomy)
+                </h2>
+                {aiClassification && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-200/70 shadow-2xs">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    AI Tự Động Nhận Diện: {aiClassification.confidenceScore}% Độ Khớp
+                  </span>
+                )}
+              </div>
+
+              {/* AI Auto-Detection Details Preview (Closed-Set State) */}
+              {aiClassification && uploadedFile && (
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-50/80 via-blue-50/60 to-purple-50/50 border border-indigo-100/90 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-black text-indigo-950 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Chiếu Xạ Dữ Liệu Học Thuật Chuẩn Hóa (Closed-Set Taxonomy State)</span>
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider bg-white px-2.5 py-0.5 rounded-full text-indigo-700 border border-indigo-200/70 shadow-2xs">
+                      Tập Đóng Bất Biến
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="bg-white/90 p-3 rounded-xl border border-indigo-100/80 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">
+                        Tên Bài Học Chuẩn Hóa
+                      </span>
+                      <span className="font-bold text-slate-800 line-clamp-1 mt-0.5">
+                        {aiClassification.suggestedTitle}
+                      </span>
+                    </div>
+                    <div className="bg-white/90 p-3 rounded-xl border border-indigo-100/80 shadow-2xs">
+                      <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">
+                        URL Reference Link Chuẩn
+                      </span>
+                      <span className="font-mono text-[11px] text-indigo-600 truncate block mt-0.5">
+                        {aiClassification.refLink}
+                      </span>
+                    </div>
+                  </div>
+
+                  {aiClassification.matchedKeywords.length > 0 && (
+                    <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                      <span className="text-[11px] font-bold text-slate-500">Từ khóa đối soát:</span>
+                      {aiClassification.matchedKeywords.map((kw, i) => (
+                        <span
+                          key={i}
+                          className="px-2 py-0.5 rounded-md bg-white text-slate-700 text-[10px] font-semibold border border-indigo-100 shadow-2xs"
+                        >
+                          {kw}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <p className="text-[11px] text-slate-500 italic">
+                    * Hệ thống cam kết tuyệt đối không phát sinh nhãn thừa. Toàn bộ Khái niệm cốt lõi & Bẫy thuật ngữ đều được kế thừa từ tệp Closed-Set JSON State có sẵn.
+                  </p>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Domain Selector */}
@@ -244,7 +326,30 @@ export const MaterialUploadHub: React.FC = () => {
                   </label>
                   <select
                     value={selectedDomainId}
-                    onChange={(e) => setSelectedDomainId(e.target.value)}
+                    onChange={(e) => {
+                      const newDomainId = e.target.value;
+                      setSelectedDomainId(newDomainId);
+                      if (uploadedFile) {
+                        const meta = TaxonomyClassifier.generateMetadataForSelection(
+                          uploadedFile.name,
+                          newDomainId,
+                          selectedSubjectId
+                        );
+                        setAiClassification((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                domainId: newDomainId,
+                                suggestedTitle: meta.suggestedTitle,
+                                canonicalSlug: meta.canonicalSlug,
+                                refLink: meta.refLink,
+                                allowedConcepts: meta.allowedConcepts,
+                                allowedJargons: meta.allowedJargons,
+                              }
+                            : null
+                        );
+                      }
+                    }}
                     disabled={isProcessing}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer disabled:opacity-50"
                   >
@@ -263,7 +368,30 @@ export const MaterialUploadHub: React.FC = () => {
                   </label>
                   <select
                     value={selectedSubjectId}
-                    onChange={(e) => setSelectedSubjectId(e.target.value)}
+                    onChange={(e) => {
+                      const newSubId = e.target.value;
+                      setSelectedSubjectId(newSubId);
+                      if (uploadedFile) {
+                        const meta = TaxonomyClassifier.generateMetadataForSelection(
+                          uploadedFile.name,
+                          selectedDomainId,
+                          newSubId
+                        );
+                        setAiClassification((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                subjectId: newSubId,
+                                suggestedTitle: meta.suggestedTitle,
+                                canonicalSlug: meta.canonicalSlug,
+                                refLink: meta.refLink,
+                                allowedConcepts: meta.allowedConcepts,
+                                allowedJargons: meta.allowedJargons,
+                              }
+                            : null
+                        );
+                      }
+                    }}
                     disabled={isProcessing || availableSubjects.length === 0}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer disabled:opacity-50"
                   >
@@ -501,6 +629,33 @@ export const MaterialUploadHub: React.FC = () => {
               <h2 className="text-xl sm:text-2xl font-black text-slate-800">
                 {extractedDraft.title}
               </h2>
+              {extractedDraft.refLink && (
+                <div className="flex items-center gap-2 text-xs pt-1 flex-wrap">
+                  <span className="font-semibold text-slate-500">URL Tham Chiếu Chuẩn:</span>
+                  <a
+                    href={extractedDraft.refLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-mono text-indigo-600 hover:underline hover:text-indigo-800 transition-colors flex items-center gap-1"
+                  >
+                    <span>{extractedDraft.refLink}</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(extractedDraft.refLink || "");
+                      setIsCopied(true);
+                      toast.success("Đã sao chép liên kết tham chiếu!");
+                      setTimeout(() => setIsCopied(false), 2000);
+                    }}
+                    className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                    title="Sao chép URL"
+                  >
+                    {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2 shrink-0">

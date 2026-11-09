@@ -11,6 +11,7 @@
 import { supabase } from "@/lib/supabase";
 import { UserProfile } from "@/types/auth.types";
 import { CatalogTopic } from "@/types/catalog.types";
+import { TaxonomyClassifier } from "@/lib/services/taxonomy-classifier";
 
 export interface ExtractedLessonDraft {
   id: string; // e.g. "draft-doc-123"
@@ -27,6 +28,8 @@ export interface ExtractedLessonDraft {
   // AI Structured Output (Chuẩn Feynman Schema)
   title: string;
   slug: string;
+  refLink?: string; // Canonical URL Reference Link: https://theodore.edu.vn/materials/...
+  confidenceScore?: number; // AI Classification Confidence (0 - 100%)
   summary: string;
   domainId: string;
   subjectId: string;
@@ -192,12 +195,13 @@ export const DocumentExtractionAgent = {
   },
 
   /**
-   * AI Extraction Engine: Đọc file, bóc tách cấu trúc và tạo ra Lesson Draft chuẩn Feynman
+   * AI Extraction Engine: Đọc file, bóc tách cấu trúc và tạo ra Lesson Draft chuẩn Feynman.
+   * Tuân thủ quy tắc Strict Closed-Set: Tuyệt đối không sinh thêm hay bịa đặt giá trị mới ngoài JSON State.
    */
   async extractCurriculumFromFile(params: {
     file: File;
-    domainId: string;
-    subjectId: string;
+    domainId?: string;
+    subjectId?: string;
     user: UserProfile;
     onProgress?: (stage: number, stageName: string) => void;
   }): Promise<ExtractedLessonDraft> {
@@ -207,27 +211,34 @@ export const DocumentExtractionAgent = {
     onProgress?.(1, "🔍 Đang phân tích cấu trúc nhị phân của tài liệu...");
     await new Promise((r) => setTimeout(r, 650));
 
-    // Đọc text thô nếu là file text, hoặc tạo text tóm lược thông minh dựa trên tên tài liệu
-    const cleanFileName = file.name.replace(/\.[^/.]+$/, "");
-    const humanTitle = cleanFileName
-      .replace(/[_-]+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+    // Nhận diện tự động qua Semantic Taxonomy Classifier nếu chưa có domain/subject
+    const classification = TaxonomyClassifier.classifyDocument(file.name);
+    const finalDomainId = domainId && domainId !== "AUTO" ? domainId : classification.domainId;
+    const finalSubjectId = subjectId && subjectId !== "AUTO" ? subjectId : classification.subjectId;
+
+    // Chuẩn hóa Academic Metadata & URL Reference Link theo Closed-Set JSON State
+    const metadata = TaxonomyClassifier.generateMetadataForSelection(
+      file.name,
+      finalDomainId,
+      finalSubjectId
+    );
+    const humanTitle = metadata.suggestedTitle;
+    const slug = metadata.canonicalSlug;
+    const refLink = metadata.refLink;
 
     // Stage 2: Phân mảnh ngữ nghĩa (Semantic Chunking)
-    onProgress?.(2, "🧩 Bóc tách ngữ nghĩa & Phân đoạn kiến thức trọng tâm...");
+    onProgress?.(2, "🧩 Bóc tách ngữ nghĩa & Chiếu xạ vào Closed-Set Taxonomy State...");
     await new Promise((r) => setTimeout(r, 850));
 
-    // Trích xuất khái niệm cốt lõi theo chuyên ngành đã chọn
-    const generatedConcepts = this.inferRequiredConcepts(humanTitle, domainId);
-    const generatedJargons = this.inferJargonTraps(humanTitle, domainId);
-
-    // Stage 3: Khởi tạo định nghĩa Feynman & Ẩn dụ
-    onProgress?.(3, "🏷️ Tự động gán nhãn: Khái niệm cốt lõi & Bẫy thuật ngữ...");
+    // Stage 3: Strict Closed-Set Tags: Chỉ lấy nhãn có sẵn trong JSON State
+    onProgress?.(3, "🏷️ Gán nhãn chuẩn hóa: Khái niệm cốt lõi & Bẫy thuật ngữ từ JSON State...");
     await new Promise((r) => setTimeout(r, 700));
 
-    const slug = this.generateSlug(humanTitle);
-    const summary = `Bài học "${humanTitle}" được hệ thống hóa tự động từ tài liệu "${file.name}". Nội dung giải thích bản chất nguyên lý theo phương pháp Feynman, tập trung làm rõ cơ chế vận hành căn bản và loại bỏ thuật ngữ rườm rà để học viên có thể giảng giải lại cho người khác.`;
+    const strictTags = TaxonomyClassifier.getStrictAllowedTags(finalSubjectId);
+    const generatedConcepts = strictTags.concepts.slice(0, 5);
+    const generatedJargons = strictTags.jargons.slice(0, 3);
+
+    const summary = `Bài học "${humanTitle}" được hệ thống hóa tự động từ tài liệu học thuật "${file.name}". Nội dung giải thích bản chất nguyên lý theo phương pháp Feynman, tập trung làm rõ cơ chế vận hành căn bản và loại bỏ thuật ngữ rườm rà để người học có thể thấu suốt và truyền đạt lại dễ dàng.`;
 
     // Stage 4: Đóng gói Schema bài học
     onProgress?.(4, "✨ Đóng gói Schema bài học và chuyển tới Hội đồng Thẩm định...");
@@ -238,15 +249,17 @@ export const DocumentExtractionAgent = {
       fileName: file.name,
       fileType: file.type || "application/octet-stream",
       fileSize: file.size,
-      rawTextSnippet: `Nội dung trích xuất từ tài liệu [${file.name}]: Đã phân tích ${Math.round(file.size / 1024)} KB tài liệu học thuật. Bài giảng bao quát các nguyên lý cơ bản, công thức trọng tâm và sơ đồ liên kết tri thức.`,
+      rawTextSnippet: `Nội dung trích xuất từ tài liệu [${file.name}]: Đã phân tích ${Math.round(file.size / 1024)} KB tài liệu học thuật. Bài giảng bao quát các nguyên lý cơ bản, công thức trọng tâm và sơ đồ liên kết tri thức chuẩn hóa.`,
       uploadedById: user.id,
       uploadedByName: user.displayName || user.email || "Thành viên Theodore",
       uploadedAt: new Date().toISOString(),
       title: humanTitle,
       slug,
+      refLink,
+      confidenceScore: classification.confidenceScore,
       summary,
-      domainId,
-      subjectId,
+      domainId: finalDomainId,
+      subjectId: finalSubjectId,
       difficultyLevel: 3,
       estimatedReadingMinutes: Math.max(10, Math.min(30, Math.round(file.size / 150000) || 15)),
       requiredConcepts: generatedConcepts,
@@ -438,67 +451,20 @@ export const DocumentExtractionAgent = {
       .trim();
   },
 
-  inferRequiredConcepts(title: string, domainId: string): string[] {
-    const t = title.toLowerCase();
-    const concepts: string[] = [];
-
-    if (domainId === "dom-cs" || domainId === "dom-it" || domainId === "dom-se") {
-      if (t.includes("api") || t.includes("rest") || t.includes("microservice")) {
-        return [
-          "Giao thức HTTP/REST & Stateless",
-          "Xác thực Token JWT / OAuth2",
-          "Phân luồng & Cân bằng tải Load Balancing",
-          "Xử lý ngoại lệ & Mã trạng thái HTTP",
-        ];
-      }
-      if (t.includes("ai") || t.includes("machine") || t.includes("deep") || t.includes("data")) {
-        return [
-          "Hàm mất mát Loss Function",
-          "Thuật toán lan truyền ngược Backpropagation",
-          "Hiện tượng Overfitting & Dropout",
-          "Độ đo đánh giá Precision & Recall",
-        ];
-      }
-      return [
-        "Kiến trúc phân tầng và phân tách trách nhiệm",
-        "Nguyên lý vận hành cốt lõi",
-        "Độ phức tạp thời gian và không gian",
-        "Kịch bản triển khai và ứng dụng thực tế",
-      ];
-    }
-
-    if (domainId === "dom-med") {
-      return [
-        "Cơ chế sinh lý học cơ sở",
-        "Triệu chứng lâm sàng điển hình",
-        "Đường dẫn truyền và phản xạ điều hòa",
-        "Chỉ định và chống chỉ định điều trị",
-      ];
-    }
-
-    if (domainId === "dom-acc" || domainId === "dom-biz" || domainId === "dom-ecom") {
-      return [
-        "Nguyên tắc cân đối dòng tiền và chi phí",
-        "Mô hình phân tích rủi ro thị trường",
-        "Tối ưu hóa phễu chuyển đổi khách hàng",
-        "Quy chuẩn pháp lý và báo cáo minh bạch",
-      ];
-    }
-
-    return [
-      "Khái niệm và định nghĩa tiên quyết",
-      "Quy luật vận hành nền tảng",
-      "Mô hình hóa bằng ví dụ trực quan",
-      "Sai lầm phổ biến khi áp dụng",
-    ];
+  /**
+   * Trích xuất Khái niệm cốt lõi theo quy tắc Strict Closed-Set từ JSON State
+   */
+  inferRequiredConcepts(_title: string, subjectIdOrDomainId: string): string[] {
+    const strictTags = TaxonomyClassifier.getStrictAllowedTags(subjectIdOrDomainId);
+    return strictTags.concepts.slice(0, 5);
   },
 
-  inferJargonTraps(title: string, domainId: string): string[] {
-    return [
-      `Dùng biệt ngữ chuyên sâu "${title.split(" ")[0] || "chuyên ngành"}" mà không giải thích bản chất`,
-      "Đánh đồng giữa quan hệ nhân quả và tương quan thống kê",
-      "Trình bày lý thuyết trừu tượng mà thiếu ví dụ đời thường (Feynman Analogy)",
-    ];
+  /**
+   * Trích xuất Bẫy thuật ngữ theo quy tắc Strict Closed-Set từ JSON State
+   */
+  inferJargonTraps(_title: string, subjectIdOrDomainId: string): string[] {
+    const strictTags = TaxonomyClassifier.getStrictAllowedTags(subjectIdOrDomainId);
+    return strictTags.jargons.slice(0, 3);
   },
 };
 
