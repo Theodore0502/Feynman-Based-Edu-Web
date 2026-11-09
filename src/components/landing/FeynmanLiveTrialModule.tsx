@@ -181,40 +181,25 @@ export const FeynmanLiveTrialModule: React.FC = () => {
     try {
       const topicTitle = feynmanTopic?.title || "Phương Pháp Học Tập & Kỹ Thuật Feynman";
 
-      // 1. Phân tích Clarity & Jargon thời gian thực
-      const analysis = await GeminiCurriculumService.analyzeTurnRealtime(topicTitle, rawContent);
-      setCurrentClarityScore(analysis.currentClarityScore);
-
-      // Cập nhật điểm phân tích vào tin nhắn người dùng
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === userMsgId
-            ? {
-                ...m,
-                clarityScore: analysis.currentClarityScore,
-                detectedAnalogy: analysis.detectedAnalogy || undefined,
-                jargonDetected: analysis.jargonDetected,
-                logicGaps: analysis.logicGaps,
-              }
-            : m
-        )
-      );
-
       // Chuẩn bị lịch sử hội thoại cho Gemini Persona Bé Bắp
       const historyForGemini = messages
         .filter((m) => m.id !== "msg-welcome")
         .map((m) => ({ role: m.role, content: m.content }));
-
       historyForGemini.push({ role: "user", content: rawContent });
 
-      // 2. Gọi Gemini LLM tạo phản ứng Socratic của Bé Bắp kèm đo lường Telemetry
-      const personaDetailed = await GeminiCurriculumService.generatePersonaChatResponseDetailed({
-        topic: topicTitle,
-        persona: beBapPersona,
-        chatHistory: historyForGemini,
-        userMessage: rawContent,
-      });
+      // Chạy SONG SONG (Promise.all) cả 2 tác vụ: Phân tích Clarity & Sinh lời thoại Bé Bắp
+      // Giúp tối ưu hóa độ trễ phản hồi (cắt giảm 50% thời gian chờ đợi)
+      const [analysis, personaDetailed] = await Promise.all([
+        GeminiCurriculumService.analyzeTurnRealtime(topicTitle, rawContent),
+        GeminiCurriculumService.generatePersonaChatResponseDetailed({
+          topic: topicTitle,
+          persona: beBapPersona,
+          chatHistory: historyForGemini,
+          userMessage: rawContent,
+        }),
+      ]);
 
+      setCurrentClarityScore(analysis.currentClarityScore);
       const personaReply = personaDetailed.reply;
 
       const assistantMsg: MessageItem = {
@@ -224,7 +209,22 @@ export const FeynmanLiveTrialModule: React.FC = () => {
         timestamp: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
       };
 
-      setMessages((prev) => [...prev, assistantMsg]);
+      // Cập nhật cả tin nhắn người dùng (kèm phân tích) và tin nhắn phản hồi của Bé Bắp
+      setMessages((prev) =>
+        prev
+          .map((m) =>
+            m.id === userMsgId
+              ? {
+                  ...m,
+                  clarityScore: analysis.currentClarityScore,
+                  detectedAnalogy: analysis.detectedAnalogy || undefined,
+                  jargonDetected: analysis.jargonDetected,
+                  logicGaps: analysis.logicGaps,
+                }
+              : m
+          )
+          .concat(assistantMsg)
+      );
 
       // 3. Tính toán Telemetry (Thời gian phản hồi & Token)
       const turnDurationMs = Date.now() - turnStartTime;
