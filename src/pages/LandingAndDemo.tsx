@@ -15,19 +15,11 @@ import { FeynmanLiveTrialModule } from "@/components/landing/FeynmanLiveTrialMod
 import { FallingLeavesDecor } from "@/components/landing/FallingLeavesDecor";
 import {
   ArrowRight,
-  Sparkles,
   Sprout,
   Flower2,
   Leaf,
-  Sun,
   Droplets,
-  Eye,
-  Quote,
-  CheckCircle2,
   HelpCircle,
-  Zap,
-  BookOpen,
-  Compass,
 } from "lucide-react";
 
 // Dữ liệu 4 tình huống tò mò: So sánh "Hoa Nhựa (Học vẹt)" vs "Đóa Hoa Sống (Thấu suốt Feynman)"
@@ -488,41 +480,10 @@ export const LandingAndDemo: React.FC = () => {
         </div>
 
         {/* =========================================================================
-            BOTANICAL FOOTER & BẢN TUYÊN NGÔN FEYNMAN
+            BOTANICAL FOOTER
             ========================================================================= */}
-        <footer className="max-w-6xl mx-auto px-6 py-14 border-t border-slate-200/80 mt-12 space-y-8">
-          <div className="p-8 rounded-3xl bg-gradient-to-tr from-[#7286D3] via-[#8EA7E9] to-[#B5B2E8] text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-card">
-            <div className="space-y-2 text-center md:text-left">
-              <span className="text-[11px] font-black uppercase tracking-wider text-amber-200 flex items-center justify-center md:justify-start gap-1.5">
-                <Quote className="w-4 h-4 text-amber-300" />
-                Triết Lý Richard Feynman
-              </span>
-              <h4 className="text-xl sm:text-2xl font-black">
-                "Mỗi khái niệm bạn thấu suốt là một đóa hoa nở rộ trong khu vườn tâm trí."
-              </h4>
-              <p className="text-xs text-white/90 max-w-lg">
-                Đừng để sự phức tạp giả tạo giam cầm tiềm năng học tập của bạn. Hãy cùng Elis bình dân hóa mọi đỉnh cao tri thức!
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-center gap-3 shrink-0">
-              <Link
-                to="/lectures"
-                className="px-5 py-3 rounded-2xl bg-white text-[#5066A1] hover:bg-slate-50 text-xs font-black shadow-xs transition-colors"
-              >
-                Khám Phá 8 Miền Tri Thức
-              </Link>
-              <Link
-                to="/auth"
-                className="px-5 py-3 rounded-2xl bg-slate-900 hover:bg-black text-white text-xs font-black shadow-xs transition-colors flex items-center gap-1.5"
-              >
-                <span>Tạo Tài Khoản Miễn Phí</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 pt-4">
+        <footer className="max-w-6xl mx-auto px-6 py-10 border-t border-slate-200/80 mt-12">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
             <div className="flex items-center gap-2">
               <EliseCatMascot size={22} />
               <span className="font-extrabold text-slate-700">Elis</span>
