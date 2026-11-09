@@ -131,40 +131,19 @@ export const AppSidebar: React.FC = () => {
 
                 <span
                   className={cn(
-                    "whitespace-nowrap overflow-hidden transition-all ease-out pl-0.5",
+                    "whitespace-nowrap overflow-hidden text-ellipsis transition-all ease-out pl-0.5 pr-2",
                     isCollapsed
                       ? "opacity-0 max-w-0 -translate-x-3 pointer-events-none duration-100 delay-0"
-                      : "opacity-100 max-w-[150px] translate-x-0 delay-150 duration-200"
+                      : "opacity-100 max-w-[200px] translate-x-0 delay-150 duration-200"
                   )}
                 >
                   {item.label}
                 </span>
 
-                {item.badge && (
-                  <span
-                    className={cn(
-                      "ml-auto mr-2.5 text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap transition-all ease-out shrink-0",
-                      isActive
-                        ? "bg-[#7286D3] text-white"
-                        : "bg-slate-100 text-slate-500",
-                      isCollapsed
-                        ? "opacity-0 max-w-0 scale-75 pointer-events-none duration-100 delay-0 overflow-hidden"
-                        : "opacity-100 max-w-[60px] scale-100 delay-150 duration-200"
-                    )}
-                  >
-                    {item.badge}
-                  </span>
-                )}
-
                 {/* Floating Tooltip in collapsed mode */}
                 {isCollapsed && (
                   <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-800 text-white text-xs font-medium rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-lg z-50">
                     {item.label}
-                    {item.badge && (
-                      <span className="ml-1.5 px-1.5 py-0.2 bg-[#7286D3] text-white rounded text-[10px]">
-                        {item.badge}
-                      </span>
-                    )}
                   </div>
                 )}
               </Link>
@@ -177,16 +156,13 @@ export const AppSidebar: React.FC = () => {
               {!isCollapsed ? (
                 <div
                   className={cn(
-                    "px-3 pb-1 text-[10px] font-black uppercase tracking-wider text-indigo-600 flex items-center justify-between transition-all overflow-hidden whitespace-nowrap",
+                    "px-3 pb-1 text-[10px] font-black uppercase tracking-wider text-indigo-600 transition-all overflow-hidden whitespace-nowrap",
                     isCollapsed
                       ? "opacity-0 max-h-0 pointer-events-none duration-100 delay-0"
                       : "opacity-100 max-h-8 delay-150 duration-200"
                   )}
                 >
                   <span>Thẩm Định Tri Thức</span>
-                  <span className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.2 rounded-md font-bold">
-                    Curator
-                  </span>
                 </div>
               ) : (
                 <div className="w-full border-t border-indigo-100 my-2" />
@@ -218,29 +194,20 @@ export const AppSidebar: React.FC = () => {
 
                     <span
                       className={cn(
-                        "whitespace-nowrap overflow-hidden transition-all ease-out pl-0.5",
+                        "whitespace-nowrap overflow-hidden text-ellipsis transition-all ease-out pl-0.5 pr-2",
                         isCollapsed
                           ? "opacity-0 max-w-0 -translate-x-3 pointer-events-none duration-100 delay-0"
-                          : "opacity-100 max-w-[150px] translate-x-0 delay-150 duration-200"
+                          : "opacity-100 max-w-[200px] translate-x-0 delay-150 duration-200"
                       )}
                     >
                       {item.label}
                     </span>
 
-                    {item.badge && (
-                      <span
-                        className={cn(
-                          "ml-auto mr-2.5 text-[10px] px-2 py-0.5 rounded-full font-bold whitespace-nowrap transition-all ease-out shrink-0",
-                          isActive
-                            ? "bg-indigo-600 text-white"
-                            : "bg-indigo-100 text-indigo-700",
-                          isCollapsed
-                            ? "opacity-0 max-w-0 scale-75 pointer-events-none duration-100 delay-0 overflow-hidden"
-                            : "opacity-100 max-w-[60px] scale-100 delay-150 duration-200"
-                        )}
-                      >
-                        {item.badge}
-                      </span>
+                    {/* Floating Tooltip in collapsed mode */}
+                    {isCollapsed && (
+                      <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-800 text-white text-xs font-medium rounded-xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity shadow-lg z-50">
+                        {item.label}
+                      </div>
                     )}
                   </Link>
                 );
@@ -254,16 +221,13 @@ export const AppSidebar: React.FC = () => {
               {!isCollapsed ? (
                 <div
                   className={cn(
-                    "px-3 pb-1 text-[10px] font-black uppercase tracking-wider text-purple-600 flex items-center justify-between transition-all overflow-hidden whitespace-nowrap",
+                    "px-3 pb-1 text-[10px] font-black uppercase tracking-wider text-purple-600 transition-all overflow-hidden whitespace-nowrap",
                     isCollapsed
                       ? "opacity-0 max-h-0 pointer-events-none duration-100 delay-0"
                       : "opacity-100 max-h-8 delay-150 duration-200"
                   )}
                 >
                   <span>Quản Trị Kiểm Chuẩn</span>
-                  <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.2 rounded-md font-bold">
-                    Admin
-                  </span>
                 </div>
               ) : (
                 <div className="w-full border-t border-purple-100 my-2" />
@@ -295,10 +259,10 @@ export const AppSidebar: React.FC = () => {
 
                     <span
                       className={cn(
-                        "whitespace-nowrap overflow-hidden transition-all ease-out pl-0.5",
+                        "whitespace-nowrap overflow-hidden text-ellipsis transition-all ease-out pl-0.5 pr-2",
                         isCollapsed
                           ? "opacity-0 max-w-0 -translate-x-3 pointer-events-none duration-100 delay-0"
-                          : "opacity-100 max-w-[150px] translate-x-0 delay-150 duration-200"
+                          : "opacity-100 max-w-[200px] translate-x-0 delay-150 duration-200"
                       )}
                     >
                       {item.label}

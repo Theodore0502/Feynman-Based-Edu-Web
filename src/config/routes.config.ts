@@ -46,7 +46,7 @@ export interface NavItem {
 export const LEARNER_NAVIGATION: NavItem[] = [
   { label: "Tổng quan", href: APP_ROUTES.DASHBOARD, icon: "LayoutDashboard" },
   { label: "Bài giảng", href: APP_ROUTES.LECTURES, icon: "BookOpen" },
-  { label: "Tải tài liệu", href: APP_ROUTES.MATERIALS_UPLOAD, icon: "UploadCloud", badge: "AI Agent" },
+  { label: "Tải tài liệu", href: APP_ROUTES.MATERIALS_UPLOAD, icon: "UploadCloud" },
   { label: "Luyện tập", href: APP_ROUTES.STAGE, icon: "Mic" },
   { label: "Thư viện AI", href: APP_ROUTES.PERSONAS, icon: "Bot" },
   { label: "Bản đồ kiến thức", href: APP_ROUTES.TOPICS, icon: "Network" },
@@ -56,18 +56,18 @@ export const LEARNER_NAVIGATION: NavItem[] = [
 ];
 
 export const CURATOR_NAVIGATION: NavItem[] = [
-  { label: "Thẩm Định Tri Thức", href: APP_ROUTES.CURATOR_VALIDATION, icon: "FileCheck", badge: "Validate" },
-  { label: "Kho Tri Thức", href: APP_ROUTES.ADMIN_CURRICULUM, icon: "FileText", badge: "Dữ liệu" },
-  { label: "Kiểm Duyệt Phản Biện", href: APP_ROUTES.ADMIN_AUDITS, icon: "ShieldAlert", badge: "Kiểm duyệt" },
+  { label: "Thẩm Định Tri Thức", href: APP_ROUTES.CURATOR_VALIDATION, icon: "FileCheck" },
+  { label: "Kho Tri Thức", href: APP_ROUTES.ADMIN_CURRICULUM, icon: "FileText" },
+  { label: "Kiểm Duyệt Phản Biện", href: APP_ROUTES.ADMIN_AUDITS, icon: "ShieldAlert" },
   { label: "Về Trang Học Tập", href: APP_ROUTES.DASHBOARD, icon: "ArrowLeft" },
 ];
 
 export const ADMIN_NAVIGATION: NavItem[] = [
-  { label: "Thẩm Định Tri Thức", href: APP_ROUTES.CURATOR_VALIDATION, icon: "FileCheck", badge: "Validate" },
-  { label: "Cấu Hình Rubric", href: APP_ROUTES.ADMIN_RUBRICS, icon: "Sliders", badge: "Quản trị" },
-  { label: "Kiểm Duyệt Phản Biện", href: APP_ROUTES.ADMIN_AUDITS, icon: "ShieldAlert", badge: "Kiểm duyệt" },
-  { label: "Quản Lý Kho Tri Thức", href: APP_ROUTES.ADMIN_CURRICULUM, icon: "FileText", badge: "Dữ liệu" },
-  { label: "Cài Đặt AI", href: APP_ROUTES.ADMIN_AI_CONFIG, icon: "Bot", badge: "Hệ thống" },
+  { label: "Thẩm Định Tri Thức", href: APP_ROUTES.CURATOR_VALIDATION, icon: "FileCheck" },
+  { label: "Cấu Hình Rubric", href: APP_ROUTES.ADMIN_RUBRICS, icon: "Sliders" },
+  { label: "Kiểm Duyệt Phản Biện", href: APP_ROUTES.ADMIN_AUDITS, icon: "ShieldAlert" },
+  { label: "Quản Lý Kho Tri Thức", href: APP_ROUTES.ADMIN_CURRICULUM, icon: "FileText" },
+  { label: "Cài Đặt AI", href: APP_ROUTES.ADMIN_AI_CONFIG, icon: "Bot" },
   { label: "Về Trang Học Tập", href: APP_ROUTES.DASHBOARD, icon: "ArrowLeft" },
 ];
 
