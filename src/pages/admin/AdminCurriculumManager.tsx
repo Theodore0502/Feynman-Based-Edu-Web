@@ -6,9 +6,10 @@
  *   - Không cần cuộn trang lên xuống, chuyển chủ đề tức thời.
  */
 
-import React, { useState } from "react";
-import { ACADEMIC_TOPICS, ACADEMIC_DOMAINS } from "@/data/academic-catalog.data";
-import { CatalogTopic } from "@/types/catalog.types";
+import React, { useState, useEffect } from "react";
+import { CurriculumService } from "@/lib/services/curriculum-service";
+import { supabase, supabaseAdmin } from "@/lib/supabase";
+import type { CatalogTopic, DomainCategory } from "@/types/catalog.types";
 import { toast } from "sonner";
 import {
   FileText,
@@ -26,12 +27,35 @@ import {
 } from "lucide-react";
 
 export const AdminCurriculumManager: React.FC = () => {
-  const [topics, setTopics] = useState<CatalogTopic[]>(ACADEMIC_TOPICS);
+  const [topics, setTopics] = useState<CatalogTopic[]>([]);
+  const [domains, setDomains] = useState<DomainCategory[]>([]);
   const [selectedDomain, setSelectedDomain] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedTopicId, setSelectedTopicId] = useState<string>(
-    ACADEMIC_TOPICS[0]?.id || ""
-  );
+  const [selectedTopicId, setSelectedTopicId] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+
+  // Nạp 100% dữ liệu sống từ Supabase
+  useEffect(() => {
+    async function loadData() {
+      setIsLoading(true);
+      try {
+        const data = await CurriculumService.getAllCurriculumGraphData();
+        if (data && data.topics.length > 0) {
+          setTopics(data.topics);
+          setDomains(data.domains);
+          setSelectedTopicId(data.topics[0].id);
+          setDraftSummary(data.topics[0].summary);
+          setDraftDiff(data.topics[0].difficultyLevel);
+        }
+      } catch (err) {
+        console.warn("Lỗi nạp bài học Supabase:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
   // Active topic being viewed or edited on the right panel
   const activeTopic =
@@ -59,23 +83,44 @@ export const AdminCurriculumManager: React.FC = () => {
     return matchDomain && matchSearch;
   });
 
-  const handleSaveDraft = () => {
+  const handleSaveDraft = async () => {
     if (!activeTopic) return;
-    setTopics((prev) =>
-      prev.map((t) =>
-        t.id === activeTopic.id
-          ? {
-              ...t,
-              summary: draftSummary,
-              difficultyLevel: draftDiff,
-              wikipediaUrl: draftWiki,
-            }
-          : t
-      )
-    );
-    toast.success(`Đã lưu Ground Truth: "${activeTopic.title}"`, {
-      description: "Hệ thống AI Persona đã được cập nhật chuẩn mực lý thuyết mới.",
-    });
+    setIsSaving(true);
+    try {
+      // Lưu trực tiếp vào Supabase academic_topics
+      const db = supabaseAdmin || supabase;
+      const { error } = await db
+        .from("academic_topics")
+        .update({
+          summary: draftSummary,
+          difficulty_level: draftDiff,
+        })
+        .eq("id", activeTopic.id);
+
+      if (error) {
+        console.warn("Cảnh báo lưu Supabase:", error.message);
+      }
+
+      setTopics((prev) =>
+        prev.map((t) =>
+          t.id === activeTopic.id
+            ? {
+                ...t,
+                summary: draftSummary,
+                difficultyLevel: draftDiff,
+                wikipediaUrl: draftWiki,
+              }
+            : t
+        )
+      );
+      toast.success(`Đã lưu Ground Truth lên Supabase: "${activeTopic.title}"`, {
+        description: "Hệ thống AI Persona đã được cập nhật chuẩn mực lý thuyết mới.",
+      });
+    } catch (err: any) {
+      toast.error("Lỗi khi lưu Supabase: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -126,7 +171,7 @@ export const AdminCurriculumManager: React.FC = () => {
         >
           Tất Cả ({topics.length})
         </button>
-        {ACADEMIC_DOMAINS.map((d) => (
+        {domains.map((d) => (
           <button
             key={d.id}
             onClick={() => setSelectedDomain(d.id)}

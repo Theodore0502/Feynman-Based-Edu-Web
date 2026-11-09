@@ -24,7 +24,6 @@ import {
   Filter,
   X,
 } from "lucide-react";
-import { TOPICS_CATALOG } from "@/data/academic-catalog.data";
 import { THREE_TIER_DOMAINS, THREE_TIER_SUBJECTS, THREE_TIER_DOMAIN_SUBJECTS, THREE_TIER_LECTURES } from "@/data/three-tier-curriculum.data";
 import { CatalogTopic, DomainCategory, AcademicSubject } from "@/types/catalog.types";
 
@@ -271,7 +270,8 @@ export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
         );
 
         // Find topics that match this intent
-        TOPICS_CATALOG.filter(intent.topicMatcher).forEach((topic) => {
+        const topicsPool = (topics && topics.length > 0) ? topics : THREE_TIER_LECTURES;
+        topicsPool.filter(intent.topicMatcher).forEach((topic) => {
           if (domainId !== "ALL" && topic.domainId !== domainId) return;
           // Avoid duplicate in exact
           const alreadyInExact = exactMatches.some((em) => em.topic.id === topic.id);

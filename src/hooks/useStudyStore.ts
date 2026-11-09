@@ -11,9 +11,40 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { StudyTopic, SpeakerScratchpad, CustomStudyMaterial } from "@/types/study.types";
-import { TOPICS_CATALOG } from "@/data/academic-catalog.data";
+const DEFAULT_STUDY_TOPIC: StudyTopic = {
+  id: "top-feynman-technique-01",
+  domainId: "dom-edu",
+  domainName: "Khoa Học Giáo Dục & Kỹ Năng Học Thuật",
+  title: "Phương Pháp Học Tập & Kỹ Thuật Feynman",
+  slug: "phuong-phap-hoc-tap-feynman",
+  summary:
+    "Kỹ thuật Feynman là phương pháp học tập dựa trên việc đơn giản hóa kiến thức đến mức tối đa, diễn giải bằng ngôn ngữ đời thường cho một đứa trẻ 10 tuổi để nhận diện lỗ hổng tư duy.",
+  difficultyLevel: 1,
+  estimatedReadingMinutes: 10,
+  requiredConcepts: [
+    "Tư duy phản biện",
+    "Lỗ hổng tri thức",
+    "Đơn giản hóa ngôn từ",
+    "Phép ẩn dụ trực quan",
+    "Siêu nhận thức",
+  ],
+  jargonTraps: [
+    {
+      term: "Lạm dụng thuật ngữ chuyên môn",
+      explanation: "Che giấu sự thiếu hiểu biết đằng sau từ ngữ bác học",
+      recommendedAnalogy: "Ví von như xây nhà mà chỉ xếp gạch không trát vữa",
+    },
+  ],
+  starterAnalogies: [
+    {
+      title: "Ẩn dụ xếp hình Lego",
+      metaphor: "Giống như việc lắp ráp một mô hình đồ chơi từ các mảnh ghép cơ bản nhất.",
+      applicableAudience: "Bé Bo (10 tuổi)",
+    },
+  ],
+};
 
-export const PRESET_STUDY_TOPICS: StudyTopic[] = TOPICS_CATALOG as StudyTopic[];
+export const PRESET_STUDY_TOPICS: StudyTopic[] = [DEFAULT_STUDY_TOPIC];
 
 interface StudyStoreState {
   activeTopic: StudyTopic | null;
@@ -24,6 +55,7 @@ interface StudyStoreState {
   // Actions
   selectTopic: (topicId: string) => void;
   selectTopicBySlug: (slug: string) => void;
+  setActiveTopicObject: (topic: StudyTopic) => void;
   setCustomMaterial: (material: CustomStudyMaterial) => void;
   updateScratchpad: (partial: Partial<SpeakerScratchpad>) => void;
   toggleScratchpad: (open?: boolean) => void;
@@ -70,6 +102,19 @@ export const useStudyStore = create<StudyStoreState>()(
         if (found) {
           get().selectTopic(found.id);
         }
+      },
+
+      setActiveTopicObject: (topic: StudyTopic) => {
+        set({
+          activeTopic: topic,
+          customMaterial: null,
+          scratchpad: {
+            ...get().scratchpad,
+            topicId: topic.id,
+            topicTitle: topic.title,
+            lastSavedAt: new Date().toISOString(),
+          },
+        });
       },
 
       setCustomMaterial: (material: CustomStudyMaterial) => {

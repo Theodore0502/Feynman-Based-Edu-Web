@@ -6,15 +6,16 @@
  * Props/Inputs: Không có.
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { getAllPersonas, type PersonaDefinition } from "@/config/personas.config";
-import { TOPICS_CATALOG, DOMAINS_CATALOG } from "@/data/academic-catalog.data";
+import { CurriculumService } from "@/lib/services/curriculum-service";
+import type { DomainCategory, CatalogTopic } from "@/types/catalog.types";
 import { getSubjectBySlug } from "@/data/three-tier-curriculum.data";
 import { PersonaAvatarCard } from "@/components/shared/PersonaAvatarCard";
 import { SupabaseService } from "@/lib/services/supabase-service";
 import { useStudyStore } from "@/hooks/useStudyStore";
-import { ArrowRight, Sparkles, BookOpen, Edit3, Sigma, Network, Eye, Cpu, Layers } from "lucide-react";
+import { ArrowRight, Sparkles, BookOpen, Edit3, Layers } from "lucide-react";
 
 export const StageSetup: React.FC = () => {
   const navigate = useNavigate();
@@ -32,17 +33,46 @@ export const StageSetup: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedDomainTab, setSelectedDomainTab] = useState<string>("ALL");
 
-  const DOMAIN_TABS = [
-    { id: "ALL", label: "Tất cả khu vực", count: TOPICS_CATALOG.length, icon: Layers },
-    { id: "math", label: "Toán Cao Cấp", count: 10, icon: Sigma, color: "text-blue-600" },
-    { id: "discrete", label: "Toán Rời Rạc", count: 10, icon: Network, color: "text-emerald-600" },
-    { id: "cv", label: "Thị Giác Máy Tính", count: 10, icon: Eye, color: "text-purple-600" },
-    { id: "cs", label: "Hệ Thống CNTT", count: 10, icon: Cpu, color: "text-amber-600" },
-  ];
+  const [domains, setDomains] = useState<DomainCategory[]>([]);
+  const [topics, setTopics] = useState<CatalogTopic[]>([]);
+  const [isLoadingCurriculum, setIsLoadingCurriculum] = useState(true);
 
-  const filteredTopics = selectedDomainTab === "ALL"
-    ? TOPICS_CATALOG
-    : TOPICS_CATALOG.filter((t) => t.domainId === selectedDomainTab);
+  useEffect(() => {
+    async function loadCurriculum() {
+      setIsLoadingCurriculum(true);
+      try {
+        const data = await CurriculumService.getAllCurriculumGraphData();
+        if (data && data.domains.length > 0) {
+          setDomains(data.domains);
+          setTopics(data.topics);
+        }
+      } catch (err) {
+        console.warn("Lỗi nạp curriculum từ Supabase:", err);
+      } finally {
+        setIsLoadingCurriculum(false);
+      }
+    }
+    loadCurriculum();
+  }, []);
+
+  const DOMAIN_TABS = useMemo(() => {
+    const allTab = { id: "ALL", label: "Tất cả khu vực", count: topics.length, icon: Layers, color: "text-slate-600" };
+    const domainList = domains.map((d) => ({
+      id: d.id,
+      label: d.name,
+      count: topics.filter((t) => t.domainId === d.id).length,
+      icon: BookOpen,
+      color: "text-[#7286D3]",
+    }));
+    return [allTab, ...domainList];
+  }, [domains, topics]);
+
+  const filteredTopics = useMemo(() => {
+    if (selectedDomainTab === "ALL") {
+      return topics.slice(0, 40);
+    }
+    return topics.filter((t) => t.domainId === selectedDomainTab);
+  }, [topics, selectedDomainTab]);
 
   const getDifficultyBadge = (diff?: string, level?: number) => {
     if (diff === "Beginner" || level === 1) {
@@ -174,7 +204,7 @@ export const StageSetup: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
               <span className="text-xs text-slate-700 font-extrabold flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-[#7286D3]" />
-                Gợi ý chủ đề Toán học & CNTT trọng tâm ({filteredTopics.length} chủ đề):
+                Gợi ý chủ đề bài giảng ({filteredTopics.length} chủ đề nạp từ Supabase):
               </span>
               <span className="text-[11px] text-slate-400">
                 Click vào thẻ để tự động điền và chọn độ khó phù hợp
@@ -253,7 +283,7 @@ export const StageSetup: React.FC = () => {
                         </span>
                       </div>
                       <span className="text-[10px] text-slate-400 block truncate pl-3">
-                        {item.domainName}
+                        {domains.find((d) => d.id === item.domainId)?.name || "Chuyên đề học thuật"}
                       </span>
                     </div>
 

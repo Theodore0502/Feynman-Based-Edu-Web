@@ -70,105 +70,47 @@ const AnalysisOutputSchema = z.object({
   isReadyToComplete: z.boolean(),
 });
 
+import { GeminiCurriculumService } from "@/lib/services/gemini-service";
+
 export async function runAnalyticalEngine(
   latestMessage: string,
   topic: string,
   persona: PersonaDefinition
 ): Promise<AnalyticalResult> {
   try {
-    const model = getLanguageModel();
-    const result = await generateObject({
-      model,
-      temperature: AI_CONFIG.ANALYZER.temperature,
-      system: buildAnalyzerSystemPrompt(topic, persona),
-      prompt: `LỜI GIẢNG CỦA NGƯỜI HỌC CẦN PHÂN TÍCH:\n"${latestMessage}"`,
-      schema: AnalysisOutputSchema,
-    });
-
-    return result.object;
+    return await GeminiCurriculumService.analyzeTurnRealtime(topic, latestMessage);
   } catch (error) {
     console.warn("Analyzer fallback heuristics triggered:", error);
-    // Thuật toán Heuristic nội bộ dự phòng nếu mạng hoặc quota lỗi
     const words = latestMessage.split(/\s+/);
     const hasLongWords = words.filter((w) => w.length > 7);
-    const mockJargons = hasLongWords.slice(0, 2).map((w) => ({
-      term: w.replace(/[^a-zA-Z0-9À-ỹ]/g, ""),
-      isExplainedSimply: false,
-      reason: "Từ dài hoặc mang tính học thuật trừu tượng",
-    }));
-
     const hasAnalogy =
       latestMessage.includes("như") ||
       latestMessage.includes("giống") ||
       latestMessage.includes("tương tự");
 
     return {
-      jargonDetected: mockJargons,
-      logicGaps: [
-        {
-          claim: latestMessage.slice(0, 60),
-          missingLink: "Cần làm rõ cơ chế dẫn đến kết quả này",
-          severity: "MEDIUM",
-        },
-      ],
-      currentClarityScore: hasAnalogy ? 75 : 62,
+      jargonDetected: hasLongWords.slice(0, 1).map((w) => ({
+        term: w.replace(/[^a-zA-Z0-9À-ỹ]/g, ""),
+        isExplainedSimply: false,
+        reason: "Từ học thuật trừu tượng cần được ví von đời thường hơn",
+      })),
+      logicGaps: [],
+      currentClarityScore: hasAnalogy ? 78 : 65,
       detectedAnalogy: hasAnalogy ? "Đã sử dụng phép so sánh trực quan" : null,
-      isReadyToComplete: latestMessage.length > 200,
+      isReadyToComplete: latestMessage.length > 150,
     };
   }
 }
-
-const MasteryOutputSchema = z.object({
-  clarityScore: z.number().min(0).max(100),
-  logicCompleteness: z.number().min(0).max(100),
-  bestAnalogy: z.string(),
-  knowledgeGaps: z.array(z.string()),
-  summaryFeedback: z.string(),
-  extractedVaultTerms: z.array(
-    z.object({
-      term: z.string(),
-      plainExplanation: z.string(),
-      analogyUsed: z.string().optional(),
-    })
-  ),
-});
 
 export async function runMasteryEvaluator(
   topic: string,
   persona: PersonaDefinition,
   history: Array<{ role: string; content: string }>
 ): Promise<MasteryEvaluation> {
-  try {
-    const model = getLanguageModel();
-    const result = await generateObject({
-      model,
-      temperature: 0.2,
-      system: buildMasteryEvaluationPrompt(topic, persona),
-      prompt: `TOÀN BỘ LỊCH SỬ PHIÊN GIẢNG:\n${JSON.stringify(history, null, 2)}`,
-      schema: MasteryOutputSchema,
-    });
-
-    return result.object;
-  } catch (error) {
-    console.warn("Mastery evaluator fallback triggered:", error);
-    return {
-      clarityScore: 78,
-      logicCompleteness: 82,
-      bestAnalogy: "Sử dụng ví dụ mô tả cơ chế trực quan",
-      knowledgeGaps: [
-        "Chưa làm rõ điều kiện biên khi xảy ra lỗi",
-        "Có thể bổ sung ví dụ đời sống gần gũi hơn",
-      ],
-      summaryFeedback:
-        "Bạn đã nắm chắc 80% bản chất khái niệm. Nếu hạn chế bớt các từ ngữ chuyên ngành chưa giải thích, bài giảng sẽ đạt mức độ Feynman hoàn hảo!",
-      extractedVaultTerms: [
-        {
-          term: topic,
-          plainExplanation: "Đã diễn giải bằng ngôn ngữ tự nhiên",
-          analogyUsed: "Ví dụ gần gũi",
-        },
-      ],
-    };
-  }
+  return await GeminiCurriculumService.generateSessionMasteryEvaluation({
+    topic,
+    persona,
+    chatHistory: history,
+  });
 }
 

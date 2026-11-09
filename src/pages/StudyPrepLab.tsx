@@ -11,11 +11,16 @@
  * Props/Inputs: Không có (Sử dụng URL params và useStudyStore).
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useStudyStore, PRESET_STUDY_TOPICS } from "@/hooks/useStudyStore";
-import { DOMAINS_CATALOG } from "@/data/academic-catalog.data";
+import { CurriculumService } from "@/lib/services/curriculum-service";
+import { GeminiCurriculumService } from "@/lib/services/gemini-service";
+import { supabase, supabaseAdmin } from "@/lib/supabase";
+import type { DomainCategory, CatalogTopic } from "@/types/catalog.types";
+import type { StudyTopic } from "@/types/study.types";
 import { SpeakerScratchpadDrawer } from "@/components/study/SpeakerScratchpadDrawer";
+import { toast } from "sonner";
 import {
   BookOpen,
   Sparkles,
@@ -38,7 +43,7 @@ export const StudyPrepLab: React.FC = () => {
   const [searchParams] = useSearchParams();
   const topicParam = searchParams.get("topicId");
 
-  const { activeTopic, selectTopic, setCustomMaterial } = useStudyStore();
+  const { activeTopic, selectTopic, setActiveTopicObject, setCustomMaterial } = useStudyStore();
 
   const [activeTab, setActiveTab] = useState<"preset" | "custom">("preset");
   const [selectedDomain, setSelectedDomain] = useState<string>("ALL");
@@ -46,42 +51,122 @@ export const StudyPrepLab: React.FC = () => {
   const [customText, setCustomText] = useState("");
   const [isExtracting, setIsExtracting] = useState(false);
 
-  const displayedTopics =
-    selectedDomain === "ALL"
-      ? PRESET_STUDY_TOPICS
-      : PRESET_STUDY_TOPICS.filter((t) => t.domainId === selectedDomain);
+  const [liveDomains, setLiveDomains] = useState<DomainCategory[]>([]);
+  const [liveTopics, setLiveTopics] = useState<StudyTopic[]>([]);
+  const [isLoadingCurriculum, setIsLoadingCurriculum] = useState(true);
 
-  // Sync param from URL if present
+  // Nạp 100% dữ liệu sống từ Supabase
   useEffect(() => {
-    if (topicParam) {
-      selectTopic(topicParam);
-    }
-  }, [topicParam, selectTopic]);
+    async function loadFromSupabase() {
+      setIsLoadingCurriculum(true);
+      try {
+        const data = await CurriculumService.getAllCurriculumGraphData();
+        if (data && data.domains.length > 0) {
+          setLiveDomains(data.domains);
 
-  // Handle custom paste extraction
-  const handleExtractCustomText = () => {
+          const domainMap = new Map(data.domains.map((d) => [d.id, d.name]));
+
+          // Chuyển đổi CatalogTopic sang StudyTopic
+          const convertedTopics: StudyTopic[] = data.topics.map((t) => {
+            const domainName = domainMap.get(t.domainId || "") || "Học Thuật";
+            return {
+              id: t.id,
+              domainId: t.domainId || "dom-cs",
+              domainName,
+              title: t.title,
+              slug: t.slug,
+              summary: t.summary,
+              difficultyLevel: t.difficultyLevel || 2,
+              estimatedReadingMinutes: t.estimatedReadingMinutes || 12,
+              requiredConcepts: t.requiredConcepts || [],
+              jargonTraps: [
+                {
+                  term: `Biệt ngữ chuyên môn của ${t.title}`,
+                  explanation: "Cần được diễn đạt bằng từ ngữ bình dân",
+                  recommendedAnalogy: "Ví von với sự vật hiện tượng đời sống quen thuộc",
+                },
+              ],
+              starterAnalogies: [
+                {
+                  title: "Phép ẩn dụ gợi ý",
+                  metaphor: `Giống như việc bóc tách bản chất của ${t.title} thành các quy luật đời thường.`,
+                  applicableAudience: "Người nghe đại chúng",
+                },
+              ],
+            };
+          });
+
+          setLiveTopics(convertedTopics);
+
+          // Nếu có param hoặc chưa có topic, chọn bài đầu tiên
+          if (convertedTopics.length > 0) {
+            if (topicParam) {
+              const matched = convertedTopics.find((ct) => ct.id === topicParam || ct.slug === topicParam);
+              if (matched) setActiveTopicObject(matched);
+            } else if (!activeTopic) {
+              setActiveTopicObject(convertedTopics[0]);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Lỗi nạp kho bài học Supabase:", err);
+      } finally {
+        setIsLoadingCurriculum(false);
+      }
+    }
+    loadFromSupabase();
+  }, [topicParam]);
+
+  const allTopicsPool = liveTopics.length > 0 ? liveTopics : PRESET_STUDY_TOPICS;
+
+  const displayedTopics = useMemo(() => {
+    if (selectedDomain === "ALL") {
+      return allTopicsPool.slice(0, 50);
+    }
+    return allTopicsPool.filter((t) => t.domainId === selectedDomain);
+  }, [allTopicsPool, selectedDomain]);
+
+  // Xử lý bóc tách tài liệu tự do bằng Gemini AI thật & lưu vào Supabase
+  const handleExtractCustomText = async () => {
     if (!customText.trim()) return;
     setIsExtracting(true);
 
-    setTimeout(() => {
-      // Mock AI extraction
-      const extractedConcepts = [
-        "Khái niệm cốt lõi 1",
-        "Cơ chế vận hành chính",
-        "Tác động thực tế",
-      ];
-      const extractedJargons = ["Thuật ngữ kỹ thuật A", "Cơ chế B"];
+    try {
+      const result = await GeminiCurriculumService.extractCustomStudyMaterial(
+        customTitle.trim(),
+        customText.trim()
+      );
 
       setCustomMaterial({
-        title: customTitle.trim() || "Tài liệu ghi chú tự do",
+        title: result.title,
         rawText: customText,
-        extractedConcepts,
-        extractedJargons,
-        generatedSummary: customText.slice(0, 250) + "...",
+        extractedConcepts: result.extractedConcepts,
+        extractedJargons: result.extractedJargons,
+        generatedSummary: result.generatedSummary,
+        suggestedAnalogies: result.suggestedAnalogies,
       });
-      setIsExtracting(false);
+
+      // Lưu tài liệu tự do vào Supabase academic_materials
+      try {
+        const db = supabaseAdmin || supabase;
+        await db.from("academic_materials").insert({
+          topic_id: activeTopic?.id || "top-toan-roi-rac-01",
+          title: result.title,
+          source_type: "TEXT_NOTE",
+          extracted_text: result.generatedSummary,
+        });
+      } catch (dbErr) {
+        console.warn("Lưu custom material vào Supabase warn:", dbErr);
+      }
+
+      toast.success("AI đã bóc tách bản chất bài học thành công!");
       setActiveTab("preset");
-    }, 600);
+    } catch (err: any) {
+      console.error("Lỗi trích xuất custom text:", err);
+      toast.error("Không thể bóc tách: " + err.message);
+    } finally {
+      setIsExtracting(false);
+    }
   };
 
   const handleLaunchStage = () => {
@@ -225,9 +310,9 @@ export const StudyPrepLab: React.FC = () => {
                   : "bg-white text-slate-600 hover:bg-slate-100 border border-[#E8EEF8]"
               }`}
             >
-              Tất cả các môn ({PRESET_STUDY_TOPICS.length})
+              Tất cả các môn ({allTopicsPool.length})
             </button>
-            {DOMAINS_CATALOG.map((domain) => (
+            {liveDomains.map((domain) => (
               <button
                 key={domain.id}
                 onClick={() => setSelectedDomain(domain.id)}
@@ -239,7 +324,7 @@ export const StudyPrepLab: React.FC = () => {
               >
                 <span>{domain.name}</span>
                 <span className="text-[10px] opacity-75 font-normal">
-                  ({PRESET_STUDY_TOPICS.filter((t) => t.domainId === domain.id).length})
+                  ({allTopicsPool.filter((t) => t.domainId === domain.id).length})
                 </span>
               </button>
             ))}
@@ -250,14 +335,14 @@ export const StudyPrepLab: React.FC = () => {
             {displayedTopics.map((topic) => (
               <button
                 key={topic.id}
-                onClick={() => selectTopic(topic.id)}
+                onClick={() => setActiveTopicObject(topic)}
                 className={`px-4 py-2.5 rounded-2xl text-xs font-bold shrink-0 transition-all border flex items-center gap-2 ${
-                  activeTopic.id === topic.id
+                  activeTopic?.id === topic.id
                     ? "bg-white border-[#7286D3] text-[#7286D3] shadow-xs ring-2 ring-[#7286D3]/15"
                     : "bg-white/80 border-[#E8EEF8] text-slate-600 hover:bg-white hover:text-slate-800"
                 }`}
               >
-                <Bookmark className={`w-3.5 h-3.5 ${activeTopic.id === topic.id ? "text-[#7286D3]" : "text-slate-400"}`} />
+                <Bookmark className={`w-3.5 h-3.5 ${activeTopic?.id === topic.id ? "text-[#7286D3]" : "text-slate-400"}`} />
                 <span>{topic.title}</span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 font-medium">
                   {topic.domainName}

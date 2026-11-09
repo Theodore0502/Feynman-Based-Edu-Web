@@ -52,5 +52,6 @@ export interface CustomStudyMaterial {
   extractedConcepts: string[];
   extractedJargons: string[];
   generatedSummary: string;
+  suggestedAnalogies?: string[];
 }
 

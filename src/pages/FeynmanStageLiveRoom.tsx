@@ -8,7 +8,7 @@
 
 import React, { useState } from "react";
 import { useParams, useNavigate, useSearchParams, Link } from "react-router-dom";
-import { getPersonaById } from "@/config/personas.config";
+import { getPersonaById, DEFAULT_PERSONAS } from "@/config/personas.config";
 import { ChatTranscript } from "@/components/stage/ChatTranscript";
 import { RealtimeAnalyzerPanel } from "@/components/stage/RealtimeAnalyzerPanel";
 import { LogicFlowMiniMap } from "@/components/stage/LogicFlowMiniMap";
@@ -20,6 +20,7 @@ import { useGamificationStore } from "@/hooks/useGamificationStore";
 import { useNotificationStore } from "@/hooks/useNotificationStore";
 import { getSubjectBySlug } from "@/data/three-tier-curriculum.data";
 import { toast } from "sonner";
+import { GeminiCurriculumService } from "@/lib/services/gemini-service";
 import type { ChatMessage } from "@/types/session.types";
 import type { AnalyticalResult } from "@/types/agent.types";
 import { Send, ArrowLeft, BookOpen, Edit3 } from "lucide-react";
@@ -69,41 +70,36 @@ export const FeynmanStageLiveRoom: React.FC = () => {
 
     const userText = input.trim();
     setInput("");
-
-    const hasJargons = userText.toLowerCase().includes("kernel") || userText.toLowerCase().includes("container") || userText.toLowerCase().includes("lạm phát");
-    const currentClarity = hasJargons ? 65 : 85;
-
-    const mockAnalysis: AnalyticalResult = {
-      jargonDetected: hasJargons ? [{ term: "Kernel / Container", isExplainedSimply: false, reason: "Từ học thuật kỹ thuật chưa được ví von đời thường" }] : [],
-      logicGaps: [],
-      currentClarityScore: currentClarity,
-      detectedAnalogy: userText.includes("như") || userText.includes("giống") ? "Phép so sánh đời thường" : null,
-      isReadyToComplete: messages.length >= 3,
-    };
-
-    setLatestAnalysis(mockAnalysis);
-
-    const newMsg: ChatMessage = {
-      id: `usr-${Date.now()}`,
-      sessionId,
-      role: "user",
-      content: userText,
-      analysisMetadata: mockAnalysis,
-      createdAt: new Date().toISOString(),
-    };
-
-    const updatedMessages = [...messages, newMsg];
-    setMessages(updatedMessages);
     setIsStreaming(true);
 
-    // Lưu User message vào Supabase
-    SupabaseService.addMessage(sessionId, "user", userText, mockAnalysis);
+    try {
+      // 1. Phân tích lượt giảng giải thời gian thực bằng Gemini AI
+      const analysis = await GeminiCurriculumService.analyzeTurnRealtime(topic, userText);
+      setLatestAnalysis(analysis);
 
-    // AI Socrates response simulation
-    setTimeout(() => {
-      const assistantText = hasJargons
-        ? `Ủa chú ơi, "Kernel" với "Container" là cái gì trong đời thực vậy ạ? Có giống như cái hộp đựng bút của con không chú?`
-        : `A con hiểu rồi! Giống như xây nhà có sẵn bàn ghế phải không ạ? Thế nếu có người muốn đổi bàn ghế khác thì sao chú?`;
+      const newMsg: ChatMessage = {
+        id: `usr-${Date.now()}`,
+        sessionId,
+        role: "user",
+        content: userText,
+        analysisMetadata: analysis,
+        createdAt: new Date().toISOString(),
+      };
+
+      const updatedMessages = [...messages, newMsg];
+      setMessages(updatedMessages);
+
+      // Lưu User message vào Supabase
+      await SupabaseService.addMessage(sessionId, "user", userText, analysis);
+
+      // 2. Sinh câu trả lời đối thoại Socratic bằng Gemini AI theo tính cách Persona
+      const chatHistory = updatedMessages.map((m) => ({ role: m.role, content: m.content }));
+      const assistantText = await GeminiCurriculumService.generatePersonaChatResponse({
+        topic,
+        persona: persona || DEFAULT_PERSONAS[0],
+        chatHistory,
+        userMessage: userText,
+      });
 
       const assistantMsg: ChatMessage = {
         id: `ast-${Date.now()}`,
@@ -114,62 +110,81 @@ export const FeynmanStageLiveRoom: React.FC = () => {
       };
 
       setMessages([...updatedMessages, assistantMsg]);
-      setIsStreaming(false);
 
       // Lưu Assistant message vào Supabase
-      SupabaseService.addMessage(sessionId, "assistant", assistantText);
-    }, 800);
+      await SupabaseService.addMessage(sessionId, "assistant", assistantText);
+    } catch (err: any) {
+      console.error("Lỗi Feynman Stage Live:", err);
+      toast.error("Lỗi khi kết nối với AI: " + err.message);
+    } finally {
+      setIsStreaming(false);
+    }
   };
 
   const handleFinishSession = async () => {
-    const score = latestAnalysis?.currentClarityScore || 85;
-    // Lưu báo cáo vào Supabase
-    await SupabaseService.saveEvaluationReport(
-      sessionId,
-      score,
-      88,
-      "Docker giống như căn hộ chung cư xây sẵn đầy đủ tiện nghi, chỉ việc dọn vào ở.",
-      ["Cơ chế cách ly Namespace", "Cgroup kiểm soát tài nguyên"],
-      "Giải thích rất lưu loát và gạt bỏ được các thuật ngữ trừu tượng."
-    );
+    try {
+      const chatHistory = messages.map((m) => ({ role: m.role, content: m.content }));
+      const evaluation = await GeminiCurriculumService.generateSessionMasteryEvaluation({
+        topic,
+        persona: persona || DEFAULT_PERSONAS[0],
+        chatHistory,
+      });
 
-    // Lưu thuật ngữ vào Vault
-    await SupabaseService.addVaultItem(
-      topic,
-      "Đã giải thích bình dân hóa vượt qua kiểm định của người nghe.",
-      "Ẩn dụ trực quan sinh động",
-      topic
-    );
+      const score = evaluation.clarityScore;
 
-    // Cập nhật chuỗi ngày và XP trong Gamification Store
-    useGamificationStore.getState().recordSessionComplete(score);
+      // Lưu báo cáo đánh giá vào Supabase
+      await SupabaseService.saveEvaluationReport(
+        sessionId,
+        evaluation.clarityScore,
+        evaluation.logicCompleteness,
+        evaluation.bestAnalogy,
+        evaluation.knowledgeGaps,
+        evaluation.summaryFeedback
+      );
 
-    const reportParams = new URLSearchParams({
-      topic,
-      score: String(score),
-    });
-    if (domain) reportParams.set("domain", domain);
-    if (subject) reportParams.set("subject", subject);
+      // Lưu các thuật ngữ vào Vault trên Supabase
+      if (evaluation.extractedVaultTerms && evaluation.extractedVaultTerms.length > 0) {
+        for (const item of evaluation.extractedVaultTerms) {
+          await SupabaseService.addVaultItem(
+            item.term,
+            item.plainExplanation,
+            item.analogyUsed || evaluation.bestAnalogy,
+            topic
+          );
+        }
+      }
 
-    // Kích hoạt Hệ Thống Thông Báo 2 Tầng:
-    // Tầng 2: Lưu vào Notification Center
-    useNotificationStore.getState().addNotification(
-      {
-        type: "REPORT_READY",
-        title: "Báo cáo Feynman đã sẵn sàng",
-        message: `Đã chấm xong bài giảng "${topic}". Điểm Clarity: ${score}/100.`,
-        actionUrl: `/stage/${sessionId}/report?${reportParams.toString()}`,
-        metadata: { score, topicId: sessionId },
-      },
-      false // Đã có Toast điều hướng bên dưới
-    );
+      // Cập nhật chuỗi ngày và XP trong Gamification Store
+      useGamificationStore.getState().recordSessionComplete(score);
 
-    // Tầng 1: Toast Sonner báo hoàn thành tức thời
-    toast.success("Buổi giảng đã hoàn tất!", {
-      description: `Báo cáo đánh giá đã sẵn sàng với điểm Clarity ${score}/100.`,
-    });
+      const reportParams = new URLSearchParams({
+        topic,
+        score: String(score),
+      });
+      if (domain) reportParams.set("domain", domain);
+      if (subject) reportParams.set("subject", subject);
 
-    navigate(`/stage/${sessionId}/report?${reportParams.toString()}`);
+      // Lưu vào Notification Center
+      useNotificationStore.getState().addNotification(
+        {
+          type: "REPORT_READY",
+          title: "Báo cáo Feynman đã sẵn sàng",
+          message: `Đã chấm xong bài giảng "${topic}". Điểm Clarity: ${score}/100.`,
+          actionUrl: `/stage/${sessionId}/report?${reportParams.toString()}`,
+          metadata: { score, topicId: sessionId },
+        },
+        false
+      );
+
+      toast.success("Buổi giảng đã hoàn tất!", {
+        description: `Báo cáo đánh giá đã sẵn sàng với điểm Clarity ${score}/100.`,
+      });
+
+      navigate(`/stage/${sessionId}/report?${reportParams.toString()}`);
+    } catch (err: any) {
+      console.error("Lỗi khi kết thúc phiên:", err);
+      toast.error("Không thể hoàn tất đánh giá: " + err.message);
+    }
   };
 
   return (
