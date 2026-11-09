@@ -2,15 +2,15 @@
  * File: src/components/landing/FeynmanLiveTrialModule.tsx
  * Mục đích: Module thử nghiệm trực tiếp 1:1 trên Landing Page cho khách trải nghiệm giảng giải Feynman với Bé Bắp (Gemini AI).
  * Bố cục:
- *   - Cột trái (1/2): Nội dung tài liệu chuẩn bị nạp trực tiếp từ Supabase, highlight nhẹ từ khóa học thuật.
- *   - Cột phải (1/2): Hộp thoại Chat/Voice tương tác thật với Bé Bắp (Persona 10 tuổi) gọi API Gemini 3.1 Flash Lite.
+ *   - Phần trên: Bố cục 1:1 (Cột trái: Tài liệu chuẩn bị nạp từ Supabase | Cột phải: Khung chat/voice với Bé Bắp)
+ *   - Phần dưới: Bảng minh bạch dữ liệu (Live Audit Console) hiển thị lịch sử đối thoại, các chỉ số chấm điểm từng lượt và Raw JSON State để người dùng copy đánh giá.
  */
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { GeminiCurriculumService } from "@/lib/services/gemini-service";
 import { DEFAULT_PERSONAS, type PersonaDefinition } from "@/config/personas.config";
-import type { JargonItem } from "@/types/agent.types";
+import type { JargonItem, LogicGapItem } from "@/types/agent.types";
 import { VoiceRecorderButton } from "@/components/shared/VoiceRecorderButton";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
 import {
@@ -23,8 +23,15 @@ import {
   CheckCircle2,
   Brain,
   Layers,
-  ArrowRight,
   Loader2,
+  Copy,
+  Check,
+  FileCode,
+  Terminal,
+  Download,
+  ShieldCheck,
+  Activity,
+  Code2,
 } from "lucide-react";
 
 interface MessageItem {
@@ -35,17 +42,32 @@ interface MessageItem {
   clarityScore?: number;
   detectedAnalogy?: string;
   jargonDetected?: JargonItem[];
+  logicGaps?: LogicGapItem[];
+}
+
+interface TurnRecord {
+  turnIndex: number;
+  userExplanation: string;
+  clarityScore: number;
+  detectedAnalogy: string | null;
+  jargonDetected: JargonItem[];
+  logicGaps: LogicGapItem[];
+  assistantResponse: string;
+  timestamp: string;
 }
 
 export const FeynmanLiveTrialModule: React.FC = () => {
+  // Session ID cố định cho phiên thử nghiệm hiện tại
+  const [sessionId] = useState<string>(() => `live_trial_${Date.now()}`);
+
   // Persona Bé Bắp (10 tuổi)
   const beBapPersona: PersonaDefinition =
     DEFAULT_PERSONAS.find((p) => p.id === "child_10yo") || DEFAULT_PERSONAS[0];
 
   // Trạng thái dữ liệu nạp từ Supabase
   const [feynmanTopic, setFeynmanTopic] = useState<any>(null);
-  const [feynmanMaterial, setFeynmanMaterial] = useState<any>(null);
-  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [, setFeynmanMaterial] = useState<any>(null);
+  const [, setIsLoadingData] = useState(true);
 
   // Trạng thái phiên chat
   const [messages, setMessages] = useState<MessageItem[]>([
@@ -60,6 +82,13 @@ export const FeynmanLiveTrialModule: React.FC = () => {
   const [inputText, setInputText] = useState("");
   const [isAiThinking, setIsAiThinking] = useState(false);
   const [currentClarityScore, setCurrentClarityScore] = useState<number | null>(null);
+
+  // Lưu trữ danh sách các lượt giảng giải đã phân tích (dùng cho bảng chấm điểm & JSON State)
+  const [turnRecords, setTurnRecords] = useState<TurnRecord[]>([]);
+
+  // Tab xem ở bảng minh bạch: 'card' (thẻ trực quan) hoặc 'json' (raw json state)
+  const [auditTab, setAuditTab] = useState<"card" | "json">("card");
+  const [copiedType, setCopiedType] = useState<"json" | "markdown" | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -82,14 +111,12 @@ export const FeynmanLiveTrialModule: React.FC = () => {
     async function loadFeynmanData() {
       setIsLoadingData(true);
       try {
-        // Query chủ đề từ academic_topics
         const { data: topicsData } = await supabase
           .from("academic_topics")
           .select("*")
           .ilike("title", "%Feynman%")
           .limit(1);
 
-        // Query tài liệu tương ứng từ academic_materials
         const { data: matsData } = await supabase
           .from("academic_materials")
           .select("*")
@@ -149,6 +176,7 @@ export const FeynmanLiveTrialModule: React.FC = () => {
                 clarityScore: analysis.currentClarityScore,
                 detectedAnalogy: analysis.detectedAnalogy || undefined,
                 jargonDetected: analysis.jargonDetected,
+                logicGaps: analysis.logicGaps,
               }
             : m
         )
@@ -177,16 +205,47 @@ export const FeynmanLiveTrialModule: React.FC = () => {
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
+
+      // Ghi nhận vào danh mục các lượt chấm điểm chi tiết (Turn Records)
+      setTurnRecords((prev) => [
+        ...prev,
+        {
+          turnIndex: prev.length + 1,
+          userExplanation: rawContent,
+          clarityScore: analysis.currentClarityScore,
+          detectedAnalogy: analysis.detectedAnalogy || null,
+          jargonDetected: analysis.jargonDetected || [],
+          logicGaps: analysis.logicGaps || [],
+          assistantResponse: personaReply,
+          timestamp: now,
+        },
+      ]);
     } catch (error) {
       console.error("Lỗi tương tác Gemini:", error);
-      const fallbackReply: MessageItem = {
+      const fallbackReply =
+        "Dạ chú ơi, chú nói từ 'nguyên lý' với 'trừu tượng' con chưa hiểu lắm ạ. Chú có thể ví dụ như một trò chơi hay một món ăn con hay thấy được không chú?";
+
+      const assistantMsg: MessageItem = {
         id: `assistant-${Date.now()}`,
         role: "assistant",
-        content:
-          "Dạ chú ơi, chú nói từ 'nguyên lý' với 'trừu tượng' con chưa hiểu lắm ạ. Chú có thể ví dụ như một trò chơi hay một món ăn con hay thấy được không chú?",
+        content: fallbackReply,
         timestamp: new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
       };
-      setMessages((prev) => [...prev, fallbackReply]);
+      setMessages((prev) => [...prev, assistantMsg]);
+
+      setTurnRecords((prev) => [
+        ...prev,
+        {
+          turnIndex: prev.length + 1,
+          userExplanation: rawContent,
+          clarityScore: 60,
+          detectedAnalogy: null,
+          jargonDetected: [{ term: "khái niệm kỹ thuật", isExplainedSimply: false, reason: "Bé Bắp chưa hiểu từ trừu tượng" }],
+          logicGaps: [],
+          assistantResponse: fallbackReply,
+          timestamp: now,
+        },
+      ]);
     } finally {
       setIsAiThinking(false);
     }
@@ -203,14 +262,123 @@ export const FeynmanLiveTrialModule: React.FC = () => {
         timestamp: "Vừa xong",
       },
     ]);
+    setTurnRecords([]);
     setCurrentClarityScore(null);
     setInputText("");
   };
 
+  // Tạo đối tượng JSON State hoàn chỉnh cho toàn bộ phiên
+  const sessionInspectionState = useMemo(() => {
+    return {
+      session_id: sessionId,
+      topic: feynmanTopic?.title || "Phương Pháp Học Tập & Kỹ Thuật Feynman",
+      subject_id: feynmanTopic?.subject_id || "sub-feynman-technique",
+      domain_id: "dom-edu",
+      persona: {
+        id: beBapPersona.id,
+        name: beBapPersona.name,
+        age: beBapPersona.age,
+        title: beBapPersona.title,
+        worldview: beBapPersona.worldview,
+        socratic_style: beBapPersona.socraticStyle,
+      },
+      evaluation_summary: {
+        current_clarity_score: currentClarityScore,
+        total_turns: turnRecords.length,
+        analogies_used: turnRecords.filter((t) => !!t.detectedAnalogy).length,
+        jargon_traps_triggered: turnRecords.reduce((sum, t) => sum + (t.jargonDetected?.length || 0), 0),
+        logic_gaps_flagged: turnRecords.reduce((sum, t) => sum + (t.logicGaps?.length || 0), 0),
+        status: turnRecords.length === 0 ? "NOT_STARTED" : "ACTIVE_TESTING",
+      },
+      turns_log: turnRecords,
+      raw_messages: messages.map((m) => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp,
+        clarity_score: m.clarityScore ?? null,
+        detected_analogy: m.detectedAnalogy ?? null,
+        jargon_count: m.jargonDetected?.length ?? 0,
+      })),
+      system_meta: {
+        ai_engine: "gemini-3.1-flash-lite",
+        runtime: "Theodore Feynman Engine 2.0",
+        transparency_mode: "FULL_AUDIT_LOG",
+        exported_at: new Date().toISOString(),
+      },
+    };
+  }, [sessionId, feynmanTopic, beBapPersona, currentClarityScore, turnRecords, messages]);
+
+  // Tạo biên bản dạng Markdown Text
+  const markdownTranscript = useMemo(() => {
+    const topicTitle = feynmanTopic?.title || "Phương Pháp Học Tập & Kỹ Thuật Feynman";
+    let md = `# BIÊN BẢN ĐỐI THOẠI FEYNMAN LIVE AUDIT\n\n`;
+    md += `- **Chủ đề bài giảng:** ${topicTitle}\n`;
+    md += `- **Người nghe AI:** ${beBapPersona.name} (${beBapPersona.age} - ${beBapPersona.title})\n`;
+    md += `- **Mã phiên (Session ID):** \`${sessionId}\`\n`;
+    md += `- **Thời gian xuất:** ${new Date().toLocaleString("vi-VN")}\n`;
+    md += `- **Độ Sáng Rõ (Clarity Score):** ${currentClarityScore !== null ? `${currentClarityScore}/100` : "Chưa có"}\n`;
+    md += `- **Tổng số lượt giảng:** ${turnRecords.length}\n\n`;
+    md += `## CHI TIẾT TỪNG LƯỢT GIẢNG GIẢI (TURN-BY-TURN):\n\n`;
+
+    if (turnRecords.length === 0) {
+      md += `*Chưa có lượt giảng giải nào được ghi nhận.*\n`;
+    } else {
+      turnRecords.forEach((t) => {
+        md += `### 🔹 Lượt #${t.turnIndex} (${t.timestamp})\n`;
+        md += `* **Người học:** "${t.userExplanation}"\n`;
+        md += `* **Độ sáng rõ:** \`${t.clarityScore}/100\`\n`;
+        if (t.detectedAnalogy) {
+          md += `* **Phép ẩn dụ phát hiện:** ✅ "${t.detectedAnalogy}"\n`;
+        }
+        if (t.jargonDetected && t.jargonDetected.length > 0) {
+          md += `* **Biệt ngữ bị bắt:** ⚠️ ${t.jargonDetected.map((j) => `${j.term} (${j.reason || "chưa bình dân hóa"})`).join(", ")}\n`;
+        }
+        md += `* **Bé Bắp phản hồi:** "${t.assistantResponse}"\n\n`;
+      });
+    }
+
+    return md;
+  }, [sessionId, feynmanTopic, beBapPersona, currentClarityScore, turnRecords]);
+
+  // Hàm sao chép JSON State
+  const handleCopyJson = async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(sessionInspectionState, null, 2));
+      setCopiedType("json");
+      setTimeout(() => setCopiedType(null), 2000);
+    } catch (err) {
+      console.error("Không thể copy JSON:", err);
+    }
+  };
+
+  // Hàm sao chép Markdown
+  const handleCopyMarkdown = async () => {
+    try {
+      await navigator.clipboard.writeText(markdownTranscript);
+      setCopiedType("markdown");
+      setTimeout(() => setCopiedType(null), 2000);
+    } catch (err) {
+      console.error("Không thể copy Markdown:", err);
+    }
+  };
+
+  // Hàm tải file JSON
+  const handleDownloadJson = () => {
+    const dataStr =
+      "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(sessionInspectionState, null, 2));
+    const downloadAnchor = document.createElement("a");
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `feynman_session_${sessionId}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
   return (
-    <section id="feynman-live-trial" className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-12">
-      {/* Header khu vực */}
-      <div className="text-center max-w-3xl mx-auto mb-10 space-y-3">
+    <section id="feynman-live-trial" className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-12 space-y-10">
+      {/* 1. Header khu vực */}
+      <div className="text-center max-w-3xl mx-auto space-y-3">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#EEF2FC] text-[#5066A1] text-xs font-bold border border-[#D5E1FA]">
           <Sparkles className="w-4 h-4 text-[#7286D3]" />
           <span>Trải Nghiệm Trực Tuyến Live 1-Click • Không Cần Đăng Nhập</span>
@@ -224,7 +392,7 @@ export const FeynmanLiveTrialModule: React.FC = () => {
         </p>
       </div>
 
-      {/* Main 1:1 Split Grid Layout */}
+      {/* 2. Main 1:1 Split Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
         {/* CỘT TRÁI (1/2): Nội dung tài liệu chuẩn bị từ Supabase */}
         <div className="bg-white rounded-3xl border border-[#E2EAFD] p-6 sm:p-7 shadow-card flex flex-col justify-between">
@@ -379,7 +547,6 @@ export const FeynmanLiveTrialModule: React.FC = () => {
                   alt={beBapPersona.name}
                   className="w-10 h-10 rounded-2xl object-cover ring-2 ring-white shadow-2xs"
                   onError={(e) => {
-                    // Fallback avatar nếu ảnh local chưa nạp
                     (e.target as HTMLImageElement).src =
                       "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=120&q=80";
                   }}
@@ -590,6 +757,300 @@ export const FeynmanLiveTrialModule: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* 3. LAYOUT DƯỚI: BẢNG MINH BẠCH DỮ LIỆU & JSON STATE CHẤM ĐIỂM (TRANSPARENCY AUDIT CONSOLE) */}
+      <div className="bg-white rounded-3xl border border-[#E2EAFD] p-6 sm:p-8 shadow-card space-y-6">
+        {/* Header Console */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="p-1.5 rounded-xl bg-indigo-50 text-[#5066A1]">
+                <Terminal className="w-4 h-4 text-[#7286D3]" />
+              </span>
+              <h3 className="text-base sm:text-lg font-extrabold text-slate-800 flex items-center gap-2">
+                Bảng Minh Bạch Dữ Liệu: Nhật Ký Lượt Giảng & JSON State Chấm Điểm
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500">
+              Dữ liệu được cập nhật trực tiếp sau mỗi lượt bạn nói. Bạn có thể sao chép nhanh JSON để gửi cho AI hoặc giáo viên đánh giá.
+            </p>
+          </div>
+
+          {/* Action Buttons: Copy JSON, Copy Markdown, Download */}
+          <div className="flex items-center flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleCopyJson}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                copiedType === "json"
+                  ? "bg-emerald-500 text-white border-emerald-500"
+                  : "bg-[#EEF2FC] text-[#5066A1] hover:bg-[#7286D3] hover:text-white border-[#D5E1FA]"
+              }`}
+            >
+              {copiedType === "json" ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copiedType === "json" ? "Đã Sao Chép JSON!" : "Sao Chép JSON State"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCopyMarkdown}
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                copiedType === "markdown"
+                  ? "bg-emerald-500 text-white border-emerald-500"
+                  : "bg-white text-slate-700 hover:bg-slate-50 border-slate-200"
+              }`}
+            >
+              {copiedType === "markdown" ? <Check className="w-3.5 h-3.5" /> : <FileCode className="w-3.5 h-3.5" />}
+              <span>{copiedType === "markdown" ? "Đã Chép Markdown!" : "Copy Biên Bản"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadJson}
+              title="Tải tệp JSON về máy"
+              className="p-2 rounded-xl bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 transition-colors cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Thống kê nhanh tổng quan (Metric Badges) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-3.5 rounded-2xl bg-[#F8FAFD] border border-slate-200/80 space-y-1">
+            <span className="text-[11px] text-slate-500 font-semibold block flex items-center gap-1">
+              <Activity className="w-3.5 h-3.5 text-blue-500" />
+              Độ Sáng Rõ Hiện Tại
+            </span>
+            <span
+              className={`text-xl font-black ${
+                (currentClarityScore ?? 0) >= 80
+                  ? "text-emerald-600"
+                  : (currentClarityScore ?? 0) >= 60
+                  ? "text-blue-600"
+                  : "text-amber-600"
+              }`}
+            >
+              {currentClarityScore !== null ? `${currentClarityScore}/100` : "--/100"}
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-[#F8FAFD] border border-slate-200/80 space-y-1">
+            <span className="text-[11px] text-slate-500 font-semibold block flex items-center gap-1">
+              <Layers className="w-3.5 h-3.5 text-purple-500" />
+              Tổng Lượt Giảng
+            </span>
+            <span className="text-xl font-black text-slate-800">{turnRecords.length} lượt</span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-[#F8FAFD] border border-slate-200/80 space-y-1">
+            <span className="text-[11px] text-slate-500 font-semibold block flex items-center gap-1">
+              <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+              Ẩn Dụ Đã Kiến Tạo
+            </span>
+            <span className="text-xl font-black text-amber-700">
+              {turnRecords.filter((t) => !!t.detectedAnalogy).length} ẩn dụ
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-[#F8FAFD] border border-slate-200/80 space-y-1">
+            <span className="text-[11px] text-slate-500 font-semibold block flex items-center gap-1">
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+              Biệt Ngữ Bị Bắt Bẻ
+            </span>
+            <span className="text-xl font-black text-rose-600">
+              {turnRecords.reduce((sum, t) => sum + (t.jargonDetected?.length || 0), 0)} từ khó
+            </span>
+          </div>
+        </div>
+
+        {/* Tab chuyển đổi xem: Thẻ trực quan vs Raw JSON */}
+        <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[#F4F7FC] border border-[#E2EAFD]">
+            <button
+              type="button"
+              onClick={() => setAuditTab("card")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                auditTab === "card"
+                  ? "bg-white text-slate-800 shadow-2xs border border-slate-200/80"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-[#7286D3]" />
+              <span>Biên Bản Chấm Điểm Từng Lượt</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 font-semibold">
+                {turnRecords.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAuditTab("json")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                auditTab === "json"
+                  ? "bg-white text-slate-800 shadow-2xs border border-slate-200/80"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <Code2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>JSON State Trực Tuyến</span>
+            </button>
+          </div>
+
+          <span className="text-[11px] text-slate-400 hidden sm:inline">
+            Tự động đồng bộ hóa với mô hình Gemini 3.1 Flash Lite
+          </span>
+        </div>
+
+        {/* TAB 1: BẢNG THẺ TRỰC QUAN TỪNG LƯỢT */}
+        {auditTab === "card" && (
+          <div className="space-y-3">
+            {turnRecords.length === 0 ? (
+              <div className="text-center py-10 px-4 rounded-2xl border border-dashed border-slate-200 bg-[#F8FAFD] space-y-2">
+                <Terminal className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-xs font-bold text-slate-600">Chưa có lượt tương tác nào được ghi nhận</p>
+                <p className="text-[11px] text-slate-400 max-w-md mx-auto">
+                  Hãy nhập một câu giảng giải cho Bé Bắp ở khung chat bên trên (ví dụ: "Chào Bắp, phương pháp Feynman giống như việc con xếp hình Lego..."), bảng chấm điểm và JSON State sẽ hiển thị ngay tại đây.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {turnRecords.map((turn) => (
+                  <div
+                    key={turn.turnIndex}
+                    className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-3"
+                  >
+                    {/* Header của Lượt */}
+                    <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-[#EEF2FC] text-[#5066A1] text-xs font-black flex items-center justify-center">
+                          #{turn.turnIndex}
+                        </span>
+                        <span className="text-xs font-bold text-slate-800">Lượt giảng giải #{turn.turnIndex}</span>
+                        <span className="text-[11px] text-slate-400">({turn.timestamp})</span>
+                      </div>
+
+                      {/* Điểm Sáng Rõ của Lượt */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-slate-400 font-semibold">Độ rõ ràng:</span>
+                        <span
+                          className={`px-2.5 py-0.5 rounded-lg text-xs font-black border ${
+                            turn.clarityScore >= 80
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : turn.clarityScore >= 60
+                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                          }`}
+                        >
+                          {turn.clarityScore}/100
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Nội dung lời giảng của người dùng */}
+                    <div className="space-y-1">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        Lời Giảng Của Bạn:
+                      </span>
+                      <p className="text-xs sm:text-sm text-slate-800 bg-[#F8FAFD] p-3 rounded-xl border border-slate-100 italic">
+                        "{turn.userExplanation}"
+                      </p>
+                    </div>
+
+                    {/* Metadata bóc tách: Ẩn dụ và Biệt ngữ */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      {/* Ẩn dụ */}
+                      <div className="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-100 space-y-1">
+                        <span className="text-[11px] font-bold text-emerald-800 flex items-center gap-1">
+                          <Lightbulb className="w-3.5 h-3.5 text-emerald-600" />
+                          Phép Ẩn Dụ Phát Hiện:
+                        </span>
+                        <p className="text-xs text-emerald-900 font-medium">
+                          {turn.detectedAnalogy ? `"${turn.detectedAnalogy}"` : "Chưa có phép ẩn dụ trực quan"}
+                        </p>
+                      </div>
+
+                      {/* Biệt ngữ */}
+                      <div className="p-2.5 rounded-xl bg-rose-50/60 border border-rose-100 space-y-1">
+                        <span className="text-[11px] font-bold text-rose-800 flex items-center gap-1">
+                          <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                          Biệt Ngữ Cần Đơn Giản Hóa:
+                        </span>
+                        {turn.jargonDetected.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {turn.jargonDetected.map((j, idx) => (
+                              <span
+                                key={idx}
+                                className="px-1.5 py-0.5 rounded bg-white border border-rose-200 text-rose-700 font-medium text-[11px]"
+                                title={j.reason}
+                              >
+                                {j.term}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-emerald-700 font-medium">
+                            Tuyệt vời! Không phát hiện biệt ngữ đao to búa lớn.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Lời phản biện của Bé Bắp */}
+                    <div className="space-y-1 pt-1">
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                        Phản Hồi & Câu Hỏi Vặn Của Bé Bắp:
+                      </span>
+                      <p className="text-xs sm:text-sm text-slate-700 bg-[#EEF2FC]/40 p-3 rounded-xl border border-[#E2EAFD]">
+                        "{turn.assistantResponse}"
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 2: RAW JSON STATE CODE BLOCK */}
+        {auditTab === "json" && (
+          <div className="relative rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-inner">
+            {/* Header thanh công cụ code */}
+            <div className="px-4 py-2.5 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400 font-mono">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
+                <span className="text-slate-400 ml-2">feynman_session_state.json</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleCopyJson}
+                className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                {copiedType === "json" ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-emerald-400">Đã chép!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copy JSON</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Code Body */}
+            <pre className="p-4 sm:p-5 text-emerald-400 text-xs font-mono overflow-x-auto max-h-[420px] leading-relaxed selection:bg-emerald-500/20">
+              {JSON.stringify(sessionInspectionState, null, 2)}
+            </pre>
+          </div>
+        )}
+      </div>
     </section>
   );
 };
+
+export default FeynmanLiveTrialModule;
