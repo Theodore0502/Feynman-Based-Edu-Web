@@ -162,8 +162,8 @@ export const LandingAndDemo: React.FC = () => {
         {/* Top Navbar */}
         <header className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#7286D3] via-[#8EA7E9] to-[#FFB4B4] p-1 flex items-center justify-center shadow-xs transition-transform duration-300 group-hover:scale-105">
-              <EliseCatMascot className="w-full h-full" />
+            <div className="w-11 h-11 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105">
+              <EliseCatMascot className="w-10 h-10 object-contain drop-shadow-xs" />
             </div>
             <div>
               <span
