@@ -79,6 +79,8 @@ export interface LiveTrialTurnResult {
   jargonDetected: JargonItem[];
   logicGaps: LogicGapItem[];
   metrics: GeminiCallMetrics;
+  isMastered?: boolean;
+  masterySummary?: string;
 }
 
 export async function callGeminiRestWithMetrics(
@@ -507,14 +509,20 @@ Bạn có 2 nhiệm vụ đồng thời cho lượt đối thoại này:
 NHIỆM VỤ 1: ĐÓNG VAI KHÁN GIẢ AI - "${persona.name}" (${badge})
 - Tính cách & lăng kính: "${worldview}"
 - System Prompt: "${persona.systemPrompt}"
-- Phong cách: Hỏi vặn Socratic ngây thơ (hỏi "Tại sao?", thắc mắc từ lạ, khen ngợi khi có ẩn dụ đồ chơi/đời thường hay và đào sâu hơn).
-- Hãy trả lời tự nhiên từ 2-4 câu với tư cách "${persona.name}".
+- Phong cách: Hỏi vặn Socratic ngây thơ (hỏi "Tại sao?", thắc mắc từ lạ, khen ngợi khi có ẩn dụ đồ chơi/đời thường hay).
+- TIÊU CHÍ KẾT BÀI / THẤU SUỐT (MASTERY CONCLUSION):
+  + Nếu người học ĐÃ giải thích được các bước cốt lõi của "${topic}" (như: tự kể lại bằng lời của mình, xem lại sách chỗ kẹt, biến thành câu chuyện/đồ chơi) VÀ điểm sáng rõ cao (>= 85), HOẶC cuộc hội thoại đã qua nhiều lượt đối thoại mà người học vừa giải đáp thỏa đáng câu hỏi:
+  + ĐẶT "isMastered": true.
+  + KẾT BÀI ĐẦY CẢM XÚC: ${persona.name} KHÔNG ĐƯỢC hỏi thêm câu hỏi nào nữa! Thay vào đó hãy reo lên vui sướng (🎉 🌟), tóm tắt lại 3 điều cốt lõi mà người học vừa dạy theo cách trẻ thơ ngây ngô, khen người học giảng quá đỉnh và cảm ơn rối rít vì đã giúp bé hiểu trọn vẹn 100%!
+  + Nếu người học chưa hoàn thành bài giảng: Đặt "isMastered": false và tiếp tục hỏi vặn 1 câu ngắn gọn.
 
 NHIỆM VỤ 2: PHÂN TÍCH HỌC THUẬT NGẦM (FEYNMAN CLARITY ANALYTICS)
 1. currentClarityScore (0 - 100): Điểm độ sáng rõ ngôn từ (Nếu dùng ẩn dụ đồ chơi/đời thường dễ hiểu thì điểm 85-98; nếu nói không biết/hàn lâm thì điểm thấp).
-2. detectedAnalogy (string hoặc null): Phép ẩn dụ/so sánh đời thường nếu người học có dùng (VD: Lắp tòa lâu đài Lego).
-3. jargonDetected: Mảng các từ ngữ chuyên ngành/hàn lâm mà người học dùng nhưng chưa giải thích bình dân.
-4. logicGaps: Mảng các lỗ hổng logic hoặc nhận định thiếu căn cứ.
+2. isMastered (boolean): Đặt là true nếu người học đã thấu suốt bài giảng và kết thúc buổi học.
+3. masterySummary (string hoặc null): Tóm tắt ngắn gọn 1 câu về sự thấu suốt nếu isMastered=true.
+4. detectedAnalogy (string hoặc null): Phép ẩn dụ/so sánh đời thường nếu người học có dùng.
+5. jargonDetected: Mảng các từ ngữ chuyên ngành/hàn lâm mà người học dùng nhưng chưa giải thích bình dân.
+6. logicGaps: Mảng các lỗ hổng logic hoặc nhận định thiếu căn cứ.
 
 CHỦ ĐỀ BÀI HỌC: "${topic}"
 LỊCH SỬ HỘI THOẠI TRƯỚC ĐÓ:
@@ -525,8 +533,10 @@ LỜI GIẢNG CỦA NGƯỜI HỌC:
 
 Trả về DUY NHẤT một JSON hợp lệ:
 {
-  "personaReply": "câu trả lời của ${persona.name}",
+  "personaReply": "câu trả lời hoặc lời reo vui kết bài của ${persona.name}",
   "currentClarityScore": 90,
+  "isMastered": false,
+  "masterySummary": null,
   "detectedAnalogy": "string hoặc null",
   "jargonDetected": [
     { "term": "string", "isExplainedSimply": false, "reason": "string" }
@@ -544,6 +554,8 @@ Trả về DUY NHẤT một JSON hợp lệ:
       return {
         personaReply: parsed.personaReply || "Dạ chú ơi, con nghe chú nói nhưng chú có thể ví von cái đó với đồ chơi Lego được không ạ?",
         currentClarityScore: typeof parsed.currentClarityScore === "number" ? parsed.currentClarityScore : 80,
+        isMastered: parsed.isMastered === true,
+        masterySummary: parsed.masterySummary || undefined,
         detectedAnalogy: parsed.detectedAnalogy || null,
         jargonDetected: Array.isArray(parsed.jargonDetected) ? parsed.jargonDetected : [],
         logicGaps: Array.isArray(parsed.logicGaps) ? parsed.logicGaps : [],

@@ -99,6 +99,7 @@ export const FeynmanLiveTrialModule: React.FC = () => {
   const [inputText, setInputText] = useState("");
   const [isAiThinking, setIsAiThinking] = useState(false);
   const [currentClarityScore, setCurrentClarityScore] = useState<number | null>(null);
+  const [isSessionMastered, setIsSessionMastered] = useState(false);
 
   // Lưu trữ danh sách các lượt giảng giải đã phân tích (kèm telemetry latency & token)
   const [turnRecords, setTurnRecords] = useState<TurnRecord[]>([]);
@@ -206,6 +207,9 @@ export const FeynmanLiveTrialModule: React.FC = () => {
       });
 
       setCurrentClarityScore(result.currentClarityScore);
+      if (result.isMastered) {
+        setIsSessionMastered(true);
+      }
 
       const assistantMsg: MessageItem = {
         id: `assistant-${Date.now()}`,
@@ -328,6 +332,7 @@ export const FeynmanLiveTrialModule: React.FC = () => {
     ]);
     setTurnRecords([]);
     setCurrentClarityScore(null);
+    setIsSessionMastered(false);
     setInputText("");
     if (chatMessagesContainerRef.current) {
       chatMessagesContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
@@ -361,7 +366,11 @@ export const FeynmanLiveTrialModule: React.FC = () => {
         analogies_used: turnRecords.filter((t) => !!t.detectedAnalogy).length,
         jargon_traps_triggered: turnRecords.reduce((sum, t) => sum + (t.jargonDetected?.length || 0), 0),
         logic_gaps_flagged: turnRecords.reduce((sum, t) => sum + (t.logicGaps?.length || 0), 0),
-        status: turnRecords.length === 0 ? "NOT_STARTED" : "ACTIVE_TESTING",
+        status: isSessionMastered
+          ? "MASTERED"
+          : turnRecords.length === 0
+          ? "NOT_STARTED"
+          : "ACTIVE_TESTING",
         performance_metrics: {
           total_tokens_used: totalTokensAcrossSession,
           average_response_time_seconds: avgLatency,
@@ -827,6 +836,44 @@ export const FeynmanLiveTrialModule: React.FC = () => {
                     <span className="w-1.5 h-1.5 rounded-full bg-[#7286D3] animate-bounce [animation-delay:0.2s]" />
                     <span className="w-1.5 h-1.5 rounded-full bg-[#7286D3] animate-bounce [animation-delay:0.4s]" />
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Thẻ chúc mừng thấu suốt trọn vẹn (Mastery Celebration Milestone) */}
+            {isSessionMastered && (
+              <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-[#7286D3] text-white shadow-card space-y-2.5 animate-in zoom-in-95 duration-300">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl animate-bounce">🎉</span>
+                  <div>
+                    <h5 className="font-black text-sm tracking-wide">
+                      CHÚC MỪNG! BÉ BẮP ĐÃ THẤU SUỐT TRỌN VẸN
+                    </h5>
+                    <span className="text-[10px] text-emerald-100 font-bold block">
+                      Feynman Technique Mastered • Chuẩn ELI5 Hoàn Hảo
+                    </span>
+                  </div>
+                </div>
+                <p className="text-xs text-white/95 leading-relaxed font-medium">
+                  Bạn đã bóc trần mọi bẫy thuật ngữ và dùng những phép ẩn dụ tuyệt vời nhất để giúp Bé Bắp hiểu trọn vẹn bản chất của bài học!
+                </p>
+                <div className="pt-1 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCopyJson}
+                    className="px-3.5 py-1.5 rounded-xl bg-white text-emerald-800 hover:bg-slate-50 text-xs font-black shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Sao Chép Biên Bản Thấu Suốt</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetChat}
+                    className="px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-bold backdrop-blur-md transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Giảng Lại Từ Đầu</span>
+                  </button>
                 </div>
               </div>
             )}
