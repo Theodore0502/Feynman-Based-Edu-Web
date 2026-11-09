@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { SupabaseService } from "@/lib/services/supabase-service";
 import type { VaultRecord } from "@/types/session.types";
 import { QuickDrillFlashcard } from "@/components/vault/QuickDrillFlashcard";
+import { PageHeroBanner } from "@/components/shared/PageHeroBanner";
 import {
   isCardDue,
   formatNextReviewLabel,
@@ -290,53 +291,52 @@ export const AnalogyJargonVault: React.FC = () => {
 
   return (
     <div className="space-y-6 w-full pb-12">
-      {/* 1. Header & Quick Drill Action Banner */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-[#8EA7E9]/20 via-[#B5B2E8]/20 to-[#FFD1D1]/30 border border-[#E8EEF8] rounded-3xl p-4 sm:p-6 shadow-xs">
-        {/* Dreamy Hero Background Image (mờ nhẹ) */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-          <img
-            src="/images/hero-banner-bg.png"
-            alt="Hero background"
-            className="w-full h-full object-cover object-center opacity-30"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-white/50 via-white/30 to-white/50 backdrop-blur-[0.5px]" />
-        </div>
-
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
-          {/* Lớp blur trắng ở dưới các chữ để nhìn rõ chữ */}
-          <div className="space-y-2 p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs max-w-2xl">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
-              Sổ Tay Thuật Ngữ & Ẩn Dụ Feynman
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Tổng hợp những thuật ngữ chuyên môn bạn đã giảng giải thành công. Thuật toán **SM-2** sẽ tự động dời lịch ôn tập theo đường cong quên lãng để bạn ghi nhớ vĩnh viễn và phản xạ tự nhiên khi giảng bài.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 shrink-0 p-3 sm:p-4 rounded-2xl bg-white/70 backdrop-blur-md border border-white/80 shadow-xs">
+      {/* 1. Header & Quick Drill Action Banner Tinh Giản */}
+      <PageHeroBanner
+        title="Sổ Tay Thuật Ngữ &amp; Ẩn Dụ Feynman"
+        description="Tổng hợp những thuật ngữ chuyên môn bạn đã giảng giải thành công. Thuật toán SM-2 tự động dời lịch ôn tập theo đường cong quên lãng để bạn ghi nhớ vĩnh viễn và phản xạ tự nhiên khi giảng bài."
+        actions={
+          <>
             <button
+              type="button"
               onClick={() => handleStartDrill()}
-              className="px-5 py-3 rounded-2xl bg-[#7286D3] hover:bg-[#5E72C4] text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer group"
+              className="px-4 py-2 rounded-xl bg-[#7286D3] hover:bg-[#5E72C4] text-white text-xs font-bold shadow-2xs transition-all flex items-center gap-2 cursor-pointer group"
             >
-              <Zap className="w-4 h-4 fill-white" />
+              <Zap className="w-3.5 h-3.5 fill-white" />
               <span>Ôn Tập Nhanh Flashcard</span>
               {dueCards.length > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-white text-[#7286D3] text-[11px] font-black animate-pulse">
+                <span className="px-2 py-0.5 rounded-full bg-white text-[#7286D3] text-[10px] font-black animate-pulse">
                   {dueCards.length} cần ôn
                 </span>
               )}
             </button>
 
             <button
+              type="button"
               onClick={() => setIsAddModalOpen(true)}
-              className="px-4 py-3 rounded-2xl bg-white hover:bg-slate-50 border border-[#E8EEF8] text-slate-700 text-xs font-bold shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-[#E8EEF8] text-slate-700 text-xs font-bold shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              <Plus className="w-4 h-4 text-[#7286D3]" />
+              <Plus className="w-3.5 h-3.5 text-[#7286D3]" />
               <span>Thêm Thuật Ngữ Mới</span>
             </button>
+          </>
+        }
+        rightWidget={
+          <div className="flex items-center gap-3">
+            <div className="text-center px-2">
+              <span className="text-[10px] font-bold text-slate-400 block uppercase">Cần Ôn Hôm Nay</span>
+              <span className="text-lg font-black text-amber-600">{dueCards.length}</span>
+            </div>
+            <div className="h-7 w-[1px] bg-slate-200" />
+            <div className="text-center px-2">
+              <span className="text-[10px] font-bold text-slate-400 block uppercase">Đã Làm Chủ</span>
+              <span className="text-lg font-black text-emerald-600">
+                {items.filter((c) => (c.repetitions || 0) >= 4).length}
+              </span>
+            </div>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* 2. Filter Tabs & Search Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E8EEF8] pb-3">

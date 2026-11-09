@@ -10,6 +10,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ClarityMeter } from "@/components/shared/ClarityMeter";
 import { MasteryCardPreview } from "@/components/shared/MasteryCardPreview";
+import { PageHeroBanner } from "@/components/shared/PageHeroBanner";
 import { useModalStore } from "@/hooks/useModalStore";
 import { useGamificationStore } from "@/hooks/useGamificationStore";
 import { useNotificationStore } from "@/hooks/useNotificationStore";
@@ -77,69 +78,49 @@ export const CommandDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Hero Welcome Action Banner */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-[#F0F4FC] via-[#F6F3FC] to-[#FCF4F7] border border-[#E2EAFD] rounded-3xl p-4 sm:p-6 shadow-xs">
-        {/* Dreamy Hero Background Image (mờ nhẹ nhàng) */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-          <img
-            src="/images/hero-banner-bg.png"
-            alt="Hero background"
-            className="w-full h-full object-cover object-center opacity-35"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-white/50 via-white/30 to-white/50 backdrop-blur-[0.5px]" />
-        </div>
-
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-          {/* Khối 1 (Trái): Card nội dung chính & nút hành động */}
-          <div className="max-w-xl lg:max-w-lg xl:max-w-xl space-y-3 p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs shrink-0">
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight leading-snug">
-              Hôm nay bạn muốn làm chủ <span className="whitespace-nowrap">khái niệm nào?</span>
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Hãy chọn một chủ đề kỹ thuật hoặc trừu tượng và bắt đầu giảng giải cho AI. Hệ thống sẽ bóc tách các lỗ hổng kiến thức của bạn theo thời gian thực.
-            </p>
-            <div className="flex flex-wrap items-center gap-3 pt-1">
-              <Link
-                to="/lectures"
-                className="px-5 py-2.5 rounded-2xl bg-white/95 hover:bg-white text-[#5066A1] text-xs font-bold border border-[#E8EEF8] flex items-center gap-2 shadow-xs transition-all cursor-pointer"
-              >
-                <BookOpen className="w-4 h-4" />
-                <span>Khám Phá Bài Giảng</span>
-              </Link>
-              <Link
-                to="/stage"
-                className="px-5 py-2.5 rounded-2xl bg-[#7286D3] hover:bg-[#5066A1] text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer"
-              >
-                <Mic className="w-4 h-4" />
-                <span>Bắt Đầu Giảng Bài</span>
-              </Link>
-              <button
-                onClick={() => openModal("QUICK_DRILL")}
-                className="px-5 py-2.5 rounded-2xl bg-white/95 hover:bg-white text-slate-700 text-xs font-semibold border border-slate-200/80 shadow-xs transition-all cursor-pointer"
-              >
-                Thử Thách 60 Giây
-              </button>
-            </div>
-          </div>
-
-          {/* Khối 2 (Giữa): Linh vật Cú Theodore bay nổi sinh động ở không gian trung tâm */}
-          <div className="flex items-center justify-center flex-1 my-1 lg:my-0 relative">
-            <div className="relative group transition-transform duration-300 hover:scale-105">
-              <img
-                src="/images/theodore-mascot.png"
-                alt="Linh vật Theodore"
-                className="w-40 h-40 sm:w-52 sm:h-52 lg:w-60 lg:h-60 xl:w-64 xl:h-64 object-contain filter drop-shadow-[0_16px_32px_rgba(114,134,211,0.32)] animate-float select-none pointer-events-none"
-              />
-            </div>
-          </div>
-
-          {/* Khối 3 (Phải): Thẻ đo độ thấu suốt (Clarity Gauge) */}
-          <div className="shrink-0 bg-white/80 backdrop-blur-md p-5 rounded-3xl border border-white/80 shadow-xs flex flex-col items-center self-center lg:self-auto">
+      {/* Hero Welcome Action Banner Tinh Giản */}
+      <PageHeroBanner
+        mascotSrc="/images/theodore-mascot.png"
+        mascotAlt="Linh vật Theodore"
+        title={
+          <>
+            Hôm nay bạn muốn làm chủ{" "}
+            <span className="whitespace-nowrap">khái niệm nào?</span>
+          </>
+        }
+        description="Hãy chọn một chủ đề kỹ thuật hoặc trừu tượng và bắt đầu giảng giải cho AI. Hệ thống sẽ bóc tách các lỗ hổng kiến thức của bạn theo thời gian thực."
+        actions={
+          <>
+            <Link
+              to="/lectures"
+              className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-[#5066A1] text-xs font-bold border border-[#E8EEF8] flex items-center gap-2 shadow-2xs transition-all cursor-pointer"
+            >
+              <BookOpen className="w-4 h-4" />
+              <span>Khám Phá Bài Giảng</span>
+            </Link>
+            <Link
+              to="/stage"
+              className="px-4 py-2 rounded-xl bg-[#7286D3] hover:bg-[#5066A1] text-white text-xs font-bold flex items-center gap-2 shadow-2xs transition-all cursor-pointer"
+            >
+              <Mic className="w-4 h-4" />
+              <span>Bắt Đầu Giảng Bài</span>
+            </Link>
+            <button
+              type="button"
+              onClick={() => openModal("QUICK_DRILL")}
+              className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-200/80 shadow-2xs transition-all cursor-pointer"
+            >
+              Thử Thách 60 Giây
+            </button>
+          </>
+        }
+        rightWidget={
+          <div className="flex flex-col items-center">
             <ClarityMeter score={82} variant="circle" />
-            <span className="text-[11px] text-slate-500 font-semibold mt-2">Độ Thấu Suốt Tuần Này</span>
+            <span className="text-[10px] text-slate-500 font-semibold mt-1">Độ Thấu Suốt Tuần Này</span>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Grid: 3 Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

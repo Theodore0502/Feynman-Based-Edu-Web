@@ -16,6 +16,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useStudyStore, PRESET_STUDY_TOPICS } from "@/hooks/useStudyStore";
 import { DOMAINS_CATALOG } from "@/data/academic-catalog.data";
 import { SpeakerScratchpadDrawer } from "@/components/study/SpeakerScratchpadDrawer";
+import { PageHeroBanner } from "@/components/shared/PageHeroBanner";
 import {
   BookOpen,
   Sparkles,
@@ -92,40 +93,21 @@ export const StudyPrepLab: React.FC = () => {
 
   return (
     <div className="space-y-8 pb-16 w-full">
-      {/* 1. Header Hero Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#8EA7E9]/20 via-[#B5B2E8]/20 to-[#FFD1D1]/30 p-4 sm:p-6 border border-[#E8EEF8] shadow-xs">
-        {/* Dreamy Hero Background Image (mờ nhẹ) */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-          <img
-            src="/images/hero-banner-bg.png"
-            alt="Hero background"
-            className="w-full h-full object-cover object-center opacity-30"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-white/50 via-white/30 to-white/50 backdrop-blur-[0.5px]" />
-        </div>
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
-          {/* Lớp blur trắng ở dưới các chữ để nhìn rõ chữ */}
-          <div className="space-y-2 p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs max-w-2xl">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
-              Phòng Chuẩn Bị & Nghiên Cứu
-            </h1>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              Hãy đọc kỹ định nghĩa chuẩn (**Ground Truth**), ghi nhớ các bẫy thuật ngữ cần tránh và phác thảo dàn ý nói. Khi bạn tự tin có thể giảng lại cho một đứa trẻ, hãy bước lên bục giảng!
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 shrink-0 p-3 sm:p-4 rounded-2xl bg-white/70 backdrop-blur-md border border-white/80 shadow-xs">
-            <button
-              onClick={handleLaunchStage}
-              className="px-6 py-3.5 rounded-2xl bg-[#7286D3] hover:bg-[#5E72C4] text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center gap-2 group cursor-pointer"
-            >
-              <span>Lên bục giảng ngay</span>
-              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* 1. Header Hero Banner Tinh Giản */}
+      <PageHeroBanner
+        title="Phòng Chuẩn Bị &amp; Nghiên Cứu"
+        description="Đọc kỹ định nghĩa chuẩn (Ground Truth), nhận diện các bẫy thuật ngữ cần tránh và phác thảo dàn ý nói. Khi bạn tự tin có thể giảng giải đơn giản cho một đứa trẻ, hãy bước lên bục giảng!"
+        actions={
+          <button
+            type="button"
+            onClick={handleLaunchStage}
+            className="px-5 py-2.5 rounded-xl bg-[#7286D3] hover:bg-[#5E72C4] text-white font-bold text-xs shadow-2xs transition-all flex items-center gap-2 group cursor-pointer"
+          >
+            <span>Lên bục giảng ngay</span>
+            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+          </button>
+        }
+      />
 
       {/* 2. Source Selector Tabs */}
       <div className="flex items-center gap-3 border-b border-[#E8EEF8] pb-3">

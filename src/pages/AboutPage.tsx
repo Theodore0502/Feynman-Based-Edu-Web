@@ -6,6 +6,7 @@
 
 import React from "react";
 import { Link } from "react-router-dom";
+import { PageHeroBanner } from "@/components/shared/PageHeroBanner";
 import {
   Sparkles,
   BookOpen,
@@ -24,43 +25,24 @@ import {
 export const AboutPage: React.FC = () => {
   return (
     <div className="space-y-8 w-full pb-16">
-      {/* 1. Hero Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#EEF2FC] via-[#F5F2FB] to-[#FFF5F5] p-6 sm:p-10 border border-[#E8EEF8] shadow-subtle">
-        {/* Dreamy Hero Background Image (mờ nhẹ) */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-          <img
-            src="/images/hero-banner-bg.png"
-            alt="Hero background"
-            className="w-full h-full object-cover object-center opacity-30"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-white/50 via-white/30 to-white/50 backdrop-blur-[0.5px]" />
-        </div>
-
-        <div className="relative z-10 space-y-4 max-w-3xl p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs">
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-800 tracking-tight leading-tight">
-            Elise
-          </h1>
-
-          <p className="text-base sm:text-lg text-slate-600 font-medium leading-relaxed">
-            Học tập đỉnh cao không phải là cố gắng nhồi nhét những thuật ngữ đao to búa lớn, mà là năng lực diễn giải những điều phức tạp nhất bằng ngôn từ giản dị nhất.
-          </p>
-
-          {/* Richard Feynman Quote Card */}
-          <div className="pt-2">
-            <div className="p-4 sm:p-5 rounded-2xl bg-white/90 backdrop-blur-md border border-[#E2EAFD] shadow-xs flex items-start gap-3">
-              <Quote className="w-6 h-6 text-[#7286D3] shrink-0 mt-0.5" />
-              <div>
-                <p className="text-xs sm:text-sm text-slate-700 italic font-medium leading-relaxed">
-                  "Nếu bạn không thể giải thích một khái niệm cho một đứa trẻ 5–10 tuổi hiểu, thì chính bạn cũng chưa thực sự hiểu tường tận về nó."
-                </p>
-                <span className="block text-xs font-bold text-[#5066A1] mt-1.5">
-                  — Richard Feynman (Nhà Vật lý đoạt giải Nobel 1965)
-                </span>
-              </div>
-            </div>
+      {/* 1. Hero Banner Tinh Giản */}
+      <PageHeroBanner
+        badge={
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-200/60 shadow-2xs">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Triết Lý Học Tập Feynman &amp; ELI5</span>
           </div>
-        </div>
-      </div>
+        }
+        title="Nền Tảng Giáo Dục Tương Tác Theodore"
+        description="Học tập đỉnh cao không phải là cố gắng nhồi nhét những thuật ngữ đao to búa lớn, mà là năng lực diễn giải những điều phức tạp nhất bằng ngôn từ giản dị nhất cho bất kỳ ai cũng có thể thấu hiểu."
+        actions={
+          <div className="p-3 rounded-xl bg-white border border-[#E2EAFD] shadow-2xs flex items-center gap-2.5 text-xs text-slate-700 italic">
+            <Quote className="w-4 h-4 text-[#7286D3] shrink-0" />
+            <span>"Nếu bạn không thể giải thích đơn giản cho một đứa trẻ hiểu, chính bạn vẫn chưa thực sự hiểu nó." — Richard Feynman</span>
+          </div>
+        }
+        mascotSrc="/images/theodore-mascot.png"
+      />
 
       {/* 2. Nguồn gốc & Ý nghĩa tên gọi "ELI5" */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#E8EEF8] shadow-subtle space-y-6">
