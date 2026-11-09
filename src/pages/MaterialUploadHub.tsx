@@ -33,6 +33,7 @@ import {
   ExtractedLessonDraft,
 } from "@/lib/services/document-extraction-agent";
 import { DomainCategory, AcademicSubject } from "@/types/catalog.types";
+import { PageHeroBanner } from "@/components/shared/PageHeroBanner";
 
 const ALLOWED_EXTENSIONS = [".pdf", ".pdfa", ".doc", ".docx", ".pptx"];
 
@@ -190,23 +191,63 @@ export const MaterialUploadHub: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12">
-      {/* Top Banner Header */}
-      <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-indigo-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="relative z-10 space-y-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-md text-amber-300 text-xs font-black tracking-wide border border-white/20">
-            <Sparkles className="w-3.5 h-3.5" />
+      {/* Top Banner Header Đồng Bộ Chuẩn Dashboard */}
+      <PageHeroBanner
+        badge={
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-bold border border-purple-200/60 shadow-2xs">
+            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
             <span>AI Curriculum Digestion Agent</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Tải Lên Tài Liệu & Tự Động Hóa Bài Học Chuẩn Feynman
-          </h1>
-          <p className="text-blue-100 text-xs sm:text-sm max-w-2xl leading-relaxed">
-            Tác nhân AI đọc sâu tài liệu học thuật (.pdf, .doc, .pptx), bóc tách cấu trúc ngữ nghĩa, tự động định danh các
-            khái niệm cốt lõi (Required Concepts) và phát hiện bẫy thuật ngữ (Jargon Traps) để chuyển giao cho Kiểm Định Viên thẩm định.
-          </p>
-        </div>
-      </div>
+        }
+        title={
+          <>
+            Tải Lên Tài Liệu &amp; Tự Động Hóa{" "}
+            <span className="whitespace-nowrap">Bài Học Chuẩn Feynman</span>
+          </>
+        }
+        description="Tác nhân AI đọc sâu tài liệu học thuật (.pdf, .doc, .pptx), bóc tách cấu trúc ngữ nghĩa, tự động định danh các khái niệm cốt lõi (Required Concepts) và phát hiện bẫy thuật ngữ (Jargon Traps)."
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="px-5 py-2.5 rounded-2xl bg-[#7286D3] hover:bg-[#5066A1] text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+            >
+              <UploadCloud className="w-4 h-4" />
+              <span>Chọn Tệp Tải Lên Ngay</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/curator/validation")}
+              className="px-5 py-2.5 rounded-2xl bg-white/90 hover:bg-white text-slate-700 text-xs font-bold border border-slate-200/80 shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <FileCheck className="w-4 h-4 text-indigo-600" />
+              <span>Sang Bàn Thẩm Định</span>
+            </button>
+          </>
+        }
+        rightWidget={
+          <div className="space-y-2.5 w-full text-center">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+              Định Dạng Hỗ Trợ
+            </span>
+            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+              {ALLOWED_EXTENSIONS.map((ext) => (
+                <span
+                  key={ext}
+                  className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/60 font-mono text-[10px] font-bold uppercase"
+                >
+                  {ext.replace(".", "")}
+                </span>
+              ))}
+            </div>
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-center gap-1 text-[11px] font-bold text-emerald-600">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>AI Agent Sẵn Sàng</span>
+            </div>
+          </div>
+        }
+      />
 
       {!extractedDraft ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

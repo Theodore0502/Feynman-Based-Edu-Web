@@ -24,6 +24,7 @@ import {
   ExtractedLessonDraft,
 } from "@/lib/services/document-extraction-agent";
 import { DomainCategory, AcademicSubject } from "@/types/catalog.types";
+import { PageHeroBanner } from "@/components/shared/PageHeroBanner";
 
 /**
  * Định dạng dung lượng tệp từ Byte sang KB -> MB -> GB
@@ -421,23 +422,26 @@ export const CuratorValidationCenter: React.FC = () => {
           ========================================================================= */}
       {!selectedDraft && (
         <div className="space-y-4">
-          {/* Header Trang Danh Sách */}
-          <div className="bg-white rounded-2xl p-6 border border-slate-200/90 shadow-2xs space-y-3">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-                  Thẩm Định Tri Thức
-                </h1>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                  Danh sách các bài học tài liệu mà người dùng đăng lên chờ validate từ AI hoặc Kiểm định viên (Curator).
-                </p>
+          {/* Header Trang Danh Sách Đồng Bộ Chuẩn Dashboard */}
+          <PageHeroBanner
+            badge={
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-200/60 shadow-2xs">
+                <span>Hội Đồng Thẩm Định Tri Thức (Curator Studio)</span>
               </div>
-
-              <div className="flex items-center gap-2">
+            }
+            title={
+              <>
+                Bàn Thẩm Định &amp; Chuẩn Hóa{" "}
+                <span className="whitespace-nowrap">Nhãn Bài Học AI</span>
+              </>
+            }
+            description="Kiểm định viên phụ trách rà soát các bài giảng do AI Agent phân tích từ tài liệu người dùng, tinh chỉnh danh mục Khái niệm cốt lõi & Bẫy thuật ngữ, trước khi phê duyệt đưa vào Cây Tri Thức 360°."
+            actions={
+              <>
                 <button
                   type="button"
                   onClick={() => navigate("/materials/upload")}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-colors cursor-pointer"
+                  className="px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
                 >
                   Tải lên tài liệu mới
                 </button>
@@ -445,29 +449,37 @@ export const CuratorValidationCenter: React.FC = () => {
                   type="button"
                   onClick={loadData}
                   disabled={isLoading}
-                  className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                  className="px-4 py-2.5 rounded-2xl bg-white/90 hover:bg-white text-slate-700 text-xs font-bold border border-slate-200/80 shadow-xs transition-all cursor-pointer disabled:opacity-50"
                 >
                   {isLoading ? "Đang tải..." : "Làm mới dữ liệu"}
                 </button>
+              </>
+            }
+            rightWidget={
+              <div className="space-y-2.5 w-full text-center">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                  Tổng Quan Hàng Đợi
+                </span>
+                <div className="grid grid-cols-2 gap-2 text-center w-full">
+                  <div className="p-2 rounded-xl bg-amber-50 border border-amber-200/70">
+                    <span className="text-lg font-black text-amber-700 block">
+                      {stats.pending}
+                    </span>
+                    <span className="text-[9.5px] font-bold text-amber-800">Chờ duyệt</span>
+                  </div>
+                  <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200/70">
+                    <span className="text-lg font-black text-emerald-700 block">
+                      {stats.validated}
+                    </span>
+                    <span className="text-[9.5px] font-bold text-emerald-800">Đã xuất bản</span>
+                  </div>
+                </div>
+                <div className="pt-1.5 border-t border-slate-100 text-[10px] text-slate-500 font-semibold">
+                  Tổng số tài liệu: <strong className="text-slate-800">{stats.total} bài</strong>
+                </div>
               </div>
-            </div>
-
-            {/* Quick Stats Badges (Text Only) */}
-            <div className="flex items-center flex-wrap gap-2 pt-2 border-t border-slate-100 text-xs">
-              <span className="px-3 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold">
-                Tất cả: {stats.total}
-              </span>
-              <span className="px-3 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 font-bold">
-                Chờ thẩm định: {stats.pending}
-              </span>
-              <span className="px-3 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold">
-                Đã xuất bản: {stats.validated}
-              </span>
-              <span className="px-3 py-1 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 font-bold">
-                Đã từ chối: {stats.rejected}
-              </span>
-            </div>
-          </div>
+            }
+          />
 
           {/* Search & Filter Bar */}
           <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-2xs space-y-3">
