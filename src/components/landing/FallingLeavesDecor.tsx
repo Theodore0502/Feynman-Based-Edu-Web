@@ -245,3 +245,4 @@ export const FallingLeavesDecor: React.FC = () => {
 };
 
 export default FallingLeavesDecor;
+
