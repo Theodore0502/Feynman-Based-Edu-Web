@@ -27,12 +27,6 @@ export const AboutPage: React.FC = () => {
     <div className="space-y-8 w-full pb-16">
       {/* 1. Hero Banner Tinh Giản */}
       <PageHeroBanner
-        badge={
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-200/60 shadow-2xs">
-            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Triết Lý Học Tập Feynman &amp; ELI5</span>
-          </div>
-        }
         title="Nền Tảng Giáo Dục Tương Tác Theodore"
         description="Học tập đỉnh cao không phải là cố gắng nhồi nhét những thuật ngữ đao to búa lớn, mà là năng lực diễn giải những điều phức tạp nhất bằng ngôn từ giản dị nhất cho bất kỳ ai cũng có thể thấu hiểu."
         actions={

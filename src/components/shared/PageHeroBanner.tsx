@@ -13,7 +13,6 @@
 import React, { ReactNode } from "react";
 
 export interface PageHeroBannerProps {
-  badge?: ReactNode;
   title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
@@ -24,7 +23,6 @@ export interface PageHeroBannerProps {
 }
 
 export const PageHeroBanner: React.FC<PageHeroBannerProps> = ({
-  badge,
   title,
   description,
   actions,
@@ -43,7 +41,6 @@ export const PageHeroBanner: React.FC<PageHeroBannerProps> = ({
       <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
         {/* Nội dung chính bên trái */}
         <div className="space-y-2 flex-1 min-w-0">
-          {badge && <div className="inline-block">{badge}</div>}
           <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight leading-snug">
             {title}
           </h1>

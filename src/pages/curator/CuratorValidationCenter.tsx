@@ -426,11 +426,6 @@ export const CuratorValidationCenter: React.FC = () => {
           <PageHeroBanner
             mascotSrc="/images/theodore-curator-owl.png"
             mascotAlt="Linh vật Thẩm định viên Theodore"
-            badge={
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-200/60 shadow-2xs">
-                <span>Hội Đồng Thẩm Định Tri Thức (Curator Studio)</span>
-              </div>
-            }
             title={
               <>
                 Bàn Thẩm Định &amp; Chuẩn Hóa{" "}

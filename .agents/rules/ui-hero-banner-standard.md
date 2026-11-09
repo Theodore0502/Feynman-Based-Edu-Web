@@ -18,7 +18,7 @@ Mọi trang chức năng trong hệ thống Theodore khi có phần đầu trang
 `flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10`:
 
 1. **Phía Trái (Nội Dung Chính)**:
-   - **Badge (Tùy chọn)**: Nhãn chuyên mục nhỏ gọn, màu pastel thanh lịch.
+   - **Tuyệt đối không dùng Eyebrow Pill / Badge trên tiêu đề**: Không gắn các pill tag bo tròn (như `✨ AI Curriculum Digestion Agent`, `Hội Đồng Thẩm Định`, v.v.) bên trên tiêu đề Hero Bar. Bắt đầu ngay bằng Tiêu đề chính.
    - **Tiêu đề (`h1`/`h2`)**: `text-xl sm:text-2xl font-black text-slate-800 tracking-tight leading-snug`.
    - **Mô tả (`p`)**: `text-xs sm:text-sm text-slate-500 max-w-3xl leading-relaxed` (1–2 dòng súc tích).
    - **Nút hành động (Tùy chọn)**: Nút thao tác nhanh bo góc `rounded-xl` với `shadow-2xs`.
