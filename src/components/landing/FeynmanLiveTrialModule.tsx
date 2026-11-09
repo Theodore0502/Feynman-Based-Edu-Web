@@ -107,21 +107,30 @@ export const FeynmanLiveTrialModule: React.FC = () => {
   const [auditTab, setAuditTab] = useState<"card" | "json">("card");
   const [copiedType, setCopiedType] = useState<"json" | "markdown" | null>(null);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Ref khung cuộn tin nhắn nội bộ (tránh tuyệt đối việc cuộn dịch chuyển toàn bộ trang window)
+  const chatMessagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Web Speech-to-Text hook
   const { isListening, toggleListening, isSupported } = useSpeechToText((transcript) => {
     setInputText((prev) => (prev ? `${prev} ${transcript}` : transcript));
   });
 
-  // Tự động cuộn xuống cuối khung chat
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  // Tự động cuộn CHỈ TRONG KHUNG CHAT, không bao giờ cuộn cửa sổ màn hình (window scroll)
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    if (chatMessagesContainerRef.current) {
+      chatMessagesContainerRef.current.scrollTo({
+        top: chatMessagesContainerRef.current.scrollHeight,
+        behavior,
+      });
+    }
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isAiThinking]);
+    // Chỉ cuộn nội bộ khi có tin nhắn mới hoặc AI bắt đầu/kết thúc suy nghĩ
+    if (messages.length > 1 || isAiThinking) {
+      scrollToBottom("smooth");
+    }
+  }, [messages.length, isAiThinking]);
 
   // 1. Tải dữ liệu thật từ Supabase
   useEffect(() => {
@@ -306,7 +315,7 @@ export const FeynmanLiveTrialModule: React.FC = () => {
     }
   };
 
-  // Reset cuộc đối thoại
+  // Reset cuộc đối thoại (chỉ cuộn hộp chat lên đầu, không nhảy màn hình)
   const handleResetChat = () => {
     setMessages([
       {
@@ -320,6 +329,9 @@ export const FeynmanLiveTrialModule: React.FC = () => {
     setTurnRecords([]);
     setCurrentClarityScore(null);
     setInputText("");
+    if (chatMessagesContainerRef.current) {
+      chatMessagesContainerRef.current.scrollTo({ top: 0, behavior: "smooth" });
+    }
   };
 
   // Tạo đối tượng JSON State hoàn chỉnh cho toàn bộ phiên
@@ -730,8 +742,8 @@ export const FeynmanLiveTrialModule: React.FC = () => {
             </div>
           </div>
 
-          {/* Vùng tin nhắn cuộn tự do */}
-          <div className="flex-1 p-4 sm:p-5 overflow-y-auto space-y-4 bg-[#F8FAFD]/60">
+          {/* Vùng tin nhắn cuộn tự do (Ref cuộn nội bộ không gây giật màn hình) */}
+          <div ref={chatMessagesContainerRef} className="flex-1 p-4 sm:p-5 overflow-y-auto space-y-4 bg-[#F8FAFD]/60">
             {messages.map((msg) => {
               const isUser = msg.role === "user";
               return (
@@ -822,8 +834,6 @@ export const FeynmanLiveTrialModule: React.FC = () => {
                 </div>
               </div>
             )}
-
-            <div ref={messagesEndRef} />
           </div>
 
           {/* Gợi ý câu nói nhanh (Quick Prompt Pills) */}
