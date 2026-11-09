@@ -8,7 +8,7 @@
  *   4. Lưu trữ bản nháp (Draft) chờ Hội đồng Kiểm Định Viên (Curator / Submitter) hoặc Admin thẩm định và xuất bản lên Supabase.
  */
 
-import { supabase } from "@/lib/supabase";
+import { supabase, supabaseAdmin } from "@/lib/supabase";
 import { UserProfile } from "@/types/auth.types";
 import { CatalogTopic } from "@/types/catalog.types";
 import { TaxonomyClassifier } from "@/lib/services/taxonomy-classifier";
@@ -306,13 +306,33 @@ export const DocumentExtractionAgent = {
 
     // Lưu vào Supabase academic_materials nếu có kết nối
     try {
-      await supabase.from("academic_materials").insert({
-        topic_id: newDraft.slug,
-        title: file.name,
-        source_type: file.name.endsWith(".pdf") || file.name.endsWith(".pdfa") ? "PDF" : file.name.endsWith(".pptx") ? "SLIDE" : "TEXT_NOTE",
-        storage_file_path: `materials/${newDraft.id}/${file.name}`,
-        extracted_text: newDraft.summary,
-      });
+      const db = supabaseAdmin || supabase;
+      const targetTopicId =
+        ontologyResult.matchedMasterTopics?.[0]?.id || "top-toan-roi-rac-01";
+      const { data: insertedMat, error: insertErr } = await db
+        .from("academic_materials")
+        .insert({
+          topic_id: targetTopicId,
+          title: file.name,
+          source_type:
+            file.name.endsWith(".pdf") || file.name.endsWith(".pdfa")
+              ? "PDF"
+              : file.name.endsWith(".pptx")
+              ? "SLIDE"
+              : "TEXT_NOTE",
+          storage_file_path: `materials/${newDraft.id}/${file.name}`,
+          extracted_text: newDraft.summary,
+        })
+        .select()
+        .single();
+
+      if (insertErr) {
+        console.warn("Lưu academic_materials vào Supabase có cảnh báo:", insertErr.message);
+      } else if (insertedMat) {
+        newDraft.materialId = insertedMat.id;
+        // Cập nhật lại cache cục bộ có chứa materialId từ Supabase
+        await this.saveDraftLocally(newDraft);
+      }
     } catch (e) {
       console.warn("Không thể lưu material vào Supabase (dùng cache cục bộ):", e);
     }

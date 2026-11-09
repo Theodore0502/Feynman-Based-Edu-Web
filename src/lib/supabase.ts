@@ -27,4 +27,18 @@ const supabaseAnonKey = rawKey && rawKey.trim().length > 0 ? rawKey.trim() : FAL
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Supabase Admin Client dùng Service Role Key (chỉ kích hoạt ở môi trường Node.js / Server có biến môi trường SUPABASE_SERVICE_ROLE_KEY)
+const serviceRoleKey =
+  typeof process !== "undefined"
+    ? process.env?.SUPABASE_SERVICE_ROLE_KEY || process.env?.VITE_SUPABASE_SERVICE_ROLE_KEY
+    : undefined;
+
+export const supabaseAdmin =
+  serviceRoleKey && serviceRoleKey.trim().length > 0
+    ? createClient(supabaseUrl, serviceRoleKey.trim(), {
+        auth: { persistSession: false, autoRefreshToken: false },
+      })
+    : supabase;
+
+
 
