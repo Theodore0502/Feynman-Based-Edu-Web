@@ -87,6 +87,9 @@ export const AuthAndOnboarding: React.FC = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Trạng thái tài khoản không tồn tại khi đăng nhập
+  const [isAccountNotFound, setIsAccountNotFound] = useState(false);
+
   // Countdown timer cho nút Gửi lại mã
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -133,10 +136,25 @@ export const AuthAndOnboarding: React.FC = () => {
   // HANDLERS
   // =========================================================================
 
+  const handleSwitchToRegister = () => {
+    setActiveTab("REGISTER");
+    const cleanUser = username.trim();
+    if (cleanUser.includes("@")) {
+      setRegEmail(cleanUser);
+      setRegUsername(cleanUser.split("@")[0]);
+    } else if (cleanUser && !["learn123", "curator123", "admin123"].includes(cleanUser)) {
+      setRegUsername(cleanUser);
+    }
+    setLocalError(null);
+    clearError();
+    setIsAccountNotFound(false);
+  };
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
     clearError();
+    setIsAccountNotFound(false);
     setIsSubmitting(true);
 
     try {
@@ -159,6 +177,9 @@ export const AuthAndOnboarding: React.FC = () => {
         toast.info("Email chưa được kích hoạt. Vui lòng nhập mã OTP hoặc kiểm tra hòm thư.");
       } else {
         setLocalError(res.error || "Thông tin đăng nhập không hợp lệ.");
+        if (res.isAccountNotFound) {
+          setIsAccountNotFound(true);
+        }
       }
     } finally {
       setIsSubmitting(false);
@@ -323,6 +344,7 @@ export const AuthAndOnboarding: React.FC = () => {
     setPassword("123123");
     setLocalError(null);
     clearError();
+    setIsAccountNotFound(false);
     toast.info(`Đã điền tài khoản mẫu: ${userKey}`);
   };
 
@@ -434,9 +456,24 @@ export const AuthAndOnboarding: React.FC = () => {
 
           {/* Error notification if any */}
           {(localError || loginError) && (
-            <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-[11px] flex items-center gap-2 animate-fade-in">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-              <span>{localError || loginError}</span>
+            <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs animate-fade-in space-y-1.5">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+                <span className="font-medium text-[11px] leading-relaxed">{localError || loginError}</span>
+              </div>
+              {isAccountNotFound && activeTab === "LOGIN" && (
+                <div className="pt-1.5 border-t border-rose-200/80 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-600 font-medium">Chưa có tài khoản?</span>
+                  <button
+                    type="button"
+                    onClick={handleSwitchToRegister}
+                    className="font-bold text-purple-700 hover:text-purple-900 underline flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <span>Đăng ký ngay</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -581,6 +618,19 @@ export const AuthAndOnboarding: React.FC = () => {
                     </>
                   )}
                 </button>
+
+                <div className="text-center pt-1">
+                  <p className="text-[11px] text-slate-500">
+                    Chưa có tài khoản?{" "}
+                    <button
+                      type="button"
+                      onClick={handleSwitchToRegister}
+                      className="font-bold text-purple-600 hover:text-purple-800 transition-colors cursor-pointer hover:underline"
+                    >
+                      Đăng ký ngay
+                    </button>
+                  </p>
+                </div>
               </form>
             </div>
           )}
@@ -727,6 +777,24 @@ export const AuthAndOnboarding: React.FC = () => {
                   </>
                 )}
               </button>
+
+              <div className="text-center pt-1">
+                <p className="text-[11px] text-slate-500">
+                  Đã có tài khoản?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab("LOGIN");
+                      setLocalError(null);
+                      clearError();
+                      setIsAccountNotFound(false);
+                    }}
+                    className="font-bold text-purple-600 hover:text-purple-800 transition-colors cursor-pointer hover:underline"
+                  >
+                    Đăng nhập ngay
+                  </button>
+                </p>
+              </div>
             </form>
           )}
 

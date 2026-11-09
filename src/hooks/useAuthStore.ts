@@ -20,6 +20,7 @@ export interface AuthResponse {
   needConfirmation?: boolean;
   email?: string;
   error?: string;
+  isAccountNotFound?: boolean;
 }
 
 interface AuthState {
@@ -151,6 +152,7 @@ export const useAuthStore = create<AuthState>()(
             return {
               success: false,
               error: "Mật khẩu không chính xác (Mật khẩu mặc định: 123123).",
+              isAccountNotFound: false,
             };
           }
 
@@ -161,6 +163,13 @@ export const useAuthStore = create<AuthState>()(
             loginError: null,
           });
           return { success: true };
+        }
+
+        // 1.1 Nếu nhập tên tài khoản không phải email và không thuộc danh sách demo -> Chưa tồn tại tài khoản
+        if (!usernameOrEmail.includes("@")) {
+          const msg = "Tài khoản không tồn tại trong hệ thống.";
+          set({ isLoading: false, loginError: msg });
+          return { success: false, error: msg, isAccountNotFound: true };
         }
 
         // 2. Đăng nhập qua Supabase Auth
@@ -186,12 +195,21 @@ export const useAuthStore = create<AuthState>()(
               };
             }
 
-            const msg =
-              error.message === "Invalid login credentials"
-                ? "Tên đăng nhập hoặc mật khẩu không chính xác."
-                : error.message;
+            const isNotFoundOrInvalid =
+              error.message === "Invalid login credentials" ||
+              error.message.toLowerCase().includes("invalid login credentials") ||
+              error.message.toLowerCase().includes("user not found");
+
+            const msg = isNotFoundOrInvalid
+              ? "Tài khoản không tồn tại hoặc mật khẩu không chính xác."
+              : error.message;
+
             set({ isLoading: false, loginError: msg });
-            return { success: false, error: msg };
+            return {
+              success: false,
+              error: msg,
+              isAccountNotFound: isNotFoundOrInvalid,
+            };
           }
 
           if (data.user) {
