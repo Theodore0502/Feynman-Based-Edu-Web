@@ -489,144 +489,182 @@ export const FeynmanLiveTrialModule: React.FC = () => {
       {/* 2. Main 1:1 Split Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
         {/* CỘT TRÁI (1/2): Nội dung tài liệu chuẩn bị từ Supabase */}
-        <div className="bg-white rounded-3xl border border-[#E2EAFD] p-6 sm:p-7 shadow-card flex flex-col justify-between">
-          <div className="space-y-5">
-            {/* Tiêu đề & Tag nguồn Supabase */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#EEF2FC] text-[#5066A1] flex items-center justify-center font-bold">
-                  <BookOpen className="w-5 h-5 text-[#7286D3]" />
-                </div>
-                <div>
-                  <h3 className="text-base font-extrabold text-slate-800">
-                    {feynmanTopic?.title || "Lý thuyết & Kỹ thuật Học tập Feynman"}
-                  </h3>
-                  <span className="text-[11px] text-slate-400 font-medium">
-                    Khoa Học Giáo Dục & Kỹ Năng Học Thuật • Nguồn Supabase
-                  </span>
-                </div>
+        <div className="bg-white rounded-3xl border border-[#E2EAFD] shadow-card flex flex-col h-[580px] overflow-hidden">
+          {/* Header tài liệu cố định */}
+          <div className="p-4 sm:px-5 bg-gradient-to-r from-[#F8FAFD] via-[#EEF2FC] to-white border-b border-[#E2EAFD] flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-[#EEF2FC] text-[#5066A1] flex items-center justify-center font-bold shadow-2xs">
+                <BookOpen className="w-5 h-5 text-[#7286D3]" />
               </div>
-
-              <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200 flex items-center gap-1">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                Live Supabase
-              </span>
+              <div>
+                <h3 className="text-sm sm:text-base font-extrabold text-slate-800">
+                  {feynmanTopic?.title || "Lý thuyết & Kỹ thuật Học tập Feynman"}
+                </h3>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  Khoa Học Giáo Dục & Kỹ Năng Học Thuật • Nguồn Supabase
+                </span>
+              </div>
             </div>
 
-            {/* Khái niệm cốt lõi & Tóm lược */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+            <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold border border-emerald-200 flex items-center gap-1 shrink-0">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              Live Supabase
+            </span>
+          </div>
+
+          {/* Vùng nội dung học liệu cuộn tự do */}
+          <div className="flex-1 p-4 sm:p-5 overflow-y-auto space-y-4 text-slate-700 bg-[#FDFEFE]">
+            {/* 1. Triết lý khởi nguồn & Câu chuyện của Richard Feynman */}
+            <div className="p-3.5 rounded-2xl bg-[#F8FAFD] border border-slate-200/80 space-y-2">
+              <h4 className="text-xs font-black text-[#5066A1] uppercase tracking-wider flex items-center gap-1.5">
                 <Brain className="w-4 h-4 text-[#7286D3]" />
-                Bản Chất Phương Pháp (Ground Truth)
+                1. Khởi Nguồn: "Biết Tên" Khác Hoàn Toàn Với "Hiểu Bản Chất"
               </h4>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed bg-[#F8FAFD] p-3.5 rounded-2xl border border-slate-100">
-                Phương pháp Feynman là kỹ thuật học tập chủ động dựa trên nguyên lý{" "}
-                <span className="bg-indigo-100/80 text-indigo-800 font-semibold px-1.5 py-0.5 rounded">
-                  Tư duy phản biện
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Nhà vật lý đoạt giải Nobel <strong>Richard Feynman</strong> từng chỉ ra: Hầu hết chúng ta mắc kẹt trong{" "}
+                <span className="bg-rose-100 text-rose-900 font-bold px-1.5 py-0.5 rounded">
+                  Ảo tưởng thông thạo
                 </span>{" "}
-                và{" "}
-                <span className="bg-purple-100/80 text-purple-800 font-semibold px-1.5 py-0.5 rounded">
-                  Siêu nhận thức
-                </span>
-                . Thay vì học vẹt thuật ngữ, người học chứng minh sự thấu suốt bằng cách{" "}
-                <span className="bg-amber-100 text-amber-900 font-semibold px-1.5 py-0.5 rounded">
-                  Đơn giản hóa ngôn từ
-                </span>{" "}
-                cho một đứa trẻ 10 tuổi và kiến tạo các{" "}
-                <span className="bg-emerald-100 text-emerald-900 font-semibold px-1.5 py-0.5 rounded">
-                  Phép ẩn dụ
-                </span>{" "}
-                gần gũi để bóc trần những{" "}
-                <span className="bg-rose-100 text-rose-900 font-semibold px-1.5 py-0.5 rounded">
-                  Lỗ hổng tri thức
-                </span>
-                .
+                – chúng ta nhớ tên thuật ngữ phức tạp và ngộ nhận rằng mình đã hiểu nó.
               </p>
+              <div className="p-2.5 rounded-xl bg-white border border-slate-200/90 text-[11px] text-slate-600 italic leading-relaxed">
+                "Con có thể biết tên một loài chim trong tất cả các thứ tiếng trên thế giới, nhưng khi con nói xong, con vẫn hoàn toàn không biết gì về chú chim đó cả. Chỉ khi con hiểu nó bay thế nào, làm tổ ra sao bằng ngôn từ mộc mạc nhất, con mới thực sự hiểu."
+              </div>
             </div>
 
-            {/* 4 Bước Vàng của Kỹ thuật Feynman */}
+            {/* 2. Chi tiết 4 Bước Thực Hành Chuẩn */}
             <div className="space-y-2.5">
-              <h4 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                 <Layers className="w-4 h-4 text-[#7286D3]" />
-                4 Bước Thực Hành Chuẩn
+                2. Quy Trình 4 Bước Thực Hành Chuẩn
               </h4>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-1">
+                {/* Bước 1 */}
+                <div className="p-3 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-1">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
                     <span className="w-5 h-5 rounded-full bg-[#EEF2FC] text-[#5066A1] text-[11px] flex items-center justify-center font-black">
                       1
                     </span>
-                    <span>Chọn Chủ Đề Cần Học</span>
+                    <span>Chọn Đề Tài & Thu Hẹp Tiêu Điểm</span>
                   </div>
                   <p className="text-[11px] text-slate-500 leading-relaxed">
-                    Xác định một khái niệm cụ thể và ghi chép lại mọi kiến thức bạn đã biết.
+                    Đừng học dàn trải. Viết <strong>1 khái niệm duy nhất</strong> lên đầu trang giấy trắng và ghi ra những gì bạn biết.
                   </p>
                 </div>
 
-                <div className="p-3 rounded-2xl bg-[#EEF2FC]/50 border border-[#D5E1FA] shadow-2xs space-y-1">
+                {/* Bước 2 */}
+                <div className="p-3 rounded-2xl bg-[#EEF2FC]/60 border border-[#D5E1FA] shadow-2xs space-y-1">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-[#5066A1]">
                     <span className="w-5 h-5 rounded-full bg-[#7286D3] text-white text-[11px] flex items-center justify-center font-black">
                       2
                     </span>
-                    <span>Giảng Cho Trẻ 10 Tuổi</span>
+                    <span>Giảng Cho Trẻ 10 Tuổi (ELI5)</span>
                   </div>
                   <p className="text-[11px] text-slate-600 leading-relaxed">
-                    Chỉ dùng từ ngữ bình dân, nói mạch lạc không nhìn tài liệu (như giải thích cho Bé Bắp).
+                    Dạy lại bằng lời nói không nhìn tài liệu (như giải thích cho Bé Bắp). Kích hoạt{" "}
+                    <span className="font-semibold text-indigo-700">Tư duy phản biện</span> tức thì.
                   </p>
                 </div>
 
-                <div className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-1">
+                {/* Bước 3 */}
+                <div className="p-3 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-1">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
                     <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-800 text-[11px] flex items-center justify-center font-black">
                       3
                     </span>
-                    <span>Bắt Lỗ Hổng & Tra Cứu</span>
+                    <span>Bắt "Điểm Khựng" & Lỗ Hổng</span>
                   </div>
                   <p className="text-[11px] text-slate-500 leading-relaxed">
-                    Chỗ nào bạn bị ấp úng hoặc phải dùng từ đao to búa lớn, đó chính là điểm chưa hiểu thật.
+                    Chỗ nào bạn ngắc ngứ hoặc buộc phải dùng từ đao to búa lớn, đó chính là{" "}
+                    <span className="font-semibold text-rose-700">Lỗ hổng tri thức</span>. Mở lại sách để lấp đầy.
                   </p>
                 </div>
 
-                <div className="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-1">
+                {/* Bước 4 */}
+                <div className="p-3 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-1">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
                     <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] flex items-center justify-center font-black">
                       4
                     </span>
-                    <span>Đơn Giản Hóa & Ẩn Dụ</span>
+                    <span>Đơn Giản Hóa & Tạo Ẩn Dụ</span>
                   </div>
                   <p className="text-[11px] text-slate-500 leading-relaxed">
-                    Sáng tạo phép ẩn dụ (như xếp hình Lego, nấu ăn) để neo giữ bản chất tri thức.
+                    Gắn bài học với một{" "}
+                    <span className="font-semibold text-emerald-700">Phép ẩn dụ đời thường</span> (Lego, xe đồ chơi, nấu ăn) để neo giữ vĩnh viễn.
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Cảnh báo Bẫy Thuật Ngữ cần tránh */}
-            <div className="p-3.5 rounded-2xl bg-[#FFF9F9] border border-[#FFDADA] space-y-1.5">
+            {/* 3. Mẫu Thực Hành So Sánh (Trước & Sau khi Feynman hóa) */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Lightbulb className="w-4 h-4 text-amber-500" />
+                3. Ví Dụ So Sánh: Nói Hàn Lâm vs Nói Kiểu Feynman
+              </h4>
+              <div className="grid grid-cols-1 gap-2 text-[11px]">
+                <div className="p-2.5 rounded-xl bg-rose-50/70 border border-rose-200 text-rose-800 space-y-0.5">
+                  <span className="font-bold block">❌ Cách giải thích học vẹt (Bé Bắp sẽ ngơ ngác):</span>
+                  <p className="italic">
+                    "Kỹ thuật Feynman là mô hình sư phạm kích hoạt siêu nhận thức để triệt tiêu tải trọng nhận thức..."
+                  </p>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200 text-emerald-900 space-y-0.5">
+                  <span className="font-bold block">✅ Cách giải thích kiểu Feynman (Bé Bắp hiểu ngay):</span>
+                  <p className="italic font-medium">
+                    "Bé Bắp ơi, học kiểu Feynman giống như khi con lắp một lâu đài Lego: thay vì học thuộc lòng sách, con đem từng mảnh ghép ra lắp cho bạn xem, chỗ nào thiếu gạch thì mình tìm lại để gắn vào cho chặt chẽ!"
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Từ điển hoán đổi Bẫy Biệt Ngữ */}
+            <div className="p-3.5 rounded-2xl bg-[#FFF9F9] border border-[#FFDADA] space-y-2">
               <div className="flex items-center gap-1.5 text-xs font-bold text-rose-800">
                 <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-                <span>Bẫy Thuật Ngữ Cấm Kỵ Đối Với Bé Bắp:</span>
+                <span>4. Từ Điển Hoán Đổi Thuật Ngữ Cấm Kỵ Đối Với Bé Bắp:</span>
               </div>
-              <ul className="text-[11px] text-rose-700 space-y-1 list-disc pl-5">
-                <li>
-                  Tránh nói <em>"Metacognition / Siêu nhận thức"</em> ➔ Hãy nói <em>"Tự soi chiếu lại xem đầu mình đã hiểu thật chưa"</em>.
+              <ul className="text-[11px] text-rose-800 space-y-1.5 pl-1">
+                <li className="flex items-start gap-1.5">
+                  <span className="text-rose-500 font-bold">•</span>
+                  <span>
+                    Tránh nói <em>"Siêu nhận thức (Metacognition)"</em> ➔ Hãy nói{" "}
+                    <strong className="text-emerald-800 bg-emerald-50 px-1 py-0.2 rounded font-bold">
+                      "Tự soi lại đầu mình xem đã thực sự hiểu bài chưa"
+                    </strong>.
+                  </span>
                 </li>
-                <li>
-                  Tránh nói <em>"Cognitive Load / Tải trọng nhận thức"</em> ➔ Hãy nói <em>"Đầu óc bị quá tải như chiếc balo đầy ắp sách"</em>.
+                <li className="flex items-start gap-1.5">
+                  <span className="text-rose-500 font-bold">•</span>
+                  <span>
+                    Tránh nói <em>"Tải trọng nhận thức (Cognitive Load)"</em> ➔ Hãy nói{" "}
+                    <strong className="text-emerald-800 bg-emerald-50 px-1 py-0.2 rounded font-bold">
+                      "Đầu óc bị quá tải như chiếc ba-lô đầy ắp sách vở"
+                    </strong>.
+                  </span>
                 </li>
-                <li>
-                  Tránh nói <em>"Ảo tưởng thông thạo"</em> ➔ Hãy nói <em>"Tưởng mình biết nhưng thực ra chỉ nhớ mặt chữ"</em>.
+                <li className="flex items-start gap-1.5">
+                  <span className="text-rose-500 font-bold">•</span>
+                  <span>
+                    Tránh nói <em>"Ảo tưởng tri thức"</em> ➔ Hãy nói{" "}
+                    <strong className="text-emerald-800 bg-emerald-50 px-1 py-0.2 rounded font-bold">
+                      "Tưởng mình biết nhưng thực ra chỉ nhớ mặt chữ"
+                    </strong>.
+                  </span>
                 </li>
               </ul>
             </div>
           </div>
 
-          {/* Footer cột trái: Gợi ý thử ngay */}
-          <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span className="flex items-center gap-1">
-              <Lightbulb className="w-4 h-4 text-amber-500" />
-              Mẹo: Thử dùng ẩn dụ <strong>"Xếp hình Lego"</strong> xem Bé Bắp phản ứng thế nào nhé!
+          {/* Footer tài liệu cố định */}
+          <div className="p-3 px-5 bg-[#F8FAFD] border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 shrink-0">
+            <span className="flex items-center gap-1.5">
+              <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+              <span>Gợi ý: Thử bắt đầu bằng <strong>"Bé Bắp ơi, phương pháp này giống như..."</strong></span>
             </span>
+            <span className="text-[10px] text-slate-400 hidden sm:inline font-mono">Feynman Ground Truth v2.0</span>
           </div>
         </div>
 
