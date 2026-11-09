@@ -24,7 +24,7 @@ export const SettingsAndAIConfig: React.FC = () => {
   };
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="w-full space-y-6">
       <div>
         <h3 className="text-xl font-black text-slate-800">Thiết Lập Hệ Thống & Cấu Hình AI</h3>
         <p className="text-xs text-slate-500">Tùy chỉnh thông số mô hình AI phản biện và thiết bị thu âm giọng nói</p>

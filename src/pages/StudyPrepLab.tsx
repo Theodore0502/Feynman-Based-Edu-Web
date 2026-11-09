@@ -91,7 +91,7 @@ export const StudyPrepLab: React.FC = () => {
   if (!activeTopic) return null;
 
   return (
-    <div className="space-y-8 pb-16 max-w-7xl mx-auto">
+    <div className="space-y-8 pb-16 w-full">
       {/* 1. Header Hero Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#8EA7E9]/20 via-[#B5B2E8]/20 to-[#FFD1D1]/30 p-4 sm:p-6 border border-[#E8EEF8] shadow-xs">
         {/* Dreamy Hero Background Image (mờ nhẹ) */}

@@ -190,7 +190,7 @@ export const MaterialUploadHub: React.FC = () => {
   const isCuratorOrAdmin = user?.role === "curator" || user?.role === "admin";
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12">
+    <div className="w-full space-y-6 pb-12">
       {/* Top Banner Header Đồng Bộ Chuẩn Dashboard */}
       <PageHeroBanner
         badge={

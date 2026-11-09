@@ -23,7 +23,7 @@ import {
 
 export const AboutPage: React.FC = () => {
   return (
-    <div className="space-y-8 max-w-5xl mx-auto pb-16">
+    <div className="space-y-8 w-full pb-16">
       {/* 1. Hero Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#EEF2FC] via-[#F5F2FB] to-[#FFF5F5] p-6 sm:p-10 border border-[#E8EEF8] shadow-subtle">
         {/* Dreamy Hero Background Image (mờ nhẹ) */}

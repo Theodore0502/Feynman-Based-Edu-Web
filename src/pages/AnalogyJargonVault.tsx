@@ -289,7 +289,7 @@ export const AnalogyJargonVault: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-12">
+    <div className="space-y-6 w-full pb-12">
       {/* 1. Header & Quick Drill Action Banner */}
       <div className="relative overflow-hidden bg-gradient-to-r from-[#8EA7E9]/20 via-[#B5B2E8]/20 to-[#FFD1D1]/30 border border-[#E8EEF8] rounded-3xl p-4 sm:p-6 shadow-xs">
         {/* Dreamy Hero Background Image (mờ nhẹ) */}

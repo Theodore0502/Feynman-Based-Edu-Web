@@ -30,7 +30,7 @@ export const WorkspaceLayout: React.FC = () => {
       <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden">
         {/* TopBar Cố Định Vị Trí (Không Bao Giờ Bị Mất Khi Scroll) */}
         <div className="shrink-0 z-40 relative px-4 sm:px-6 lg:px-8 pt-3 sm:pt-4 pb-2 bg-[#F3F6FA]">
-          <div className={cn("w-full max-w-7xl mx-auto", isTopicsPage && "max-w-none")}>
+          <div className="w-full">
             <TopHeader />
           </div>
         </div>

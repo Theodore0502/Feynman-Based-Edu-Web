@@ -19,7 +19,7 @@ export const PageContainer: React.FC<PageContainerProps> = ({
   className,
 }) => {
   return (
-    <div className={cn("w-full max-w-7xl mx-auto space-y-6 pb-12", className)}>
+    <div className={cn("w-full space-y-6 pb-12", className)}>
       {children}
     </div>
   );
