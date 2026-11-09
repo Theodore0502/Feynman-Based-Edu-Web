@@ -480,31 +480,10 @@ export const LandingAndDemo: React.FC = () => {
         </div>
 
         {/* =========================================================================
-            BOTANICAL FOOTER
+            FOOTER
             ========================================================================= */}
-        <footer className="max-w-6xl mx-auto px-6 py-10 border-t border-slate-200/80 mt-12">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-            <div className="flex items-center gap-2">
-              <EliseCatMascot size={22} />
-              <span className="font-extrabold text-slate-700">Elis</span>
-              <span>— Nền tảng học sâu theo phương pháp Feynman & Chuẩn ELI5</span>
-            </div>
-
-            <div className="flex items-center gap-4 text-slate-500 font-medium">
-              <Link to="/about" className="hover:text-slate-900 transition-colors">
-                Về Elis
-              </Link>
-              <Link to="/lectures" className="hover:text-slate-900 transition-colors">
-                Kho Bài Giảng
-              </Link>
-              <Link to="/vault" className="hover:text-slate-900 transition-colors">
-                Kho Ẩn Dụ & Thuật Ngữ
-              </Link>
-              <Link to="/auth" className="hover:text-slate-900 transition-colors">
-                Đăng Nhập
-              </Link>
-            </div>
-          </div>
+        <footer className="max-w-6xl mx-auto px-6 py-8 border-t border-slate-200/80 mt-12 text-center text-xs text-slate-400 font-medium">
+          <p>Copyright © Theodore0502</p>
         </footer>
       </div>
     </div>
