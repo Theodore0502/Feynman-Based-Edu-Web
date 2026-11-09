@@ -237,11 +237,21 @@ export const LandingAndDemo: React.FC = () => {
             dán nhãn từ ngữ?
           </h1>
 
-          {/* Dẫn nhập khơi gợi thắc mắc */}
-          <p className="text-sm sm:text-base text-slate-600 max-w-2xl mx-auto leading-relaxed">
-            Richard Feynman từng cảnh báo: <em>"Đừng nhầm lẫn giữa việc biết tên gọi của một thứ với việc thực sự thấu hiểu nó."</em>{" "}
-            Học vẹt thuật ngữ chỉ giúp bạn cắm một cành hoa nhựa giả tạo. Chỉ khi bạn giảng giải được cho một cậu bé 10 tuổi hiểu say mê, hạt mầm tri thức mới thực sự bám rễ sâu vào tiềm thức và trổ bông vĩnh cửu.
-          </p>
+          {/* Dẫn nhập khơi gợi thắc mắc & Trích dẫn Feynman */}
+          <div className="max-w-2xl mx-auto space-y-4">
+            <div className="p-4 sm:p-5 rounded-2xl bg-white/80 backdrop-blur-md border border-[#E2EAFD] shadow-2xs space-y-1.5">
+              <p className="text-sm sm:text-base text-slate-800 italic font-semibold leading-relaxed">
+                "Đừng nhầm lẫn giữa việc biết tên gọi của một thứ với việc thực sự thấu hiểu nó."
+              </p>
+              <span className="block text-xs font-black text-[#5066A1] uppercase tracking-wider">
+                — Richard Feynman —
+              </span>
+            </div>
+
+            <p className="text-sm sm:text-base text-slate-600 leading-relaxed font-medium">
+              Học vẹt thuật ngữ chỉ giúp bạn cắm một cành hoa nhựa giả tạo. Chỉ khi bạn giảng giải được cho một cậu bé 10 tuổi hiểu say mê, hạt mầm tri thức mới thực sự bám rễ sâu vào tiềm thức và trổ bông vĩnh cửu.
+            </p>
+          </div>
 
           {/* Thẻ Thống Kê Tò Mò (Curiosity Metrics) */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-3xl mx-auto pt-2">
