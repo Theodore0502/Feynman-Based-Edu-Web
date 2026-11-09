@@ -195,12 +195,7 @@ export const MaterialUploadHub: React.FC = () => {
       <PageHeroBanner
         mascotSrc="/images/theodore-upload-owl.png"
         mascotAlt="Linh vật Tải tài liệu Theodore"
-        badge={
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-bold border border-purple-200/60 shadow-2xs">
-            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-            <span>AI Curriculum Digestion Agent</span>
-          </div>
-        }
+        mascotClassName="w-52 h-52 sm:w-64 sm:h-64 lg:w-80 lg:h-80 xl:w-96 xl:h-96"
         title={
           <>
             Tải Lên Tài Liệu &amp; Tự Động Hóa{" "}
@@ -227,27 +222,6 @@ export const MaterialUploadHub: React.FC = () => {
               <span>Sang Bàn Thẩm Định</span>
             </button>
           </>
-        }
-        rightWidget={
-          <div className="space-y-2.5 w-full text-center">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
-              Định Dạng Hỗ Trợ
-            </span>
-            <div className="flex items-center justify-center gap-1.5 flex-wrap">
-              {ALLOWED_EXTENSIONS.map((ext) => (
-                <span
-                  key={ext}
-                  className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200/60 font-mono text-[10px] font-bold uppercase"
-                >
-                  {ext.replace(".", "")}
-                </span>
-              ))}
-            </div>
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-center gap-1 text-[11px] font-bold text-emerald-600">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>AI Agent Sẵn Sàng</span>
-            </div>
-          </div>
         }
       />
 
