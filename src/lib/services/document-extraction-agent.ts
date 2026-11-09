@@ -22,6 +22,7 @@ export interface ExtractedLessonDraft {
   uploadedById: string;
   uploadedByName: string;
   uploadedAt: string;
+  updatedAt?: string;
 
   // AI Structured Output (Chuẩn Feynman Schema)
   title: string;
@@ -290,6 +291,7 @@ export const DocumentExtractionAgent = {
     const updated: ExtractedLessonDraft = {
       ...all[idx],
       ...updates,
+      updatedAt: new Date().toISOString(),
     };
     all[idx] = updated;
 
