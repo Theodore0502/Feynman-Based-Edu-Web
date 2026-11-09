@@ -720,6 +720,17 @@ export const CuratorValidationCenter: React.FC = () => {
                   {selectedDraft.uploadedByName}
                 </span>
               </div>
+
+              {selectedDraft.suggestedRoadmapPosition && (
+                <div className="col-span-2 sm:col-span-4 bg-indigo-50/70 p-2.5 rounded-xl border border-indigo-100">
+                  <span className="text-[10px] uppercase font-bold text-indigo-600 block">
+                    Định Vị Trong Master Knowledge Graph (Supabase)
+                  </span>
+                  <span className="font-semibold text-slate-800 text-xs">
+                    {selectedDraft.suggestedRoadmapPosition}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

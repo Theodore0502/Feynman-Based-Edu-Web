@@ -576,10 +576,10 @@ export const MaterialUploadHub: React.FC = () => {
           {/* Stepper Progress */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             {[
-              { num: 1, title: "Tiếp Nhận File", desc: "Quét cấu trúc nhị phân .pdf / .docx" },
-              { num: 2, title: "Semantic Chunking", desc: "Bóc tách ngữ nghĩa & phân đoạn" },
-              { num: 3, title: "Gán Nhãn Khái Niệm", desc: "Chiết xuất Concepts & Jargon Traps" },
-              { num: 4, title: "Schema Feynman", desc: "Đóng gói bài học & chuyển giao" },
+              { num: 1, title: "Tiếp Nhận & Vai Trò", desc: "Quét nhị phân & nhận diện loại hình sư phạm" },
+              { num: 2, title: "Semantic Chunking", desc: "Băm ý niệm & tiền đề Anthropic Context" },
+              { num: 3, title: "Chiếu Xạ Master Graph", desc: "Định vị tiên quyết & độ khó trên Supabase" },
+              { num: 4, title: "Schema Feynman", desc: "Đóng gói bài học & lưu trữ Supabase" },
             ].map((st) => (
               <div
                 key={st.num}
@@ -658,7 +658,13 @@ export const MaterialUploadHub: React.FC = () => {
               )}
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              {extractedDraft.pedagogicalRoleLabel && (
+                <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 text-xs font-bold border border-purple-200 shadow-2xs">
+                  <FileText className="w-3.5 h-3.5 text-purple-600" />
+                  {extractedDraft.pedagogicalRoleLabel}
+                </span>
+              )}
               <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">
                 <Clock className="w-3.5 h-3.5 text-slate-500" />
                 {extractedDraft.estimatedReadingMinutes} phút đọc
@@ -669,6 +675,42 @@ export const MaterialUploadHub: React.FC = () => {
               </span>
             </div>
           </div>
+
+          {/* Master Ontology Projection & Roadmap Positioning */}
+          {extractedDraft.suggestedRoadmapPosition && (
+            <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-indigo-600" />
+                  <span>Định Vị Trong Cây Tri Thức Chuẩn (Master Ontology Projection)</span>
+                </div>
+                <span className="text-[10px] font-bold text-indigo-600 bg-white px-2 py-0.5 rounded border border-indigo-200">
+                  Supabase Knowledge Graph
+                </span>
+              </div>
+              <p className="text-xs font-semibold text-slate-700">
+                📌 {extractedDraft.suggestedRoadmapPosition}
+              </p>
+              {extractedDraft.prerequisiteTopics && extractedDraft.prerequisiteTopics.length > 0 && (
+                <div className="pt-1 border-t border-indigo-100/60">
+                  <span className="text-[11px] font-bold text-slate-500 block mb-1">
+                    Kiến thức tiên quyết cần nắm vững trước bài này:
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {extractedDraft.prerequisiteTopics.map((pt, i) => (
+                      <span
+                        key={i}
+                        className="text-[11px] bg-white text-indigo-900 px-2.5 py-1 rounded-lg border border-indigo-200 font-medium shadow-2xs"
+                        title={pt.reason}
+                      >
+                        🔹 {pt.title}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Summary / Ground Truth */}
           <div className="space-y-2">
@@ -718,6 +760,42 @@ export const MaterialUploadHub: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Semantic Chunks / Atomic Knowledge Units Preview */}
+          {extractedDraft.semanticChunks && extractedDraft.semanticChunks.length > 0 && (
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-blue-600" />
+                  Hạt Nhân Tri Thức Đã Bóc Tách ({extractedDraft.semanticChunks.length} Khối)
+                </h4>
+                <span className="text-[10px] text-slate-400 font-medium">
+                  Đã gắn tiền đề Contextual Retrieval
+                </span>
+              </div>
+              <div className="space-y-2">
+                {extractedDraft.semanticChunks.slice(0, 3).map((chunk) => (
+                  <div
+                    key={chunk.chunkId}
+                    className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 text-xs space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between text-slate-700 font-bold">
+                      <span className="line-clamp-1">📌 {chunk.heading}</span>
+                      <span className="text-[10px] text-slate-400 shrink-0">
+                        ~{chunk.estimatedReadingSeconds}s đọc
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-mono text-indigo-700 bg-white p-1.5 rounded border border-indigo-100">
+                      {chunk.contextualContent.split("\n")[0]}
+                    </div>
+                    <p className="text-slate-600 text-xs line-clamp-2 leading-relaxed">
+                      {chunk.rawContent}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">

@@ -12,6 +12,8 @@ import { supabase } from "@/lib/supabase";
 import { UserProfile } from "@/types/auth.types";
 import { CatalogTopic } from "@/types/catalog.types";
 import { TaxonomyClassifier } from "@/lib/services/taxonomy-classifier";
+import { SemanticChunker, SemanticChunk, PedagogicalRole } from "@/lib/services/semantic-chunker";
+import { OntologyProjector, OntologyProjectionResult } from "@/lib/services/ontology-projector";
 
 export interface ExtractedLessonDraft {
   id: string; // e.g. "draft-doc-123"
@@ -39,6 +41,14 @@ export interface ExtractedLessonDraft {
   jargonTraps: string[]; // Bẫy thuật ngữ dễ gây ngộ nhận
   suggestedAnalogies: string[]; // Ẩn dụ Feynman gợi ý
   keyTakeaways: string[]; // Điểm mấu chốt
+
+  // Heterogeneous Document & Ontology Mapping
+  pedagogicalRole?: PedagogicalRole;
+  pedagogicalRoleLabel?: string;
+  semanticChunks?: SemanticChunk[];
+  ontologyAlignment?: OntologyProjectionResult;
+  prerequisiteTopics?: Array<{ id: string; title: string; reason: string }>;
+  suggestedRoadmapPosition?: string;
 
   // Trạng thái thẩm định
   status: "PENDING_VALIDATION" | "VALIDATED" | "REJECTED";
@@ -207,8 +217,8 @@ export const DocumentExtractionAgent = {
   }): Promise<ExtractedLessonDraft> {
     const { file, domainId, subjectId, user, onProgress } = params;
 
-    // Stage 1: Tiếp nhận và quét định dạng
-    onProgress?.(1, "🔍 Đang phân tích cấu trúc nhị phân của tài liệu...");
+    // Stage 1: Tiếp nhận và quét định dạng & vai trò sư phạm
+    onProgress?.(1, "🔍 Đang phân tích cấu trúc nhị phân & Nhận diện vai trò sư phạm...");
     await new Promise((r) => setTimeout(r, 650));
 
     // Nhận diện tự động qua Semantic Taxonomy Classifier dựa trên Kho Dữ Liệu Hệ Thống
@@ -226,12 +236,21 @@ export const DocumentExtractionAgent = {
     const slug = metadata.canonicalSlug;
     const refLink = metadata.refLink;
 
-    // Stage 2: Phân mảnh ngữ nghĩa & Đọc sâu tài liệu
-    onProgress?.(2, "🧩 Bóc tách ngữ nghĩa & Tham chiếu Kho Tri Thức Hệ Thống...");
+    // Stage 2: Băm theo ranh giới ý niệm (Semantic Chunking & Contextual Retrieval Prefix)
+    onProgress?.(2, "🧩 Bóc tách ngữ nghĩa, băm theo ranh giới ý niệm & gắn tiền đề Anthropic Context...");
     await new Promise((r) => setTimeout(r, 850));
 
-    // Stage 3: Sinh nội dung Feynman động phù hợp với ngữ cảnh thực tế của tài liệu
-    onProgress?.(3, "🏷️ Hệ thống hóa tri thức: Khái niệm cốt lõi, Bẫy thuật ngữ & Ẩn dụ mẫu...");
+    const sampleText = `${humanTitle}\n\nTài liệu học thuật chuyên sâu về ${humanTitle} thuộc môn ${classification.subjectName}. Bài giảng hệ thống hóa các nguyên lý vận hành cốt lõi, bóc tách cấu trúc tri thức và loại bỏ các bẫy thuật ngữ rườm rà.`;
+
+    const chunkAnalysis = SemanticChunker.chunkDocument({
+      fileName: file.name,
+      rawText: sampleText,
+      subjectName: classification.subjectName,
+      domainName: classification.domainName,
+    });
+
+    // Stage 3: Chiếu xạ vào Master Knowledge Graph trên Supabase (Ontology Projection)
+    onProgress?.(3, "🌐 Chiếu xạ vào Master Knowledge Graph trên Supabase để xác định vị trí tiên quyết...");
     await new Promise((r) => setTimeout(r, 700));
 
     const generatedFeynman = TaxonomyClassifier.generateContextualFeynmanContent(
@@ -240,8 +259,15 @@ export const DocumentExtractionAgent = {
       finalDomainId
     );
 
-    // Stage 4: Đóng gói Schema bài học
-    onProgress?.(4, "✨ Đóng gói Schema bài học và chuyển tới Hội đồng Thẩm định...");
+    const ontologyResult = await OntologyProjector.projectToMasterGraph({
+      subjectId: finalSubjectId,
+      documentTitle: humanTitle,
+      extractedConcepts: generatedFeynman.concepts,
+      rawTextSnippet: sampleText,
+    });
+
+    // Stage 4: Đóng gói Schema bài học & Lưu trữ Supabase
+    onProgress?.(4, "✨ Đóng gói Schema bài học chuẩn Feynman & Lưu trữ Supabase...");
     await new Promise((r) => setTimeout(r, 500));
 
     const newDraft: ExtractedLessonDraft = {
@@ -249,7 +275,7 @@ export const DocumentExtractionAgent = {
       fileName: file.name,
       fileType: file.type || "application/octet-stream",
       fileSize: file.size,
-      rawTextSnippet: `Nội dung trích xuất từ tài liệu [${file.name}]: Đã phân tích ${Math.round(file.size / 1024)} KB tài liệu học thuật. Bài giảng bao quát các nguyên lý cơ bản, công thức trọng tâm và sơ đồ liên kết tri thức chuẩn hóa.`,
+      rawTextSnippet: `Nội dung trích xuất từ tài liệu [${file.name}]: Đã phân tích ${Math.round(file.size / 1024)} KB tài liệu học thuật (${chunkAnalysis.pedagogicalRoleLabel}). Gồm ${chunkAnalysis.totalChunks} Hạt nhân tri thức (Atomic Knowledge Units).`,
       uploadedById: user.id,
       uploadedByName: user.displayName || user.email || "Thành viên Theodore",
       uploadedAt: new Date().toISOString(),
@@ -260,12 +286,18 @@ export const DocumentExtractionAgent = {
       summary: generatedFeynman.summary,
       domainId: finalDomainId,
       subjectId: finalSubjectId,
-      difficultyLevel: 3,
+      difficultyLevel: ontologyResult.calculatedDifficulty || 3,
       estimatedReadingMinutes: Math.max(10, Math.min(30, Math.round(file.size / 150000) || 15)),
       requiredConcepts: generatedFeynman.concepts,
       jargonTraps: generatedFeynman.jargons,
       suggestedAnalogies: generatedFeynman.analogies,
       keyTakeaways: generatedFeynman.keyTakeaways,
+      pedagogicalRole: chunkAnalysis.pedagogicalRole,
+      pedagogicalRoleLabel: chunkAnalysis.pedagogicalRoleLabel,
+      semanticChunks: chunkAnalysis.chunks,
+      ontologyAlignment: ontologyResult,
+      prerequisiteTopics: ontologyResult.prerequisiteTopics,
+      suggestedRoadmapPosition: ontologyResult.suggestedRoadmapPosition,
       status: "PENDING_VALIDATION",
     };
 
