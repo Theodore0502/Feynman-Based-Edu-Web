@@ -2,10 +2,13 @@
  * File: src/lib/services/document-extraction-agent.ts
  * Mục đích: AI Curriculum Extraction Agent (Tác nhân chuyển hóa tài liệu thô thành bài học chuẩn Feynman).
  * Quy trình:
- *   1. Tiếp nhận tài liệu (PDF, PDFA, DOC, DOCX, PPTX).
- *   2. Bóc tách nội dung ngữ nghĩa (Semantic Parsing & Chunking).
- *   3. Tự động chiết xuất Khái niệm Cốt Lõi (Required Concepts) & Bẫy Thuật Ngữ (Jargon Traps).
- *   4. Lưu trữ bản nháp (Draft) chờ Hội đồng Kiểm Định Viên (Curator / Submitter) hoặc Admin thẩm định và xuất bản lên Supabase.
+ *   1. Tiếp nhận tài liệu (DOCX, PDF, PPTX, TXT, MD, JSON).
+ *   2. Bóc tách 100% văn bản thực tế từ tệp qua DocumentParser (sử dụng mammoth cho docx).
+ *   3. Phân tích ngữ nghĩa chuyên sâu bằng Tác nhân Gemini (gemini-3.1-flash-lite) kết nối trực tiếp Supabase.
+ *   4. Bóc tách ranh giới ý niệm (Semantic Chunking) & Tiền đề ngữ cảnh Anthropic Contextual Retrieval.
+ *   5. Chiếu xạ Đồ thị Tri thức (Master Knowledge Graph Projection) trên Supabase để xác định vị trí tiên quyết.
+ *   6. Đóng gói Lesson Draft chuẩn Feynman & Lưu trữ vào Supabase academic_materials.
+ *   7. Ghi nhận toàn bộ sự kiện vào SystemLogger.
  */
 
 import { supabase, supabaseAdmin } from "@/lib/supabase";
@@ -14,6 +17,9 @@ import { CatalogTopic } from "@/types/catalog.types";
 import { TaxonomyClassifier } from "@/lib/services/taxonomy-classifier";
 import { SemanticChunker, SemanticChunk, PedagogicalRole } from "@/lib/services/semantic-chunker";
 import { OntologyProjector, OntologyProjectionResult } from "@/lib/services/ontology-projector";
+import { DocumentParser } from "@/lib/services/document-parser";
+import { GeminiCurriculumService } from "@/lib/services/gemini-service";
+import { SystemLogger } from "@/lib/services/system-logger";
 
 export interface ExtractedLessonDraft {
   id: string; // e.g. "draft-doc-123"
@@ -30,21 +36,21 @@ export interface ExtractedLessonDraft {
   // AI Structured Output (Chuẩn Feynman Schema)
   title: string;
   slug: string;
-  refLink?: string; // Canonical URL Reference Link: https://theodore.edu.vn/materials/...
-  confidenceScore?: number; // AI Classification Confidence (0 - 100%)
+  refLink: string;
+  confidenceScore: number;
   summary: string;
   domainId: string;
   subjectId: string;
-  difficultyLevel: number; // 1 - 5
+  difficultyLevel: number;
   estimatedReadingMinutes: number;
-  requiredConcepts: string[]; // Khái niệm cốt lõi bắt buộc
-  jargonTraps: string[]; // Bẫy thuật ngữ dễ gây ngộ nhận
-  suggestedAnalogies: string[]; // Ẩn dụ Feynman gợi ý
-  keyTakeaways: string[]; // Điểm mấu chốt
+  requiredConcepts: string[];
+  jargonTraps: string[];
+  suggestedAnalogies: string[];
+  keyTakeaways: string[];
 
-  // Heterogeneous Document & Ontology Mapping
-  pedagogicalRole?: PedagogicalRole;
-  pedagogicalRoleLabel?: string;
+  // Hệ Thống Ranh Giới Ngữ Nghĩa & Đồ Thị Tri Thức Master
+  pedagogicalRole: PedagogicalRole;
+  pedagogicalRoleLabel: string;
   semanticChunks?: SemanticChunk[];
   ontologyAlignment?: OntologyProjectionResult;
   prerequisiteTopics?: Array<{ id: string; title: string; reason: string }>;
@@ -59,137 +65,22 @@ export interface ExtractedLessonDraft {
 
 const STORAGE_KEY = "theodore_curator_lesson_drafts";
 
-// Danh sách các bản nháp mẫu chất lượng cao khởi tạo sẵn
-const INITIAL_MOCK_DRAFTS: ExtractedLessonDraft[] = [
-  {
-    id: "draft-arch-microservices-01",
-    fileName: "Giao_Trinh_Kien_Truc_Microservices_DevOps.pdf",
-    fileType: "application/pdf",
-    fileSize: 2450000,
-    rawTextSnippet: "Kiến trúc Microservices chia nhỏ ứng dụng thành các dịch vụ độc lập giao tiếp qua REST API hoặc Message Broker gRPC. Mỗi service sở hữu database riêng biệt...",
-    uploadedById: "usr_learner_demo",
-    uploadedByName: "Trần Minh Quân (Kỹ Sư Phần Mềm)",
-    uploadedAt: new Date(Date.now() - 3600 * 1000 * 4).toISOString(),
-    title: "Kiến Trúc Microservices & Cơ Chế Phân Tán",
-    slug: "kien-truc-microservices-phan-tan",
-    summary: "Thay vì gom toàn bộ code thành một khối cồng kềnh (Monolith), Microservices chia hệ thống thành các xưởng nhỏ độc lập, mỗi bên phụ trách một việc và trao đổi qua thư chuyển phát nhanh.",
-    domainId: "dom-se",
-    subjectId: "sub-sw-arch",
-    difficultyLevel: 3,
-    estimatedReadingMinutes: 15,
-    requiredConcepts: [
-      "Độc lập triển khai (Independent Deploy)",
-      "Cơ sở dữ liệu phân tán (Database per Service)",
-      "Cổng giao tiếp API Gateway",
-      "Giao vận tin nhắn Event-Driven (Kafka/RabbitMQ)",
-      "Cơ chế Circuit Breaker chống sập chéo"
-    ],
-    jargonTraps: [
-      "Ngộ nhận Microservices luôn tốt hơn Monolith",
-      "Nhầm lẫn giữa Đồng bộ HTTP và Bất đồng bộ Message Queue",
-      "Bẫy giao dịch hai pha phân tán Distributed Transaction"
-    ],
-    suggestedAnalogies: [
-      "Giống như một khu phố có tiệm bánh mì, tiệm giặt ủi và tiệm sửa xe riêng, tiệm này sửa máy thì tiệm bánh mì vẫn bán bình thường thay vì một đại siêu thị mất điện là đóng cửa toàn bộ."
-    ],
-    keyTakeaways: [
-      "Tối ưu khả năng mở rộng (Scalability) độc lập cho từng module",
-      "Chấp nhận độ phức tạp cao hơn trong giám sát và duy trì tính nhất quán dữ liệu"
-    ],
-    status: "PENDING_VALIDATION"
-  },
-  {
-    id: "draft-ai-transformers-02",
-    fileName: "Co_Che_Attention_Va_Transformers_DeepLearning.docx",
-    fileType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    fileSize: 1840000,
-    rawTextSnippet: "Cơ chế tự chú ý (Self-Attention) cho phép mô hình ngôn ngữ gán trọng số cho từng từ trong câu dựa trên ngữ cảnh toàn cục mà không phụ thuộc vào thứ tự xử lý tuần tự như RNN...",
-    uploadedById: "usr_learner_ai",
-    uploadedByName: "Lê Hoàng Yến (NCS AI Lab)",
-    uploadedAt: new Date(Date.now() - 3600 * 1000 * 12).toISOString(),
-    title: "Cơ Chế Self-Attention Trong Mô Hình Transformers",
-    slug: "co-che-self-attention-transformers",
-    summary: "Cơ chế Self-Attention giúp máy tính biết từ nào cần 'liếc nhìn' từ nào trong câu để hiểu đúng ngữ cảnh, giống như khi đọc một trang sách ta chú ý cùng lúc vào chủ ngữ và hành động liên quan.",
-    domainId: "dom-cs",
-    subjectId: "sub-ai-intro",
-    difficultyLevel: 4,
-    estimatedReadingMinutes: 18,
-    requiredConcepts: [
-      "Vectơ Query, Key, Value (Q, K, V)",
-      "Tích vô hướng ma trận phân tầng (Scaled Dot-Product)",
-      "Hàm Softmax tính trọng số chú ý",
-      "Multi-Head Attention (Chú ý đa đầu)",
-      "Mã hóa vị trí Positional Encoding"
-    ],
-    jargonTraps: [
-      "Nhầm lẫn giữa Attention thông thường và Self-Attention",
-      "Bẫy độ phức tạp bậc hai O(N^2) theo độ dài chuỗi ký tự",
-      "Hiểu nhầm Query và Key có vai trò đối xứng"
-    ],
-    suggestedAnalogies: [
-      "Giống như bạn đi vào thư viện tìm sách: 'Query' là phiếu yêu cầu của bạn, 'Key' là nhãn dán trên gáy sách của thư viện, còn 'Value' là nội dung cuốn sách bạn mượn về."
-    ],
-    keyTakeaways: [
-      "Khắc phục hoàn toàn điểm nghẽn ghi nhớ ngữ cảnh xa của mạng tuần hoàn RNN/LSTM",
-      "Cho phép tính toán song song cực nhanh trên phần cứng GPU hiện đại"
-    ],
-    status: "PENDING_VALIDATION"
-  },
-  {
-    id: "draft-med-circulatory-03",
-    fileName: "He_Tuan_Hoan_Mau_Sinh_Ly_Hoc.pptx",
-    fileType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    fileSize: 3200000,
-    rawTextSnippet: "Hệ tuần hoàn gồm tim và mạng lưới mạch máu. Tim hoạt động như chiếc bơm kép: nửa phải bơm máu lên phổi để trao đổi oxy, nửa trái bơm máu giàu oxy đi nuôi dưỡng toàn cơ thể...",
-    uploadedById: "usr_med_student",
-    uploadedByName: "Nguyễn Thảo My (SV Y Khoa)",
-    uploadedAt: new Date(Date.now() - 3600 * 1000 * 24).toISOString(),
-    title: "Sinh Lý Hệ Tuần Hoàn: Chu Kỳ Bơm Máu Của Tim",
-    slug: "sinh-ly-he-tuan-hoan-tim",
-    summary: "Trái tim hoạt động như một cỗ máy bơm 2 buồng độc lập: buồng nhận nước bẩn đưa đi lọc sạch ở nhà máy phổi, buồng còn lại bơm nước tinh khiết đi khắp thành phố cơ thể.",
-    domainId: "dom-med",
-    subjectId: "sub-med-physiology",
-    difficultyLevel: 2,
-    estimatedReadingMinutes: 12,
-    requiredConcepts: [
-      "Tâm nhĩ và Tâm thất (Atrium & Ventricle)",
-      "Vòng tuần hoàn nhỏ (Tuần hoàn phổi)",
-      "Vòng tuần hoàn lớn (Tuần hoàn hệ thống)",
-      "Hệ thống van tim một chiều (Van nhĩ-thất & Bán nguyệt)",
-      "Nút xoang nhĩ tự phát nhịp (SA Node)"
-    ],
-    jargonTraps: [
-      "Nhầm lẫn động mạch luôn mang máu đỏ tươi giàu O2 (Động mạch phổi mang máu nghèo O2)",
-      "Hiểu nhầm tim tự đập cần sự điều khiển liên tục của não bộ"
-    ],
-    suggestedAnalogies: [
-      "Giống như hệ thống đường ống nước gia đình có bơm tăng áp và van một chiều để nước chỉ chảy theo hướng cố định mà không bị chảy ngược lại."
-    ],
-    keyTakeaways: [
-      "Hiểu rõ chu kỳ co bóp tâm thu và tâm trương",
-      "Nắm vững cơ chế đóng mở van tim tạo ra 2 tiếng tim T1 - T2 khi khám lâm sàng"
-    ],
-    status: "PENDING_VALIDATION"
-  }
-];
-
 export const DocumentExtractionAgent = {
   /**
-   * Lấy toàn bộ danh sách bản nháp từ LocalStorage + Supabase
+   * Lấy toàn bộ danh sách bản nháp từ LocalStorage và Supabase (Không dùng mock data)
    */
   async getAllDrafts(): Promise<ExtractedLessonDraft[]> {
-    if (typeof window === "undefined") return INITIAL_MOCK_DRAFTS;
+    if (typeof window === "undefined") return [];
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_MOCK_DRAFTS));
-        return INITIAL_MOCK_DRAFTS;
+        return [];
       }
       const parsed: ExtractedLessonDraft[] = JSON.parse(raw);
       return parsed;
-    } catch (e) {
-      console.warn("Lỗi đọc drafts:", e);
-      return INITIAL_MOCK_DRAFTS;
+    } catch (e: any) {
+      SystemLogger.warn("AGENT_EXTRACTION", "GET_DRAFTS", `Lỗi đọc drafts: ${e.message}`);
+      return [];
     }
   },
 
@@ -205,94 +96,134 @@ export const DocumentExtractionAgent = {
   },
 
   /**
-   * AI Extraction Engine: Đọc file, bóc tách cấu trúc và tạo ra Lesson Draft chuẩn Feynman.
-   * Kết nối Kho Dữ Liệu Hệ Thống để định vị taxonomy và sinh nội dung ngữ nghĩa phù hợp.
+   * AI Extraction Engine: Đọc file thực tế, gọi Gemini LLM và tạo ra Lesson Draft chuẩn Feynman.
    */
   async extractCurriculumFromFile(params: {
-    file: File;
+    file: File | { name: string; buffer: Buffer; type?: string };
     domainId?: string;
     subjectId?: string;
     user: UserProfile;
     onProgress?: (stage: number, stageName: string) => void;
   }): Promise<ExtractedLessonDraft> {
     const { file, domainId, subjectId, user, onProgress } = params;
+    const startTime = Date.now();
+    const fileName = "name" in file ? file.name : "document";
 
-    // Stage 1: Tiếp nhận và quét định dạng & vai trò sư phạm
-    onProgress?.(1, "🔍 Đang phân tích cấu trúc nhị phân & Nhận diện vai trò sư phạm...");
-    await new Promise((r) => setTimeout(r, 650));
-
-    // Nhận diện tự động qua Semantic Taxonomy Classifier dựa trên Kho Dữ Liệu Hệ Thống
-    const classification = TaxonomyClassifier.classifyDocument(file.name);
-    const finalDomainId = domainId && domainId !== "AUTO" ? domainId : classification.domainId;
-    const finalSubjectId = subjectId && subjectId !== "AUTO" ? subjectId : classification.subjectId;
-
-    // Chuẩn hóa Academic Metadata & URL Reference Link theo kho dữ liệu
-    const metadata = TaxonomyClassifier.generateMetadataForSelection(
-      file.name,
-      finalDomainId,
-      finalSubjectId
+    SystemLogger.info(
+      "AGENT_EXTRACTION",
+      "START_PIPELINE",
+      `Bắt đầu quy trình bóc tách tài liệu học thuật cho tệp [${fileName}] bởi người dùng [${user.displayName || user.email}]`
     );
-    const humanTitle = metadata.suggestedTitle;
-    const slug = metadata.canonicalSlug;
-    const refLink = metadata.refLink;
 
-    // Stage 2: Băm theo ranh giới ý niệm (Semantic Chunking & Contextual Retrieval Prefix)
-    onProgress?.(2, "🧩 Bóc tách ngữ nghĩa, băm theo ranh giới ý niệm & gắn tiền đề Anthropic Context...");
-    await new Promise((r) => setTimeout(r, 850));
+    // =========================================================================
+    // Stage 1: Bóc tách văn bản thực tế từ nhị phân DOCX/PDF/TXT
+    // =========================================================================
+    onProgress?.(1, "🔍 Đang bóc tách toàn bộ văn bản thực tế từ tệp tài liệu...");
+    const parsedDoc = await DocumentParser.parseDocument(file);
 
-    const sampleText = `${humanTitle}\n\nTài liệu học thuật chuyên sâu về ${humanTitle} thuộc môn ${classification.subjectName}. Bài giảng hệ thống hóa các nguyên lý vận hành cốt lõi, bóc tách cấu trúc tri thức và loại bỏ các bẫy thuật ngữ rườm rà.`;
+    // Đồng bộ taxonomy mới nhất từ Supabase
+    const liveTaxonomy = await TaxonomyClassifier.syncSystemTaxonomy();
 
-    const chunkAnalysis = SemanticChunker.chunkDocument({
-      fileName: file.name,
-      rawText: sampleText,
-      subjectName: classification.subjectName,
-      domainName: classification.domainName,
+    // =========================================================================
+    // Stage 2: Nhận diện học thuật & Sinh Feynman Schema bằng Gemini LLM
+    // =========================================================================
+    onProgress?.(2, "🧠 Tác nhân Gemini (gemini-3.1-flash-lite) đang phân tích học thuật & tạo Schema Feynman...");
+
+    const availableDomains = liveTaxonomy.domains.map((d) => ({
+      id: d.id,
+      name: d.name,
+      slug: d.slug,
+      description: d.description,
+    }));
+
+    const availableSubjects = liveTaxonomy.subjects.map((s) => ({
+      id: s.id,
+      name: s.name,
+      slug: s.slug,
+      description: s.description,
+      domainId: s.domainId,
+    }));
+
+    const geminiAnalysis = await GeminiCurriculumService.analyzeDocument({
+      fileName: parsedDoc.fileName,
+      documentText: parsedDoc.extractedText,
+      availableDomains,
+      availableSubjects,
     });
 
-    // Stage 3: Chiếu xạ vào Master Knowledge Graph trên Supabase (Ontology Projection)
-    onProgress?.(3, "🌐 Chiếu xạ vào Master Knowledge Graph trên Supabase để xác định vị trí tiên quyết...");
-    await new Promise((r) => setTimeout(r, 700));
+    const finalDomainId = domainId && domainId !== "AUTO" ? domainId : geminiAnalysis.domainId;
+    const finalSubjectId = subjectId && subjectId !== "AUTO" ? subjectId : geminiAnalysis.subjectId;
 
-    const generatedFeynman = TaxonomyClassifier.generateContextualFeynmanContent(
-      file.name,
+    const metadata = TaxonomyClassifier.generateMetadataForSelection(
+      parsedDoc.fileName,
+      finalDomainId,
       finalSubjectId,
-      finalDomainId
+      parsedDoc.extractedText.slice(0, 500)
     );
+
+    const humanTitle = geminiAnalysis.suggestedTitle || metadata.suggestedTitle;
+    const slug = geminiAnalysis.canonicalSlug || metadata.canonicalSlug;
+    const refLink = metadata.refLink;
+
+    // =========================================================================
+    // Stage 3: Băm theo ranh giới ý niệm (Semantic Chunking & Contextual Prefix)
+    // =========================================================================
+    onProgress?.(3, "🧩 Bóc tách ngữ nghĩa theo ranh giới ý niệm & gắn tiền đề Anthropic Context...");
+
+    const chunkAnalysis = SemanticChunker.chunkDocument({
+      fileName: parsedDoc.fileName,
+      rawText: parsedDoc.extractedText,
+      subjectName: geminiAnalysis.subjectName,
+      domainName: geminiAnalysis.domainName,
+    });
+
+    // =========================================================================
+    // Stage 4: Chiếu xạ Đồ thị Tri thức Master trên Supabase (Ontology Projection)
+    // =========================================================================
+    onProgress?.(4, "🌐 Chiếu xạ vào Master Knowledge Graph trên Supabase để xác định vị trí tiên quyết...");
 
     const ontologyResult = await OntologyProjector.projectToMasterGraph({
       subjectId: finalSubjectId,
       documentTitle: humanTitle,
-      extractedConcepts: generatedFeynman.concepts,
-      rawTextSnippet: sampleText,
+      extractedConcepts: geminiAnalysis.requiredConcepts,
+      rawTextSnippet: parsedDoc.extractedText.slice(0, 1500),
     });
 
-    // Stage 4: Đóng gói Schema bài học & Lưu trữ Supabase
-    onProgress?.(4, "✨ Đóng gói Schema bài học chuẩn Feynman & Lưu trữ Supabase...");
-    await new Promise((r) => setTimeout(r, 500));
+    // Nếu Gemini cung cấp lý giải tiên quyết hợp lý cho môn này, ưu tiên ghi nhận
+    if (geminiAnalysis.prerequisiteReasoning && ontologyResult.prerequisiteTopics.length === 0) {
+      ontologyResult.prerequisiteTopics.push({
+        id: "prereq-foundational",
+        title: "Kiến thức nền tảng",
+        reason: geminiAnalysis.prerequisiteReasoning,
+      });
+    }
 
+    // =========================================================================
+    // Đóng gói Lesson Draft chuẩn
+    // =========================================================================
     const newDraft: ExtractedLessonDraft = {
       id: `draft-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      fileName: file.name,
-      fileType: file.type || "application/octet-stream",
-      fileSize: file.size,
-      rawTextSnippet: `Nội dung trích xuất từ tài liệu [${file.name}]: Đã phân tích ${Math.round(file.size / 1024)} KB tài liệu học thuật (${chunkAnalysis.pedagogicalRoleLabel}). Gồm ${chunkAnalysis.totalChunks} Hạt nhân tri thức (Atomic Knowledge Units).`,
+      fileName: parsedDoc.fileName,
+      fileType: parsedDoc.fileType,
+      fileSize: parsedDoc.fileSizeBytes,
+      rawTextSnippet: parsedDoc.extractedText.slice(0, 400),
       uploadedById: user.id,
       uploadedByName: user.displayName || user.email || "Thành viên Theodore",
       uploadedAt: new Date().toISOString(),
       title: humanTitle,
       slug,
       refLink,
-      confidenceScore: classification.confidenceScore,
-      summary: generatedFeynman.summary,
+      confidenceScore: geminiAnalysis.confidenceScore,
+      summary: geminiAnalysis.feynmanSummary,
       domainId: finalDomainId,
       subjectId: finalSubjectId,
-      difficultyLevel: ontologyResult.calculatedDifficulty || 3,
-      estimatedReadingMinutes: Math.max(10, Math.min(30, Math.round(file.size / 150000) || 15)),
-      requiredConcepts: generatedFeynman.concepts,
-      jargonTraps: generatedFeynman.jargons,
-      suggestedAnalogies: generatedFeynman.analogies,
-      keyTakeaways: generatedFeynman.keyTakeaways,
-      pedagogicalRole: chunkAnalysis.pedagogicalRole,
+      difficultyLevel: geminiAnalysis.difficultyLevel || ontologyResult.calculatedDifficulty || 2,
+      estimatedReadingMinutes: geminiAnalysis.estimatedReadingMinutes || 15,
+      requiredConcepts: geminiAnalysis.requiredConcepts,
+      jargonTraps: geminiAnalysis.jargonTraps,
+      suggestedAnalogies: geminiAnalysis.suggestedAnalogies,
+      keyTakeaways: geminiAnalysis.keyTakeaways,
+      pedagogicalRole: geminiAnalysis.pedagogicalRole || chunkAnalysis.pedagogicalRole,
       pedagogicalRoleLabel: chunkAnalysis.pedagogicalRoleLabel,
       semanticChunks: chunkAnalysis.chunks,
       ontologyAlignment: ontologyResult,
@@ -304,38 +235,63 @@ export const DocumentExtractionAgent = {
     // Lưu vào LocalStorage
     await this.saveDraftLocally(newDraft);
 
-    // Lưu vào Supabase academic_materials nếu có kết nối
+    // =========================================================================
+    // Lưu vào Supabase academic_materials
+    // =========================================================================
     try {
       const db = supabaseAdmin || supabase;
       const targetTopicId =
         ontologyResult.matchedMasterTopics?.[0]?.id || "top-toan-roi-rac-01";
+
       const { data: insertedMat, error: insertErr } = await db
         .from("academic_materials")
         .insert({
           topic_id: targetTopicId,
-          title: file.name,
+          title: parsedDoc.fileName,
           source_type:
-            file.name.endsWith(".pdf") || file.name.endsWith(".pdfa")
+            parsedDoc.fileName.endsWith(".pdf") || parsedDoc.fileName.endsWith(".pdfa")
               ? "PDF"
-              : file.name.endsWith(".pptx")
+              : parsedDoc.fileName.endsWith(".pptx")
               ? "SLIDE"
               : "TEXT_NOTE",
-          storage_file_path: `materials/${newDraft.id}/${file.name}`,
+          storage_file_path: `materials/${newDraft.id}/${parsedDoc.fileName}`,
           extracted_text: newDraft.summary,
         })
         .select()
         .single();
 
       if (insertErr) {
-        console.warn("Lưu academic_materials vào Supabase có cảnh báo:", insertErr.message);
+        SystemLogger.warn(
+          "SUPABASE_CLIENT",
+          "INSERT_ACADEMIC_MATERIAL",
+          `Cảnh báo lưu academic_materials: ${insertErr.message}`
+        );
       } else if (insertedMat) {
         newDraft.materialId = insertedMat.id;
-        // Cập nhật lại cache cục bộ có chứa materialId từ Supabase
         await this.saveDraftLocally(newDraft);
+        SystemLogger.info(
+          "SUPABASE_CLIENT",
+          "INSERT_ACADEMIC_MATERIAL",
+          `Đã lưu thành công academic_materials trên Supabase! ID: ${insertedMat.id}`
+        );
       }
-    } catch (e) {
-      console.warn("Không thể lưu material vào Supabase (dùng cache cục bộ):", e);
+    } catch (e: any) {
+      SystemLogger.error(
+        "SUPABASE_CLIENT",
+        "INSERT_ACADEMIC_MATERIAL",
+        `Lỗi khi lưu material vào Supabase: ${e.message}`,
+        e
+      );
     }
+
+    const duration = Date.now() - startTime;
+    SystemLogger.info(
+      "AGENT_EXTRACTION",
+      "PIPELINE_COMPLETE",
+      `Hoàn tất bóc tách & hệ thống hóa tài liệu [${fileName}] trong ${duration}ms (Draft ID: ${newDraft.id})`,
+      { draftId: newDraft.id, domainId: newDraft.domainId, subjectId: newDraft.subjectId },
+      duration
+    );
 
     return newDraft;
   },
@@ -358,13 +314,13 @@ export const DocumentExtractionAgent = {
     if (typeof window !== "undefined") {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
     }
+    SystemLogger.info("CURATOR_HUB", "UPDATE_DRAFT", `Curator cập nhật bản nháp [${draftId}]`);
     return updated;
   },
 
   /**
    * Phê duyệt bài học (Validate & Publish):
    * Đưa bài học chính thức lên Supabase (academic_topics) với status = 'VALIDATED'
-   * Nhờ đó bài học sẽ xuất hiện ngay lập tức trên Cây Tri Thức 360° và Kho Bài Học!
    */
   async validateAndPublishDraft(
     draftId: string,
@@ -378,19 +334,23 @@ export const DocumentExtractionAgent = {
         return { success: false, error: "Không tìm thấy bài học bản nháp cần duyệt" };
       }
 
-      const draft = { ...all[idx], ...(edits || {}) };
+      let draft = all[idx];
+      if (edits) {
+        draft = { ...draft, ...edits };
+      }
 
-      // Cập nhật trạng thái draft
+      const nowIso = new Date().toISOString();
       draft.status = "VALIDATED";
       draft.validatedBy = curatorUser.displayName || curatorUser.email;
-      draft.validatedAt = new Date().toISOString();
+      draft.validatedAt = nowIso;
+      draft.updatedAt = nowIso;
       all[idx] = draft;
+
       if (typeof window !== "undefined") {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
       }
 
-      // Đẩy vào bảng academic_topics trên Supabase
-      const topicId = `top-${draft.slug}-${Date.now().toString().slice(-4)}`;
+      const topicId = `top-${draft.slug}-${Date.now().toString(36).slice(-4)}`;
       const topicPayload = {
         id: topicId,
         subject_id: draft.subjectId,
@@ -404,14 +364,21 @@ export const DocumentExtractionAgent = {
         order_index: 99,
       };
 
-      const { data, error } = await supabase
+      const db = supabaseAdmin || supabase;
+      const { data, error } = await db
         .from("academic_topics")
         .upsert(topicPayload, { onConflict: "id" })
         .select()
         .single();
 
       if (error) {
-        console.warn("Lưu Supabase có lỗi, tiếp tục với dữ liệu local:", error.message);
+        SystemLogger.warn("SUPABASE_CLIENT", "PUBLISH_TOPIC", `Lưu academic_topics có cảnh báo: ${error.message}`);
+      } else {
+        SystemLogger.info(
+          "SUPABASE_CLIENT",
+          "PUBLISH_TOPIC",
+          `Đã xuất bản bài học mới vào academic_topics trên Supabase! ID: ${topicId}`
+        );
       }
 
       const publishedTopic: CatalogTopic = {
@@ -430,7 +397,7 @@ export const DocumentExtractionAgent = {
 
       return { success: true, topic: publishedTopic };
     } catch (err: any) {
-      console.error("Lỗi khi validate bài học:", err);
+      SystemLogger.error("CURATOR_HUB", "PUBLISH_TOPIC", `Lỗi khi validate bài học: ${err.message}`, err);
       return { success: false, error: err.message || "Lỗi không xác định khi xuất bản" };
     }
   },
@@ -438,11 +405,7 @@ export const DocumentExtractionAgent = {
   /**
    * Từ chối bài học bản nháp
    */
-  async rejectDraft(
-    draftId: string,
-    reason: string,
-    curatorUser: UserProfile
-  ): Promise<boolean> {
+  async rejectDraft(draftId: string, reason: string, curatorUser: UserProfile): Promise<boolean> {
     const all = await this.getAllDrafts();
     const idx = all.findIndex((d) => d.id === draftId);
     if (idx === -1) return false;
@@ -455,6 +418,7 @@ export const DocumentExtractionAgent = {
     if (typeof window !== "undefined") {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
     }
+    SystemLogger.info("CURATOR_HUB", "REJECT_DRAFT", `Curator từ chối bản nháp [${draftId}]: ${reason}`);
     return true;
   },
 
@@ -467,12 +431,10 @@ export const DocumentExtractionAgent = {
     if (typeof window !== "undefined") {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
     }
+    SystemLogger.info("CURATOR_HUB", "DELETE_DRAFT", `Đã xóa bản nháp [${draftId}]`);
     return true;
   },
 
-  // -------------------------------------------------------------
-  // Helpers
-  // -------------------------------------------------------------
   async saveDraftLocally(draft: ExtractedLessonDraft) {
     const all = await this.getAllDrafts();
     const existingIdx = all.findIndex((d) => d.id === draft.id);
@@ -485,43 +447,4 @@ export const DocumentExtractionAgent = {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
     }
   },
-
-  generateSlug(text: string): string {
-    return text
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[đĐ]/g, "d")
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-")
-      .trim();
-  },
-
-  /**
-   * Trích xuất Khái niệm cốt lõi phù hợp với tài liệu và bối cảnh môn học trong kho dữ liệu
-   */
-  inferRequiredConcepts(title: string, subjectId: string): string[] {
-    const lookup = TaxonomyClassifier.findSubjectAndDomain(subjectId);
-    const content = TaxonomyClassifier.generateContextualFeynmanContent(
-      title,
-      subjectId,
-      lookup?.domain.id || ""
-    );
-    return content.concepts;
-  },
-
-  /**
-   * Trích xuất Bẫy thuật ngữ phù hợp với tài liệu và bối cảnh môn học trong kho dữ liệu
-   */
-  inferJargonTraps(title: string, subjectId: string): string[] {
-    const lookup = TaxonomyClassifier.findSubjectAndDomain(subjectId);
-    const content = TaxonomyClassifier.generateContextualFeynmanContent(
-      title,
-      subjectId,
-      lookup?.domain.id || ""
-    );
-    return content.jargons;
-  },
 };
-

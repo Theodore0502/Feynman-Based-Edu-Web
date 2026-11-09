@@ -103,25 +103,33 @@ export const OntologyProjector = {
     const prerequisiteTopics: Array<{ id: string; title: string; reason: string }> = [];
     let calculatedDifficulty = 2;
 
-    if (topMatches.length > 0) {
+    if (topMatches.length > 0 && topMatches[0].matchScore >= 20) {
       const primaryMatch = topMatches[0];
       calculatedDifficulty = primaryMatch.difficultyLevel;
 
-      // Tìm các bài học đứng trước trong Master Graph của môn này
-      const priorTopics = masterTopics
-        .filter((t) => (t.orderIndex || 1) < primaryMatch.orderIndex)
-        .slice(-2); // Lấy 1-2 bài liền kề trước đó
+      if ((primaryMatch.orderIndex || 1) > 1) {
+        // Tìm các bài học đứng trước trong Master Graph của môn này
+        const priorTopics = masterTopics
+          .filter((t) => (t.orderIndex || 1) < primaryMatch.orderIndex)
+          .slice(-2); // Lấy 1-2 bài liền kề trước đó
 
-      for (const pt of priorTopics) {
+        for (const pt of priorTopics) {
+          prerequisiteTopics.push({
+            id: pt.id,
+            title: pt.title,
+            reason: `Nền tảng tiên quyết về [${pt.title}] trước khi tiếp thu [${primaryMatch.title}].`,
+          });
+        }
+      } else {
         prerequisiteTopics.push({
-          id: pt.id,
-          title: pt.title,
-          reason: `Nền tảng tiên quyết về [${pt.title}] trước khi tiếp thu [${primaryMatch.title}].`,
+          id: "prereq-foundation",
+          title: "Không yêu cầu tiên quyết",
+          reason: `Đây là bài giảng khởi đầu nền tảng số 1 của môn [${subjectName}].`,
         });
       }
     } else {
-      // Trường hợp tài liệu mới hoàn toàn chưa có trong Master Graph
-      calculatedDifficulty = Math.min(5, Math.max(2, Math.round(extractedConcepts.length / 2)));
+      // Trường hợp tài liệu mới hoàn toàn chưa có trong Master Graph hoặc match score thấp
+      calculatedDifficulty = Math.min(5, Math.max(1, Math.round(extractedConcepts.length / 2) || 2));
     }
 
     // 4. Xác định các bài học được củng cố (Reinforced Topics)
