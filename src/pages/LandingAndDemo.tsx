@@ -21,7 +21,7 @@ export const LandingAndDemo: React.FC = () => {
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#7286D3] via-[#8EA7E9] to-[#FFB4B4] p-1 flex items-center justify-center shadow-xs">
             <EliseCatMascot className="w-full h-full" />
           </div>
-          <span className="font-black text-xl tracking-tight text-slate-800">Elise</span>
+          <span className="font-black text-xl tracking-tight text-slate-800">Elis</span>
         </div>
 
         <div className="flex items-center gap-4">
@@ -29,7 +29,7 @@ export const LandingAndDemo: React.FC = () => {
             to="/about"
             className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
           >
-            Về Elise
+            Về Elis
           </Link>
           <Link
             to="/auth"

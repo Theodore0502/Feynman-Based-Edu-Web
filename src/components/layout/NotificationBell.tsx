@@ -252,7 +252,7 @@ export const NotificationBell: React.FC = () => {
             {/* 4. Footer */}
             <div className="p-2.5 border-t border-slate-100 bg-[#F8FAFD] text-center">
               <span className="text-[10px] text-slate-400 font-medium">
-                Hệ thống thông báo thời gian thực • Elise
+                Hệ thống thông báo thời gian thực • Elis
               </span>
             </div>
           </div>

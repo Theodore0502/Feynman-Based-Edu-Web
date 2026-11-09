@@ -29,6 +29,7 @@ export const EliseCatMascot: React.FC<EliseCatMascotProps> = ({
 };
 
 // Re-export với các tên alias tiện dụng
+export const ElisCatMascot = EliseCatMascot;
 export const TheodoreOwlLogo = EliseCatMascot;
 export const AppBrandLogo = EliseCatMascot;
 export default EliseCatMascot;

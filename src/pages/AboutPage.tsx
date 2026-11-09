@@ -38,7 +38,7 @@ export const AboutPage: React.FC = () => {
 
         <div className="relative z-10 space-y-4 max-w-3xl p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-800 tracking-tight leading-tight">
-            Elise
+            Elis
           </h1>
 
           <p className="text-base sm:text-lg text-slate-600 font-medium leading-relaxed">
@@ -70,7 +70,7 @@ export const AboutPage: React.FC = () => {
           </div>
           <div>
             <h2 className="text-xl font-black text-slate-800">
-              Nguồn Gốc & Ý Nghĩa Tên Gọi "Elise" (Từ Thuật Ngữ ELI5)
+              Nguồn Gốc & Ý Nghĩa Tên Gọi "Elis" (Từ Thuật Ngữ ELI5)
             </h2>
             <p className="text-xs text-slate-500">
               Tên gọi lấy cảm hứng từ thuật ngữ kinh điển trên Internet "ELI5" (Explain Like I'm 5)
@@ -80,7 +80,7 @@ export const AboutPage: React.FC = () => {
 
         <div className="space-y-4 text-xs sm:text-sm text-slate-600 leading-relaxed">
           <p>
-            Tên gọi <strong className="text-slate-800">Elise</strong> được lấy cảm hứng trực tiếp từ thuật ngữ kinh điển trên Internet:{" "}
+            Tên gọi <strong className="text-slate-800">Elis</strong> được lấy cảm hứng trực tiếp từ thuật ngữ kinh điển trên Internet:{" "}
             <span className="text-[#5066A1] font-extrabold bg-[#EEF2FC] px-2 py-0.5 rounded-md">
               "ELI5" (Explain Like I'm 5)
             </span>{" "}
@@ -92,7 +92,7 @@ export const AboutPage: React.FC = () => {
           </p>
 
           <p>
-            Tại <strong>Elise</strong>, chúng tôi tạo ra không gian mô phỏng chân thực: Bạn sẽ đóng vai người đi dạy và giảng giải bài học cho một cậu bé 10 tuổi tò mò – <strong>Bé Bắp</strong>. Bé Bắp không hề biết các thuật ngữ kỹ thuật, chỉ biết que kem, viên bi, hộp bánh và bộ xếp hình Lego. Khi bạn có thể ví von cơ chế phức tạp thành câu chuyện đời sống mà Bé Bắp gật đầu thấu hiểu, bạn đã đạt đến đẳng cấp cao nhất của sự tinh thông!
+            Tại <strong>Elis</strong>, chúng tôi tạo ra không gian mô phỏng chân thực: Bạn sẽ đóng vai người đi dạy và giảng giải bài học cho một cậu bé 10 tuổi tò mò – <strong>Bé Bắp</strong>. Bé Bắp không hề biết các thuật ngữ kỹ thuật, chỉ biết que kem, viên bi, hộp bánh và bộ xếp hình Lego. Khi bạn có thể ví von cơ chế phức tạp thành câu chuyện đời sống mà Bé Bắp gật đầu thấu hiểu, bạn đã đạt đến đẳng cấp cao nhất của sự tinh thông!
           </p>
         </div>
 
@@ -266,7 +266,7 @@ export const AboutPage: React.FC = () => {
       <div className="p-8 rounded-3xl bg-gradient-to-tr from-[#7286D3] via-[#8EA7E9] to-[#B5B2E8] text-white flex flex-col sm:flex-row sm:items-center justify-between gap-6 shadow-card">
         <div className="space-y-1 max-w-lg">
           <h3 className="text-xl sm:text-2xl font-black">
-            Bạn Đã Sẵn Sàng Thử Thách Cùng Elise?
+            Bạn Đã Sẵn Sàng Thử Thách Cùng Elis?
           </h3>
           <p className="text-xs sm:text-sm text-white/90">
             Chọn ngay một bài giảng trong kho tri thức và bắt đầu giảng giải cho Bé Bắp 10 tuổi!

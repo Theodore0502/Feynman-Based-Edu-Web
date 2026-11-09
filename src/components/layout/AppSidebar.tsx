@@ -95,7 +95,7 @@ export const AppSidebar: React.FC = () => {
             )}
             style={{ fontFamily: "'Nahla Script', cursive, sans-serif" }}
           >
-            Elise
+            Elis
           </span>
         </Link>
 

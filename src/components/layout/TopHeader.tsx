@@ -1,7 +1,7 @@
 /**
  * File: src/components/layout/TopHeader.tsx
  * Mục đích: Thanh tiêu đề trên cùng (Floating Breadcrumb Topbar) thiết kế theo phong cách hiện đại 1 dòng:
- *   - Logo linh vật Mèo Elise (EliseCatMascot) + Tên thương hiệu "Elise".
+ *   - Logo linh vật Mèo Elis (EliseCatMascot) + Tên thương hiệu "Elis".
  *   - Chuỗi Breadcrumb phân cấp theo ngữ cảnh trang hiện tại kèm Badge phiên bản/chuỗi ngày.
  *   - Bộ tiện ích nhanh: Thử thách 60 giây, Chuông thông báo, Avatar người dùng thu gọn & Đổi vai.
  */

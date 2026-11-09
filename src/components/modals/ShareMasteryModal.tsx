@@ -55,7 +55,7 @@ export const ShareMasteryModal: React.FC = () => {
           <p className="text-xs text-white/90">Tôi vừa vượt qua bài kiểm tra bình dân hóa Feynman với điểm số:</p>
           <div className="text-4xl font-black">{score}%</div>
           <span className="inline-block text-[10px] font-bold px-3 py-1 bg-white/20 backdrop-blur-md rounded-full">
-            Feynman Technique Stage • Elise
+            Feynman Technique Stage • Elis
           </span>
         </div>
 

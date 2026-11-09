@@ -8,7 +8,7 @@ import { create } from "zustand";
 import { AIPromptConfig, AIModelParameters } from "@/types/ai-config.types";
 import defaultPromptsBackup from "@/data/prompts-backup.json";
 
-const STORAGE_KEY = "elise_ai_system_prompts";
+const STORAGE_KEY = "elis_ai_system_prompts";
 
 interface AISettingsState {
   prompts: AIPromptConfig[];
@@ -35,7 +35,7 @@ const loadInitialPrompts = (): AIPromptConfig[] => {
     return defaultPromptsBackup as AIPromptConfig[];
   }
   try {
-    const cached = localStorage.getItem(STORAGE_KEY);
+    const cached = localStorage.getItem(STORAGE_KEY) || localStorage.getItem("elise_ai_system_prompts");
     if (cached) {
       const parsed = JSON.parse(cached);
       if (Array.isArray(parsed) && parsed.length > 0) {

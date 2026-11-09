@@ -124,7 +124,7 @@ export const PublicMasteryShareView: React.FC = () => {
             </div>
             <div className="flex items-center gap-1.5">
               <GraduationCap className="w-3.5 h-3.5 text-slate-500" />
-              <span>Feynman Technique Stage • Elise Academic Engine</span>
+              <span>Feynman Technique Stage • Elis Academic Engine</span>
             </div>
           </div>
         </div>

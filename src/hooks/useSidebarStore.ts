@@ -15,12 +15,15 @@ interface SidebarState {
   setCollapsed: (collapsed: boolean) => void;
 }
 
-const STORAGE_KEY = "elise_sidebar_collapsed";
+const STORAGE_KEY = "elis_sidebar_collapsed";
 
 export const useSidebarStore = create<SidebarState>((set) => ({
   isCollapsed: (() => {
     try {
-      return localStorage.getItem(STORAGE_KEY) === "true";
+      return (
+        localStorage.getItem(STORAGE_KEY) === "true" ||
+        localStorage.getItem("elise_sidebar_collapsed") === "true"
+      );
     } catch {
       return false;
     }

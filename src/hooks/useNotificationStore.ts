@@ -178,7 +178,7 @@ export const useNotificationStore = create<NotificationStore>()(
       },
     }),
     {
-      name: "elise_notifications",
+      name: "elis_notifications",
     }
   )
 );
