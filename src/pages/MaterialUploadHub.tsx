@@ -193,6 +193,14 @@ export const MaterialUploadHub: React.FC = () => {
     <div className="w-full space-y-6 pb-12">
       {/* Top Banner Header Đồng Bộ Chuẩn Dashboard */}
       <PageHeroBanner
+        mascotSrc="/images/theodore-upload-owl.png"
+        mascotAlt="Linh vật Tải tài liệu Theodore"
+        badge={
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-bold border border-purple-200/60 shadow-2xs">
+            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+            <span>AI Curriculum Digestion Agent</span>
+          </div>
+        }
         title={
           <>
             Tải Lên Tài Liệu &amp; Tự Động Hóa{" "}
