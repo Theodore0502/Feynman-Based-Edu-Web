@@ -1,15 +1,18 @@
 /**
  * File: src/pages/AuthAndOnboarding.tsx
- * Mục đích: Cổng Đăng Nhập & Đăng Ký Elise Feynman Stage:
- *   - Bố cục màn hình chuẩn 1:1 với hiệu ứng Motion Sliding đồng thời:
- *     + Ở trạng thái Đăng Nhập: Nửa trái là Giàn Hoa 1 (efrt57), Nửa phải là Bàn Đăng Nhập.
- *     + Khi chuyển sang Đăng Ký: Giàn hoa 1 trượt sang trái biến mất, Bàn Đăng Nhập trượt sang nửa trái biến thành Đăng Ký, Giàn hoa 2 (k753ta) từ rìa phải trượt vào chiếm trọn nửa phải.
- *     + Đổi ngược lại thì chuyển động đảo chiều đồng thời mượt mà 100%.
- *   - Câu danh ngôn Feynman đứng yên ở đáy màn hình làm điểm tựa thị giác (Visual Anchor).
- *   - Zero Scrollbar: Toàn bộ nội dung hiển thị trọn vẹn trong khung nhìn 100vh.
+ * Mục đích: Cổng Đăng Nhập, Đăng Ký, Xác Nhận Email (OTP/Link) & Quên Mật Khẩu qua Supabase Auth.
+ * Đặc điểm:
+ *   - Bố cục chuẩn 1:1 Motion Sliding đồng thời:
+ *     + LOGIN & CONFIRM_EMAIL: Giàn hoa 1 bên trái, Bàn thao tác bên phải.
+ *     + REGISTER & FORGOT_PASSWORD: Bàn thao tác bên trái, Giàn hoa 2 bên phải.
+ *   - Đăng ký tài khoản gửi Email Xác Nhận kèm mã OTP 6 số.
+ *   - Hỗ trợ nhập mã OTP kích hoạt trực tiếp hoặc bấm vào link trong email.
+ *   - Quên mật khẩu gửi mã OTP khôi phục để đặt lại mật khẩu mới an toàn.
+ *   - Giữ nguyên các tài khoản kiểm thử nhanh (learn123, curator123, admin123).
+ *   - Zero Scrollbar: Thiết kế tối ưu hiển thị vừa vặn trong 100vh.
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuthStore } from "@/hooks/useAuthStore";
 import { EliseCatMascot } from "@/components/shared/EliseCatMascot";
@@ -24,19 +27,38 @@ import {
   Mail,
   AlertCircle,
   Sparkles,
+  KeyRound,
+  CheckCircle2,
+  RefreshCw,
+  Send,
+  ArrowLeft,
+  Clock,
 } from "lucide-react";
 import { UserRole } from "@/types/auth.types";
+import { supabase } from "@/lib/supabase";
 
 export const AuthAndOnboarding: React.FC = () => {
   const navigate = useNavigate();
-  const { login, register, loginError } = useAuthStore();
+  const {
+    login,
+    signUp,
+    verifySignupOtp,
+    resendSignupEmail,
+    sendPasswordResetOtp,
+    verifyPasswordResetOtp,
+    updatePassword,
+    loginError,
+    clearError,
+  } = useAuthStore();
 
-  const [activeTab, setActiveTab] = useState<"LOGIN" | "REGISTER">("LOGIN");
+  type TabMode = "LOGIN" | "REGISTER" | "CONFIRM_EMAIL" | "FORGOT_PASSWORD";
+  const [activeTab, setActiveTab] = useState<TabMode>("LOGIN");
 
   // Form states - Login
   const [username, setUsername] = useState("learn123");
   const [password, setPassword] = useState("123123");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form states - Register
   const [regFullName, setRegFullName] = useState("");
@@ -45,58 +67,246 @@ export const AuthAndOnboarding: React.FC = () => {
   const [regPassword, setRegPassword] = useState("");
   const [regRole, setRegRole] = useState<UserRole>("learner");
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLocalError(null);
-    const success = login(username, password);
-    if (success) {
-      toast.success("Đăng nhập thành công!", {
-        description: `Chào mừng bạn trở lại, ${username}!`,
-      });
-      if (username.trim().toLowerCase() === "admin123") {
-        navigate("/admin/rubrics");
-      } else if (username.trim().toLowerCase() === "curator123") {
-        navigate("/curator/validation");
-      } else {
+  // Form states - Confirm Email OTP
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const [signupOtp, setSignupOtp] = useState("");
+  const [resendCountdown, setResendCountdown] = useState(0);
+
+  // Form states - Forgot Password
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotStep, setForgotStep] = useState<1 | 2>(1); // 1: Nhập email gửi OTP, 2: Nhập OTP & mật khẩu mới
+  const [resetOtp, setResetOtp] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+
+  // Countdown timer cho nút Gửi lại mã
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (resendCountdown > 0) {
+      timer = setInterval(() => {
+        setResendCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [resendCountdown]);
+
+  // Lắng nghe sự kiện Auth từ Supabase (khi người dùng nhấp vào link trong email)
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setActiveTab("FORGOT_PASSWORD");
+        setForgotStep(2);
+        toast.info("Vui lòng nhập mật khẩu mới để hoàn tất khôi phục.");
+      } else if (event === "SIGNED_IN" && session) {
+        toast.success("Tài khoản đã được xác thực thành công!");
         navigate("/dashboard");
       }
-    } else {
-      setLocalError(loginError || "Thông tin đăng nhập không hợp lệ.");
+    });
+
+    // Bắt query parameters nếu redirect về từ email
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("confirmed") === "true") {
+      toast.success("Email đã được xác nhận thành công! Bạn có thể đăng nhập ngay.");
+      setActiveTab("LOGIN");
+    }
+    if (params.get("mode") === "recovery") {
+      setActiveTab("FORGOT_PASSWORD");
+      setForgotStep(2);
+    }
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
+
+  // =========================================================================
+  // HANDLERS
+  // =========================================================================
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalError(null);
+    clearError();
+    setIsSubmitting(true);
+
+    try {
+      const res = await login(username, password);
+      if (res.success) {
+        toast.success("Đăng nhập thành công!", {
+          description: `Chào mừng bạn trở lại, ${username}!`,
+        });
+        const cleanUser = username.trim().toLowerCase();
+        if (cleanUser === "admin123") {
+          navigate("/admin/rubrics");
+        } else if (cleanUser === "curator123") {
+          navigate("/curator/validation");
+        } else {
+          navigate("/dashboard");
+        }
+      } else if (res.needConfirmation) {
+        setConfirmEmail(res.email || username);
+        setActiveTab("CONFIRM_EMAIL");
+        toast.info("Email chưa được kích hoạt. Vui lòng nhập mã OTP hoặc kiểm tra hòm thư.");
+      } else {
+        setLocalError(res.error || "Thông tin đăng nhập không hợp lệ.");
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
+    clearError();
 
-    if (!regUsername.trim() || !regPassword.trim()) {
-      setLocalError("Vui lòng điền tên tài khoản và mật khẩu.");
+    if (!regEmail.trim() || !regPassword.trim()) {
+      setLocalError("Vui lòng điền địa chỉ email và mật khẩu.");
       return;
     }
 
-    const success = register({
-      username: regUsername.trim(),
-      email: regEmail.trim() || `${regUsername.trim()}@elise.edu`,
-      fullName: regFullName.trim() || regUsername.trim(),
-      role: regRole,
-      password: regPassword,
-    });
+    if (regPassword.length < 6) {
+      setLocalError("Mật khẩu phải có độ dài tối thiểu 6 ký tự.");
+      return;
+    }
 
-    if (success) {
-      toast.success("Đăng ký tài khoản thành công!", {
-        description: `Chào mừng bạn gia nhập Elise với vai trò ${
-          regRole === "admin" ? "Quản trị viên" : "Học viên"
-        }.`,
+    setIsSubmitting(true);
+    try {
+      const res = await signUp({
+        username: regUsername.trim() || regEmail.split("@")[0],
+        email: regEmail.trim(),
+        fullName: regFullName.trim() || regUsername.trim() || regEmail.split("@")[0],
+        role: regRole,
+        password: regPassword,
       });
-      if (regRole === "admin") {
-        navigate("/admin/rubrics");
-      } else if (regRole === "curator") {
-        navigate("/curator/validation");
+
+      if (res.success) {
+        if (res.needConfirmation) {
+          setConfirmEmail(regEmail.trim());
+          setResendCountdown(60);
+          setActiveTab("CONFIRM_EMAIL");
+          toast.success("Đăng ký thành công!", {
+            description: `Mã OTP và liên kết kích hoạt đã được gửi về email ${regEmail.trim()}.`,
+          });
+        } else {
+          toast.success("Đăng ký tài khoản thành công!");
+          navigate("/dashboard");
+        }
       } else {
-        navigate("/dashboard");
+        setLocalError(res.error || "Không thể tạo tài khoản.");
       }
-    } else {
-      setLocalError(loginError || "Không thể tạo tài khoản.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleVerifySignupOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalError(null);
+    clearError();
+
+    if (!signupOtp.trim() || signupOtp.trim().length < 6) {
+      setLocalError("Vui lòng nhập đúng mã OTP 6 số từ email.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await verifySignupOtp(confirmEmail, signupOtp.trim());
+      if (res.success) {
+        toast.success("Xác thực email thành công! Chào mừng bạn gia nhập Theodore.");
+        navigate("/dashboard");
+      } else {
+        setLocalError(res.error || "Mã OTP không chính xác hoặc đã hết hạn.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResendSignupOtp = async () => {
+    if (resendCountdown > 0 || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const res = await resendSignupEmail(confirmEmail);
+      if (res.success) {
+        setResendCountdown(60);
+        toast.success("Đã gửi lại mã xác nhận và liên kết về email!");
+      } else {
+        toast.error("Không thể gửi lại email: " + (res.error || "Vui lòng thử lại sau."));
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSendForgotOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalError(null);
+    clearError();
+
+    if (!forgotEmail.trim()) {
+      setLocalError("Vui lòng nhập địa chỉ email của bạn.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await sendPasswordResetOtp(forgotEmail.trim());
+      if (res.success) {
+        setForgotStep(2);
+        toast.success("Đã gửi mã OTP đặt lại mật khẩu về email của bạn!");
+      } else {
+        setLocalError(res.error || "Không thể gửi mã khôi phục. Vui lòng kiểm tra lại email.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResetPasswordWithOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalError(null);
+    clearError();
+
+    if (!resetOtp.trim()) {
+      setLocalError("Vui lòng nhập mã OTP 6 số nhận được qua email.");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setLocalError("Mật khẩu mới phải có tối thiểu 6 ký tự.");
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setLocalError("Xác nhận mật khẩu mới không khớp.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const verifyRes = await verifyPasswordResetOtp(forgotEmail.trim(), resetOtp.trim());
+      if (!verifyRes.success) {
+        setLocalError(verifyRes.error || "Mã OTP không chính xác hoặc đã hết hạn.");
+        return;
+      }
+
+      const updateRes = await updatePassword(newPassword);
+      if (updateRes.success) {
+        toast.success("Đặt lại mật khẩu thành công! Bạn có thể đăng nhập bằng mật khẩu mới.");
+        setUsername(forgotEmail);
+        setPassword(newPassword);
+        setActiveTab("LOGIN");
+        setForgotStep(1);
+        setResetOtp("");
+        setNewPassword("");
+        setConfirmNewPassword("");
+      } else {
+        setLocalError(updateRes.error || "Không thể cập nhật mật khẩu mới.");
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -104,6 +314,7 @@ export const AuthAndOnboarding: React.FC = () => {
     setUsername(userKey);
     setPassword("123123");
     setLocalError(null);
+    clearError();
     toast.info(`Đã điền tài khoản mẫu: ${userKey}`);
   };
 
@@ -113,12 +324,11 @@ export const AuthAndOnboarding: React.FC = () => {
       <FallingLeavesEffect count={26} className="z-0" />
 
       {/* =========================================================================
-          KHỐI 1: GIÀN HOA TRÁI (Image 1 - efrt57efrt57efrt)
-          - z-10: Nằm đè lên trên lớp lá rơi (lá không chèn lên hình hoa)
+          KHỐI 1: GIÀN HOA TRÁI (Image 1)
           ========================================================================= */}
       <div
         className={`w-full lg:w-1/2 h-44 sm:h-56 lg:h-full absolute inset-y-0 left-0 overflow-hidden bg-slate-900 transition-transform duration-1000 ease-in-out z-10 ${
-          activeTab === "LOGIN"
+          activeTab === "LOGIN" || activeTab === "CONFIRM_EMAIL"
             ? "translate-x-0 pointer-events-auto"
             : "-translate-x-full pointer-events-none"
         }`}
@@ -131,12 +341,11 @@ export const AuthAndOnboarding: React.FC = () => {
       </div>
 
       {/* =========================================================================
-          KHỐI 2: GIÀN HOA PHẢI (Image 2 - k753tak753tak753)
-          - z-10: Nằm đè lên trên lớp lá rơi (lá không chèn lên hình hoa)
+          KHỐI 2: GIÀN HOA PHẢI (Image 2)
           ========================================================================= */}
       <div
         className={`w-full lg:w-1/2 h-44 sm:h-56 lg:h-full absolute inset-y-0 right-0 overflow-hidden bg-slate-900 transition-transform duration-1000 ease-in-out z-10 ${
-          activeTab === "REGISTER"
+          activeTab === "REGISTER" || activeTab === "FORGOT_PASSWORD"
             ? "translate-x-0 pointer-events-auto"
             : "translate-x-full pointer-events-none"
         }`}
@@ -149,74 +358,84 @@ export const AuthAndOnboarding: React.FC = () => {
       </div>
 
       {/* =========================================================================
-          KHỐI 3: BÀN LÀM VIỆC ĐĂNG NHẬP / ĐĂNG KÝ (AUTH CARD DESK)
-          - z-20: Nằm trên cùng, tuyệt đối không bị lá rơi bay đè lên form hay nút bấm
+          KHỐI 3: BÀN LÀM VIỆC ĐĂNG NHẬP / ĐĂNG KÝ / OTP (AUTH CARD DESK)
           ========================================================================= */}
       <div
         className={`w-full lg:w-[450px] h-full absolute inset-y-0 left-1/2 flex items-center justify-center p-3 sm:p-5 z-20 transition-transform duration-1000 ease-in-out ${
-          activeTab === "LOGIN"
+          activeTab === "LOGIN" || activeTab === "CONFIRM_EMAIL"
             ? "translate-x-[-50%] lg:translate-x-[calc(-50%+19vw)]"
             : "translate-x-[-50%] lg:translate-x-[calc(-50%-19vw)]"
         }`}
       >
-        <div className="bg-white w-full max-w-[420px] rounded-3xl p-5 sm:p-6 border border-[#E2EAFD] shadow-card space-y-3.5 my-auto transition-all duration-500">
+        <div className="bg-white w-full max-w-[430px] rounded-3xl p-5 sm:p-6 border border-[#E2EAFD] shadow-card space-y-3 my-auto transition-all duration-500">
           {/* Logo & Headline */}
           <div className="text-center space-y-1">
             <div className="w-12 h-12 mx-auto flex items-center justify-center p-0.5 rounded-2xl bg-gradient-to-tr from-[#8EA7E9]/30 to-[#FFB4B4]/30 border border-purple-200 shadow-xs">
               <EliseCatMascot size={42} />
             </div>
             <h2 className="text-lg sm:text-xl font-black text-slate-800 tracking-tight transition-all duration-200">
-              {activeTab === "LOGIN" ? "Đăng Nhập Elise" : "Đăng Ký Tài Khoản"}
+              {activeTab === "LOGIN" && "Đăng Nhập Theodore"}
+              {activeTab === "REGISTER" && "Đăng Ký Tài Khoản"}
+              {activeTab === "CONFIRM_EMAIL" && "Xác Nhận Email Kích Hoạt"}
+              {activeTab === "FORGOT_PASSWORD" && "Đặt Lại Mật Khẩu"}
             </h2>
             <p className="text-[11px] text-slate-500">
-              Học sâu phương pháp Feynman qua phản biện AI cùng các Persona
+              {activeTab === "CONFIRM_EMAIL"
+                ? "Kiểm tra hòm thư để nhận mã OTP kích hoạt tài khoản"
+                : activeTab === "FORGOT_PASSWORD"
+                ? "Khôi phục mật khẩu bảo mật qua mã OTP gửi về email"
+                : "Học sâu phương pháp Feynman qua phản biện AI cùng các Persona"}
             </p>
           </div>
 
-          {/* Toggle Tabs: [Đăng Nhập] | [Đăng Ký] */}
-          <div className="grid grid-cols-2 p-1 rounded-2xl bg-slate-100 border border-slate-200/80 text-xs font-bold">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("LOGIN");
-                setLocalError(null);
-              }}
-              className={`py-1.5 rounded-xl transition-all cursor-pointer ${
-                activeTab === "LOGIN"
-                  ? "bg-white text-purple-700 shadow-xs"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              Đăng Nhập
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("REGISTER");
-                setLocalError(null);
-              }}
-              className={`py-1.5 rounded-xl transition-all cursor-pointer ${
-                activeTab === "REGISTER"
-                  ? "bg-white text-purple-700 shadow-xs"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              Đăng Ký
-            </button>
-          </div>
+          {/* Toggle Tabs: [Đăng Nhập] | [Đăng Ký] (Ẩn khi đang ở Confirm Email hoặc Forgot Password) */}
+          {(activeTab === "LOGIN" || activeTab === "REGISTER") && (
+            <div className="grid grid-cols-2 p-1 rounded-2xl bg-slate-100 border border-slate-200/80 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("LOGIN");
+                  setLocalError(null);
+                  clearError();
+                }}
+                className={`py-1.5 rounded-xl transition-all cursor-pointer ${
+                  activeTab === "LOGIN"
+                    ? "bg-white text-purple-700 shadow-xs"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                Đăng Nhập
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("REGISTER");
+                  setLocalError(null);
+                  clearError();
+                }}
+                className={`py-1.5 rounded-xl transition-all cursor-pointer ${
+                  activeTab === "REGISTER"
+                    ? "bg-white text-purple-700 shadow-xs"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                Đăng Ký
+              </button>
+            </div>
+          )}
 
           {/* Error notification if any */}
           {(localError || loginError) && (
-            <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-[11px] flex items-center gap-2">
+            <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-[11px] flex items-center gap-2 animate-fade-in">
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
               <span>{localError || loginError}</span>
             </div>
           )}
 
           {/* =====================================================================
-              TAB 1: FORM ĐĂNG NHẬP (LOGIN)
+              VIEW 1: FORM ĐĂNG NHẬP (LOGIN)
               ===================================================================== */}
-          {activeTab === "LOGIN" ? (
+          {activeTab === "LOGIN" && (
             <div className="space-y-3 animate-fade-in">
               {/* Quick Fill Pills for Demo */}
               <div className="space-y-1.5">
@@ -287,16 +506,31 @@ export const AuthAndOnboarding: React.FC = () => {
                       required
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      placeholder="learn123 hoặc admin123"
+                      placeholder="learn123 hoặc email@domain.com"
                       className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#F8FAFD] border border-[#E2EAFD] text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-400"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Mật khẩu
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-slate-700">
+                      Mật khẩu
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForgotEmail(username.includes("@") ? username : "");
+                        setForgotStep(1);
+                        setLocalError(null);
+                        clearError();
+                        setActiveTab("FORGOT_PASSWORD");
+                      }}
+                      className="text-[10px] font-bold text-purple-600 hover:text-purple-800 transition-colors cursor-pointer"
+                    >
+                      Quên mật khẩu?
+                    </button>
+                  </div>
                   <div className="relative">
                     <Lock className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
                     <input
@@ -304,7 +538,7 @@ export const AuthAndOnboarding: React.FC = () => {
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="123123"
+                      placeholder="123123 hoặc mật khẩu tài khoản"
                       className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#F8FAFD] border border-[#E2EAFD] text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-400"
                     />
                   </div>
@@ -312,17 +546,29 @@ export const AuthAndOnboarding: React.FC = () => {
 
                 <button
                   type="submit"
-                  className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer mt-1"
+                  disabled={isSubmitting}
+                  className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer mt-1 disabled:opacity-60"
                 >
-                  <span>Đăng Nhập Vào Hệ Thống</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  {isSubmitting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Đang Xác Thực...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Đăng Nhập Vào Hệ Thống</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </>
+                  )}
                 </button>
               </form>
             </div>
-          ) : (
-            /* =====================================================================
-                TAB 2: FORM ĐĂNG KÝ (REGISTER) - Gọn Gàng Không Cuộn Trang
-                ===================================================================== */
+          )}
+
+          {/* =====================================================================
+              VIEW 2: FORM ĐĂNG KÝ (REGISTER)
+              ===================================================================== */}
+          {activeTab === "REGISTER" && (
             <form onSubmit={handleRegisterSubmit} className="space-y-2.5 animate-fade-in">
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -345,7 +591,6 @@ export const AuthAndOnboarding: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    required
                     value={regUsername}
                     onChange={(e) => setRegUsername(e.target.value)}
                     placeholder="learner_feynman"
@@ -356,15 +601,16 @@ export const AuthAndOnboarding: React.FC = () => {
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Địa chỉ Email
+                  Địa chỉ Email <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <Mail className="w-3.5 h-3.5 absolute left-3 top-2 text-slate-400" />
                   <input
                     type="email"
+                    required
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="feynman@elise.edu"
+                    placeholder="ban@gmail.com (nhận OTP xác nhận)"
                     className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-[#F8FAFD] border border-[#E2EAFD] text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-400"
                   />
                 </div>
@@ -372,7 +618,7 @@ export const AuthAndOnboarding: React.FC = () => {
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Mật khẩu
+                  Mật khẩu <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <Lock className="w-3.5 h-3.5 absolute left-3 top-2 text-slate-400" />
@@ -434,12 +680,253 @@ export const AuthAndOnboarding: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer mt-1"
+                disabled={isSubmitting}
+                className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer mt-1 disabled:opacity-60"
               >
-                <span>Tạo Tài Khoản & Bắt Đầu Học</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Đang Đăng Ký & Gửi Mail...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Tạo Tài Khoản & Gửi Email Xác Nhận</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </>
+                )}
               </button>
             </form>
+          )}
+
+          {/* =====================================================================
+              VIEW 3: XÁC NHẬN EMAIL (CONFIRM EMAIL VIA OTP OR LINK)
+              ===================================================================== */}
+          {activeTab === "CONFIRM_EMAIL" && (
+            <div className="space-y-3.5 animate-fade-in text-center">
+              <div className="w-12 h-12 mx-auto rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center shadow-inner">
+                <Mail className="w-6 h-6 animate-pulse" />
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-slate-700">
+                  Email xác nhận đã được gửi đến:
+                </p>
+                <p className="text-xs font-black text-indigo-700 bg-indigo-50/80 py-1 px-3 rounded-lg border border-indigo-200/60 inline-block font-mono">
+                  {confirmEmail}
+                </p>
+              </div>
+
+              <form onSubmit={handleVerifySignupOtp} className="space-y-2.5 text-left">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1 text-center">
+                    Nhập mã OTP 6 số từ hòm thư của bạn:
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    required
+                    value={signupOtp}
+                    onChange={(e) => setSignupOtp(e.target.value.replace(/\D/g, ""))}
+                    placeholder="123456"
+                    className="w-full py-2 text-center text-lg font-black tracking-[0.3em] font-mono rounded-xl bg-[#F8FAFD] border-2 border-indigo-200 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting || signupOtp.length < 6}
+                  className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Đang Kích Hoạt...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Xác Thực Kích Hoạt & Vào Học</span>
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Resend OTP button with countdown */}
+              <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("LOGIN");
+                    setLocalError(null);
+                    clearError();
+                  }}
+                  className="hover:text-purple-600 flex items-center gap-1 cursor-pointer font-bold"
+                >
+                  <ArrowLeft className="w-3 h-3" />
+                  <span>Về Đăng nhập</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResendSignupOtp}
+                  disabled={resendCountdown > 0 || isSubmitting}
+                  className={`font-bold transition-colors cursor-pointer ${
+                    resendCountdown > 0
+                      ? "text-slate-400 cursor-not-allowed"
+                      : "text-indigo-600 hover:text-indigo-800"
+                  }`}
+                >
+                  {resendCountdown > 0 ? (
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      <span>Gửi lại sau ({resendCountdown}s)</span>
+                    </span>
+                  ) : (
+                    <span>Gửi lại mã OTP</span>
+                  )}
+                </button>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-[10px] text-slate-500 leading-relaxed text-left">
+                💡 <strong>Mẹo:</strong> Bạn cũng có thể nhấp trực tiếp vào nút <em>"Confirm your mail"</em> trong hòm thư để kích hoạt tức thì mà không cần nhập OTP.
+              </div>
+            </div>
+          )}
+
+          {/* =====================================================================
+              VIEW 4: QUÊN MẬT KHẨU & ĐẶT LẠI MẬT KHẨU QUA OTP EMAIL
+              ===================================================================== */}
+          {activeTab === "FORGOT_PASSWORD" && (
+            <div className="space-y-3 animate-fade-in">
+              <div className="w-10 h-10 mx-auto rounded-2xl bg-purple-50 border border-purple-200 text-purple-600 flex items-center justify-center shadow-inner">
+                <KeyRound className="w-5 h-5" />
+              </div>
+
+              {forgotStep === 1 ? (
+                /* Bước 1: Nhập email gửi OTP */
+                <form onSubmit={handleSendForgotOtp} className="space-y-2.5">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Nhập địa chỉ Email tài khoản
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                      <input
+                        type="email"
+                        required
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        placeholder="email_da_dang_ky@domain.com"
+                        className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#F8FAFD] border border-[#E2EAFD] text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-400"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-60"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Đang Gửi Mã OTP...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Gửi Mã OTP Đặt Lại Mật Khẩu</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              ) : (
+                /* Bước 2: Nhập OTP & Mật khẩu mới */
+                <form onSubmit={handleResetPasswordWithOtp} className="space-y-2.5">
+                  <div className="p-2 rounded-xl bg-purple-50/70 border border-purple-200 text-[10px] text-purple-700 text-center font-medium">
+                    Mã OTP khôi phục đã gửi tới: <strong>{forgotEmail}</strong>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Mã OTP 6 số từ Email
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      required
+                      value={resetOtp}
+                      onChange={(e) => setResetOtp(e.target.value.replace(/\D/g, ""))}
+                      placeholder="123456"
+                      className="w-full py-1.5 text-center text-sm font-black tracking-[0.25em] font-mono rounded-xl bg-[#F8FAFD] border border-purple-300 focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 mb-1">
+                        Mật khẩu mới
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="≥ 6 ký tự"
+                        className="w-full px-3 py-1.5 rounded-xl bg-[#F8FAFD] border border-[#E2EAFD] text-xs font-medium focus:outline-none focus:border-purple-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-700 mb-1">
+                        Nhập lại mật khẩu
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={confirmNewPassword}
+                        onChange={(e) => setConfirmNewPassword(e.target.value)}
+                        placeholder="Trùng khớp"
+                        className="w-full px-3 py-1.5 rounded-xl bg-[#F8FAFD] border border-[#E2EAFD] text-xs font-medium focus:outline-none focus:border-purple-400"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || resetOtp.length < 6}
+                    className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Đang Cập Nhật Mật Khẩu...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Xác Nhận & Đặt Lại Mật Khẩu</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
+
+              <div className="text-center pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("LOGIN");
+                    setForgotStep(1);
+                    setLocalError(null);
+                    clearError();
+                  }}
+                  className="text-[11px] font-bold text-slate-500 hover:text-purple-600 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <ArrowLeft className="w-3 h-3" />
+                  <span>Quay lại Đăng nhập</span>
+                </button>
+              </div>
+            </div>
           )}
 
           {/* Footer Back Link */}

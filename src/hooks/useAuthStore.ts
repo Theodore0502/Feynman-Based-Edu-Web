@@ -1,31 +1,61 @@
 /**
  * File: src/hooks/useAuthStore.ts
  * Purpose: Authentication & Two-Role State Management for the Feynman Technique Stage.
- * Supports credentials for:
- *   - learn123 / 123123 (Role: learner)
- *   - admin123 / 123123 (Role: admin)
- * Includes persistent session in localStorage and quick dev role switcher.
+ * Supports:
+ *   1. Supabase Real Auth: Email Registration with Confirmation Link & 6-digit OTP,
+ *      Password Reset with Email OTP & Recovery, and Session Persistence.
+ *   2. Instant Preconfigured Accounts for Dev/Demo:
+ *      - learn123 / 123123 (Role: learner)
+ *      - curator123 / 123123 (Role: curator)
+ *      - admin123 / 123123 (Role: admin)
  */
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { supabase } from "@/lib/supabase";
 import { UserProfile, UserRole } from "../types/auth.types";
+
+export interface AuthResponse {
+  success: boolean;
+  needConfirmation?: boolean;
+  email?: string;
+  error?: string;
+}
 
 interface AuthState {
   user: UserProfile | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
   loginError: string | null;
-  login: (usernameOrEmail: string, password: string) => boolean;
+
+  // Actions
+  login: (usernameOrEmail: string, password: string) => Promise<AuthResponse>;
+  signUp: (data: {
+    username: string;
+    email: string;
+    fullName: string;
+    role: UserRole;
+    password: string;
+  }) => Promise<AuthResponse>;
   register: (data: {
     username: string;
     email: string;
     fullName: string;
     role: UserRole;
     password: string;
-  }) => boolean;
-  logout: () => void;
+  }) => Promise<AuthResponse>;
+
+  verifySignupOtp: (email: string, token: string) => Promise<AuthResponse>;
+  resendSignupEmail: (email: string) => Promise<AuthResponse>;
+
+  sendPasswordResetOtp: (email: string) => Promise<AuthResponse>;
+  verifyPasswordResetOtp: (email: string, token: string) => Promise<AuthResponse>;
+  updatePassword: (newPassword: string) => Promise<AuthResponse>;
+
+  logout: () => Promise<void>;
   switchRole: (newRole: UserRole) => void;
   setProfile: (profile: Partial<UserProfile>) => void;
+  clearError: () => void;
 }
 
 export const PRECONFIGURED_USERS: Record<string, { password: string; profile: UserProfile }> = {
@@ -36,6 +66,7 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
       username: "learn123",
       email: "learn123@theodore.edu",
       fullName: "Nguyễn Giảng Viên (Learner)",
+      displayName: "Nguyễn Giảng Viên (Learner)",
       role: "learner",
       fieldOfStudy: "Công Nghệ Thông Tin & Toán",
       masteryPoints: 480,
@@ -50,6 +81,7 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
       username: "curator123",
       email: "curator123@theodore.edu",
       fullName: "Lê Thẩm Định (Knowledge Curator)",
+      displayName: "Lê Thẩm Định (Knowledge Curator)",
       role: "curator",
       fieldOfStudy: "Kiểm Định & Gán Nhãn Tri Thức",
       assignedDomains: ["dom-it", "dom-cs", "dom-se"],
@@ -65,6 +97,7 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
       username: "admin123",
       email: "admin123@theodore.edu",
       fullName: "Trần Kiểm Chuẩn (Moderator Admin)",
+      displayName: "Trần Kiểm Chuẩn (Moderator Admin)",
       role: "admin",
       fieldOfStudy: "Quản Trị Học Thuật & Đánh Giá AI",
       assignedDomains: [
@@ -90,69 +123,356 @@ export const useAuthStore = create<AuthState>()(
       // Default to learn123 on first launch
       user: PRECONFIGURED_USERS.learn123.profile,
       isAuthenticated: true,
+      isLoading: false,
       loginError: null,
 
-      login: (usernameOrEmail: string, password: string): boolean => {
+      clearError: () => set({ loginError: null }),
+
+      /**
+       * Đăng nhập: Ưu tiên tài khoản mẫu demo, nếu không thì gọi Supabase Auth
+       */
+      login: async (usernameOrEmail: string, password: string): Promise<AuthResponse> => {
         const cleanInput = usernameOrEmail.trim().toLowerCase();
-        
-        // Find matching preconfigured user by username or email
+        set({ isLoading: true, loginError: null });
+
+        // 1. Kiểm tra tài khoản nhanh (Quick Demo Accounts)
         const targetEntry = Object.values(PRECONFIGURED_USERS).find(
           (u) =>
             u.profile.username.toLowerCase() === cleanInput ||
             u.profile.email.toLowerCase() === cleanInput
         );
 
-        if (!targetEntry) {
-          set({ loginError: "Tài khoản không tồn tại. Dùng learn123, curator123 hoặc admin123." });
-          return false;
+        if (targetEntry) {
+          if (targetEntry.password !== password) {
+            set({
+              isLoading: false,
+              loginError: "Mật khẩu không chính xác (Mật khẩu mặc định: 123123).",
+            });
+            return {
+              success: false,
+              error: "Mật khẩu không chính xác (Mật khẩu mặc định: 123123).",
+            };
+          }
+
+          set({
+            user: targetEntry.profile,
+            isAuthenticated: true,
+            isLoading: false,
+            loginError: null,
+          });
+          return { success: true };
         }
 
-        if (targetEntry.password !== password) {
-          set({ loginError: "Mật khẩu không chính xác (Mật khẩu mặc định: 123123)." });
-          return false;
-        }
+        // 2. Đăng nhập qua Supabase Auth
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email: usernameOrEmail.trim(),
+            password,
+          });
 
-        set({
-          user: targetEntry.profile,
-          isAuthenticated: true,
-          loginError: null,
-        });
-        return true;
+          if (error) {
+            // Trường hợp tài khoản chưa xác nhận email
+            if (
+              error.message.toLowerCase().includes("email not confirmed") ||
+              error.message.toLowerCase().includes("not confirmed")
+            ) {
+              const msg = "Email của bạn chưa được xác nhận. Vui lòng kiểm tra hộp thư hoặc nhập mã OTP để kích hoạt tài khoản.";
+              set({ isLoading: false, loginError: msg });
+              return {
+                success: false,
+                needConfirmation: true,
+                email: usernameOrEmail.trim(),
+                error: msg,
+              };
+            }
+
+            const msg =
+              error.message === "Invalid login credentials"
+                ? "Tên đăng nhập hoặc mật khẩu không chính xác."
+                : error.message;
+            set({ isLoading: false, loginError: msg });
+            return { success: false, error: msg };
+          }
+
+          if (data.user) {
+            const userMeta = data.user.user_metadata || {};
+            const profile: UserProfile = {
+              id: data.user.id,
+              username: userMeta.username || data.user.email?.split("@")[0] || "user",
+              email: data.user.email || "",
+              fullName: userMeta.full_name || data.user.email?.split("@")[0] || "Học viên Theodore",
+              displayName: userMeta.full_name || data.user.email?.split("@")[0] || "Học viên Theodore",
+              role: (userMeta.role as UserRole) || "learner",
+              fieldOfStudy: userMeta.field_of_study || "Phương pháp Feynman",
+              masteryPoints: 0,
+              clarityAverage: 0,
+              createdAt: data.user.created_at,
+            };
+
+            set({
+              user: profile,
+              isAuthenticated: true,
+              isLoading: false,
+              loginError: null,
+            });
+            return { success: true };
+          }
+
+          set({ isLoading: false, loginError: "Không tìm thấy thông tin người dùng." });
+          return { success: false, error: "Không tìm thấy thông tin người dùng." };
+        } catch (err: any) {
+          set({ isLoading: false, loginError: err.message || "Lỗi kết nối máy chủ Supabase." });
+          return { success: false, error: err.message || "Lỗi kết nối máy chủ Supabase." };
+        }
       },
 
-      register: (data) => {
+      /**
+       * Đăng ký tài khoản mới kèm gửi Email Xác Nhận & Mã OTP
+       */
+      signUp: async (data): Promise<AuthResponse> => {
+        set({ isLoading: true, loginError: null });
+        const cleanEmail = data.email.trim().toLowerCase();
         const cleanUsername = data.username.trim().toLowerCase();
+
+        // Kiểm tra trùng tài khoản demo
         if (PRECONFIGURED_USERS[cleanUsername]) {
-          set({ loginError: "Tên đăng nhập này đã tồn tại." });
-          return false;
+          const msg = "Tên đăng nhập này đã được sử dụng cho tài khoản demo hệ thống.";
+          set({ isLoading: false, loginError: msg });
+          return { success: false, error: msg };
         }
 
-        const newProfile: UserProfile = {
-          id: `usr-${Date.now()}`,
-          username: data.username.trim(),
-          email: data.email.trim(),
-          fullName: data.fullName.trim() || data.username.trim(),
-          role: data.role,
-          fieldOfStudy: data.role === "admin" ? "Quản Trị Học Thuật" : "Khoa Học & Công Nghệ",
-          masteryPoints: 0,
-          clarityAverage: 0,
-          createdAt: new Date().toISOString(),
-        };
+        try {
+          const redirectUrl =
+            typeof window !== "undefined"
+              ? `${window.location.origin}/auth?confirmed=true`
+              : undefined;
 
-        PRECONFIGURED_USERS[cleanUsername] = {
-          password: data.password,
-          profile: newProfile,
-        };
+          const { data: authData, error } = await supabase.auth.signUp({
+            email: cleanEmail,
+            password: data.password,
+            options: {
+              data: {
+                full_name: data.fullName.trim() || data.username.trim(),
+                username: data.username.trim(),
+                role: data.role || "learner",
+              },
+              emailRedirectTo: redirectUrl,
+            },
+          });
 
-        set({
-          user: newProfile,
-          isAuthenticated: true,
-          loginError: null,
-        });
-        return true;
+          if (error) {
+            set({ isLoading: false, loginError: error.message });
+            return { success: false, error: error.message };
+          }
+
+          // Trường hợp Supabase yêu cầu xác nhận email (session == null)
+          if (authData.user && !authData.session) {
+            set({ isLoading: false, loginError: null });
+            return {
+              success: true,
+              needConfirmation: true,
+              email: cleanEmail,
+            };
+          }
+
+          // Trường hợp tự động kích hoạt (nếu Supabase tắt verify email)
+          if (authData.user && authData.session) {
+            const userMeta = authData.user.user_metadata || {};
+            const profile: UserProfile = {
+              id: authData.user.id,
+              username: data.username.trim(),
+              email: cleanEmail,
+              fullName: data.fullName.trim() || data.username.trim(),
+              displayName: data.fullName.trim() || data.username.trim(),
+              role: data.role || "learner",
+              fieldOfStudy: data.role === "admin" ? "Quản Trị Học Thuật" : "Khoa Học & Công Nghệ",
+              masteryPoints: 0,
+              clarityAverage: 0,
+              createdAt: authData.user.created_at,
+            };
+
+            set({
+              user: profile,
+              isAuthenticated: true,
+              isLoading: false,
+              loginError: null,
+            });
+            return { success: true, needConfirmation: false };
+          }
+
+          set({ isLoading: false, loginError: null });
+          return { success: true, needConfirmation: true, email: cleanEmail };
+        } catch (err: any) {
+          set({ isLoading: false, loginError: err.message || "Lỗi khi đăng ký tài khoản." });
+          return { success: false, error: err.message || "Lỗi khi đăng ký tài khoản." };
+        }
       },
 
-      logout: () => {
+      register: async (data) => {
+        return get().signUp(data);
+      },
+
+      /**
+       * Xác thực mã OTP 6 số để kích hoạt tài khoản đăng ký
+       */
+      verifySignupOtp: async (email: string, token: string): Promise<AuthResponse> => {
+        set({ isLoading: true, loginError: null });
+        try {
+          const { data, error } = await supabase.auth.verifyOtp({
+            email: email.trim().toLowerCase(),
+            token: token.trim(),
+            type: "signup",
+          });
+
+          if (error) {
+            set({ isLoading: false, loginError: error.message });
+            return { success: false, error: error.message };
+          }
+
+          if (data.user) {
+            const userMeta = data.user.user_metadata || {};
+            const profile: UserProfile = {
+              id: data.user.id,
+              username: userMeta.username || data.user.email?.split("@")[0] || "user",
+              email: data.user.email || email,
+              fullName: userMeta.full_name || "Học viên Theodore",
+              displayName: userMeta.full_name || "Học viên Theodore",
+              role: (userMeta.role as UserRole) || "learner",
+              fieldOfStudy: userMeta.field_of_study || "Phương pháp Feynman",
+              masteryPoints: 0,
+              clarityAverage: 0,
+              createdAt: data.user.created_at,
+            };
+
+            set({
+              user: profile,
+              isAuthenticated: true,
+              isLoading: false,
+              loginError: null,
+            });
+            return { success: true };
+          }
+
+          set({ isLoading: false });
+          return { success: true };
+        } catch (err: any) {
+          set({ isLoading: false, loginError: err.message || "Lỗi xác thực mã OTP." });
+          return { success: false, error: err.message || "Lỗi xác thực mã OTP." };
+        }
+      },
+
+      /**
+       * Gửi lại email xác thực kích hoạt tài khoản
+       */
+      resendSignupEmail: async (email: string): Promise<AuthResponse> => {
+        try {
+          const redirectUrl =
+            typeof window !== "undefined"
+              ? `${window.location.origin}/auth?confirmed=true`
+              : undefined;
+
+          const { error } = await supabase.auth.resend({
+            type: "signup",
+            email: email.trim().toLowerCase(),
+            options: {
+              emailRedirectTo: redirectUrl,
+            },
+          });
+
+          if (error) {
+            return { success: false, error: error.message };
+          }
+          return { success: true };
+        } catch (err: any) {
+          return { success: false, error: err.message || "Không thể gửi lại email." };
+        }
+      },
+
+      /**
+       * Quên mật khẩu: Gửi mã OTP khôi phục mật khẩu về email
+       */
+      sendPasswordResetOtp: async (email: string): Promise<AuthResponse> => {
+        set({ isLoading: true, loginError: null });
+        try {
+          const redirectUrl =
+            typeof window !== "undefined"
+              ? `${window.location.origin}/auth?mode=recovery`
+              : undefined;
+
+          const { error } = await supabase.auth.resetPasswordForEmail(
+            email.trim().toLowerCase(),
+            {
+              redirectTo: redirectUrl,
+            }
+          );
+
+          if (error) {
+            set({ isLoading: false, loginError: error.message });
+            return { success: false, error: error.message };
+          }
+
+          set({ isLoading: false, loginError: null });
+          return { success: true, email: email.trim() };
+        } catch (err: any) {
+          set({ isLoading: false, loginError: err.message || "Lỗi gửi yêu cầu khôi phục mật khẩu." });
+          return { success: false, error: err.message || "Lỗi gửi yêu cầu khôi phục mật khẩu." };
+        }
+      },
+
+      /**
+       * Xác thực mã OTP khôi phục mật khẩu
+       */
+      verifyPasswordResetOtp: async (email: string, token: string): Promise<AuthResponse> => {
+        set({ isLoading: true, loginError: null });
+        try {
+          const { data, error } = await supabase.auth.verifyOtp({
+            email: email.trim().toLowerCase(),
+            token: token.trim(),
+            type: "recovery",
+          });
+
+          if (error) {
+            set({ isLoading: false, loginError: error.message });
+            return { success: false, error: error.message };
+          }
+
+          set({ isLoading: false, loginError: null });
+          return { success: true };
+        } catch (err: any) {
+          set({ isLoading: false, loginError: err.message || "Mã OTP khôi phục không hợp lệ." });
+          return { success: false, error: err.message || "Mã OTP khôi phục không hợp lệ." };
+        }
+      },
+
+      /**
+       * Cập nhật mật khẩu mới sau khi xác thực OTP thành công
+       */
+      updatePassword: async (newPassword: string): Promise<AuthResponse> => {
+        set({ isLoading: true, loginError: null });
+        try {
+          const { error } = await supabase.auth.updateUser({
+            password: newPassword,
+          });
+
+          if (error) {
+            set({ isLoading: false, loginError: error.message });
+            return { success: false, error: error.message };
+          }
+
+          set({ isLoading: false, loginError: null });
+          return { success: true };
+        } catch (err: any) {
+          set({ isLoading: false, loginError: err.message || "Không thể cập nhật mật khẩu mới." });
+          return { success: false, error: err.message || "Không thể cập nhật mật khẩu mới." };
+        }
+      },
+
+      logout: async () => {
+        try {
+          await supabase.auth.signOut();
+        } catch (e) {
+          // Ignore
+        }
         set({
           user: null,
           isAuthenticated: false,
@@ -193,4 +513,3 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
-
