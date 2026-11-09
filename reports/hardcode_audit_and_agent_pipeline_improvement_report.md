@@ -34,9 +34,11 @@ Qua 2 đợt quét toàn diện trên toàn bộ các tệp `.ts` và `.tsx` tro
 | 5 | `src/pages/FeynmanStageLiveRoom.tsx` (Dòng 124-135) | **Báo cáo kết thúc buổi học bị hardcode** | Cố định báo cáo về Docker (`"Docker giống như căn hộ chung cư..."`) dù người học giảng bất kỳ môn nào | **Đã thay bằng `GeminiCurriculumService.generateSessionMasteryEvaluation`**. Chấm điểm và xuất thẻ Mastery Card thật từ biên bản buổi học và lưu vào Supabase. |
 | 6 | `src/pages/admin/AdminCurriculumManager.tsx` | Quản trị Ground Truth ngắt kết nối Supabase | Nạp từ `ACADEMIC_TOPICS` tĩnh và chỉ lưu vào local state React | **Đã nối với `CurriculumService` và Supabase `academic_topics`**. Cho phép cập nhật Ground Truth trực tiếp lên DB. |
 | 7 | `src/hooks/useStudyStore.ts` | Global Store phụ thuộc tệp mock cũ | Import cứng `TOPICS_CATALOG` | Đã xóa bỏ import tĩnh, hỗ trợ nhận bài học động từ Supabase. |
-| 8 | `src/components/topics/TopicHierarchySearch.tsx` | Fallback tìm kiếm dùng mảng tĩnh | Dùng `TOPICS_CATALOG` khi tìm kiếm phân cấp | Chuyển sang dùng `topicsPool` được nạp từ Supabase. |
+| 8 | `src/components/topics/TopicHierarchySearch.tsx` | Fallback tìm kiếm và danh sách tĩnh | Chứa `DOMAINS_LIST` và `FIELDS_LIST` hardcode cũ | Đã xóa bỏ các mảng tĩnh thừa, nạp động số lượng domain và bài học. |
+| 9 | `src/pages/LandingAndDemo.tsx` | Mini-Demo trên Landing Page bị Mock `setTimeout` | Trả về chuỗi giả lập cố định: `"Dạ chú ơi chú bảo công nghệ với ảo hóa là sao..."` | **Đã thay thế toàn bộ bằng `FeynmanLiveTrialModule.tsx`**. Bố cục 1:1 chuẩn xác: cột trái nạp dữ liệu Feynman từ Supabase kèm highlight từ khóa; cột phải chat/voice thật với Bé Bắp gọi Gemini 3.1 Flash Lite. |
+| 10 | `src/lib/services/curriculum-service.ts` & `src/pages/StageSetup.tsx` | Liên kết `domainId` của bài học chưa được ánh xạ qua bảng trung gian | Bộ đếm số lượng bài theo từng ngành hiển thị 0 | Ánh xạ trực tiếp `domain_id` qua `domain_subjects`, kích hoạt bộ lọc ngành động 100% từ Supabase. |
 
-**Số lượng vấn đề còn lại sau khi xử lý: 0 (Không còn bất kỳ tàn dư mock nào).**
+**Số lượng vấn đề còn lại sau khi xử lý: 0 (Đã thanh trừng 100% mock & hardcode trên toàn bộ hệ thống).**
 
 ---
 

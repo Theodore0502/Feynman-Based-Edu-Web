@@ -56,7 +56,7 @@ export const StageSetup: React.FC = () => {
   }, []);
 
   const DOMAIN_TABS = useMemo(() => {
-    const allTab = { id: "ALL", label: "Tất cả khu vực", count: topics.length, icon: Layers, color: "text-slate-600" };
+    const allTab = { id: "ALL", label: "Tất cả lĩnh vực", count: topics.length, icon: Layers, color: "text-slate-600" };
     const domainList = domains.map((d) => ({
       id: d.id,
       label: d.name,
@@ -69,7 +69,7 @@ export const StageSetup: React.FC = () => {
 
   const filteredTopics = useMemo(() => {
     if (selectedDomainTab === "ALL") {
-      return topics.slice(0, 40);
+      return topics;
     }
     return topics.filter((t) => t.domainId === selectedDomainTab);
   }, [topics, selectedDomainTab]);

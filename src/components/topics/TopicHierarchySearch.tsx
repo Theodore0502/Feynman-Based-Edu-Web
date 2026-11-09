@@ -44,35 +44,6 @@ interface TopicHierarchySearchProps {
   externalFilter?: SearchFilterState;
 }
 
-// 4 Nhóm Ngành Chuẩn
-const DOMAINS_LIST = [
-  { id: "ALL", name: "Tất cả Nhóm Ngành (Cấp 1)", symbol: "🌐", color: "#64748b" },
-  { id: "math", name: "Toán Cao Cấp & Đại Số", symbol: "∑", color: "#2563eb" },
-  { id: "discrete", name: "Toán Rời Rạc & Đồ Thị", symbol: "⑂", color: "#059669" },
-  { id: "cv", name: "Thị Giác Máy Tính & AI", symbol: "👁", color: "#7c3aed" },
-  { id: "cs", name: "Hệ Thống & KHMT", symbol: "⚙", color: "#d97706" },
-];
-
-// 12 Ngành Chuyên Môn Chuẩn
-const FIELDS_LIST = [
-  // Math
-  { id: "field-algebra", domainId: "math", name: "Đại Số Tuyến Tính (ĐSTT)" },
-  { id: "field-calculus", domainId: "math", name: "Giải Tích Nhiều Biến (GT)" },
-  { id: "field-optimization", domainId: "math", name: "Tối Ưu Hóa Vi Phân (TƯH)" },
-  // Discrete
-  { id: "field-graph-theory", domainId: "discrete", name: "Lý Thuyết Đồ Thị (ĐTH)" },
-  { id: "field-logic", domainId: "discrete", name: "Logic & Boole (LOGIC)" },
-  { id: "field-combinatorics", domainId: "discrete", name: "Tổ Hợp & Nhị Thức (TỔ HỢP)" },
-  // CV
-  { id: "field-neural-nets", domainId: "cv", name: "Mạng Tích Chập CNN" },
-  { id: "field-image-proc", domainId: "cv", name: "Xử Lý & Lọc Biên (LỌC)" },
-  { id: "field-detection", domainId: "cv", name: "Nhận Diện & YOLO" },
-  // CS
-  { id: "field-os", domainId: "cs", name: "Hệ Điều Hành & Con Trỏ (HĐH)" },
-  { id: "field-db", domainId: "cs", name: "Cơ Sở Dữ Liệu B-Tree (CSDL)" },
-  { id: "field-dist-sys", domainId: "cs", name: "Hệ Thống Phân Tán" },
-];
-
 // Từ điển ngữ nghĩa ngữ cảnh (Semantic Intent Synonyms & Intent Vectors)
 const SEMANTIC_INTENTS: Array<{
   keywords: string[];
@@ -157,7 +128,7 @@ export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
   // Danh sách các Domain (bao gồm lựa chọn "Tất cả")
   const activeDomainsList = useMemo(() => {
     return [
-      { id: "ALL", name: "Tất cả 8 Nhóm Ngành", color: "#64748b" },
+      { id: "ALL", name: `Tất cả ${domains.length} Nhóm Ngành`, color: "#64748b" },
       ...domains.map((d) => ({
         id: d.id,
         name: d.name,

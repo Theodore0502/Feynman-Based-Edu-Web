@@ -6,36 +6,13 @@
  * Props/Inputs: Không có.
  */
 
-import React, { useState } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
 import { EliseCatMascot } from "@/components/shared/EliseCatMascot";
-import { DEFAULT_PERSONAS } from "@/config/personas.config";
-import { PersonaAvatarCard } from "@/components/shared/PersonaAvatarCard";
-import { VoiceRecorderButton } from "@/components/shared/VoiceRecorderButton";
-import { useSpeechToText } from "@/hooks/useSpeechToText";
-import { ArrowRight, Sparkles, Play } from "lucide-react";
+import { FeynmanLiveTrialModule } from "@/components/landing/FeynmanLiveTrialModule";
+import { ArrowRight, Sparkles } from "lucide-react";
 
 export const LandingAndDemo: React.FC = () => {
-  const [demoInput, setDemoInput] = useState("");
-  const [demoResponse, setDemoResponse] = useState<string | null>(null);
-  const [selectedPersona, setSelectedPersona] = useState(DEFAULT_PERSONAS[0]);
-  const [isDemoLoading, setIsDemoLoading] = useState(false);
-
-  const { isListening, toggleListening, isSupported } = useSpeechToText((text) =>
-    setDemoInput(text)
-  );
-
-  const handleRunMiniDemo = () => {
-    if (!demoInput.trim()) return;
-    setIsDemoLoading(true);
-    setTimeout(() => {
-      setIsDemoLoading(false);
-      setDemoResponse(
-        `Dạ chú ơi, chú bảo "công nghệ" với "ảo hóa" là sao ạ? Con chỉ biết đồ chơi Lego thôi, cái này có lắp ráp như Lego được không chú?`
-      );
-    }, 700);
-  };
-
   return (
     <div className="min-h-screen bg-[#F3F6FA] text-slate-800">
       {/* Top Navbar */}
@@ -70,7 +47,7 @@ export const LandingAndDemo: React.FC = () => {
       </header>
 
       {/* Hero Section */}
-      <section className="max-w-4xl mx-auto px-6 pt-12 pb-16 text-center space-y-6">
+      <section className="max-w-4xl mx-auto px-6 pt-12 pb-14 text-center space-y-6">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#EEF2FC] text-[#5066A1] text-xs font-bold border border-[#D5E1FA]">
           <Sparkles className="w-4 h-4 text-[#7286D3]" />
           <span>Kỹ Thuật Học Sâu Feynman Thế Hệ Mới</span>
@@ -96,83 +73,16 @@ export const LandingAndDemo: React.FC = () => {
             <ArrowRight className="w-4 h-4" />
           </Link>
           <a
-            href="#mini-demo"
+            href="#feynman-live-trial"
             className="px-6 py-3 rounded-2xl bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold border border-slate-200/80 shadow-xs transition-all"
           >
-            Thử Giảng Nhanh Dưới Đây
+            Thử Giảng Live Cho Bé Bắp Dưới Đây
           </a>
         </div>
       </section>
 
-      {/* Interactive Mini-Demo Section */}
-      <section id="mini-demo" className="max-w-3xl mx-auto px-6 pb-20">
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#E2EAFD] shadow-card space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-            <div>
-              <h3 className="text-lg font-bold text-slate-800">Phòng Thử Nghiệm Nhanh (Mini-Demo)</h3>
-              <p className="text-xs text-slate-500">Chọn người nghe và thử giải thích một khái niệm bạn biết</p>
-            </div>
-            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#E8F8F0] text-[#1E7E50]">
-              Không cần đăng nhập
-            </span>
-          </div>
-
-          {/* Chọn Persona */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {DEFAULT_PERSONAS.map((p) => (
-              <PersonaAvatarCard
-                key={p.id}
-                persona={p}
-                variant="compact"
-                isSelected={selectedPersona.id === p.id}
-                onSelect={() => setSelectedPersona(p)}
-              />
-            ))}
-          </div>
-
-          {/* Input & Voice */}
-          <div className="space-y-3">
-            <div className="relative">
-              <textarea
-                rows={3}
-                value={demoInput}
-                onChange={(e) => setDemoInput(e.target.value)}
-                placeholder={`Ví dụ: "Docker giống như một chiếc hộp thần kỳ chứa sẵn đồ đạc..."`}
-                className="w-full p-4 pr-14 rounded-2xl bg-[#F8FAFD] border border-[#E2EAFD] text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#8EA7E9]"
-              />
-              <div className="absolute right-3 bottom-3">
-                <VoiceRecorderButton
-                  isListening={isListening}
-                  onToggle={toggleListening}
-                  isSupported={isSupported}
-                />
-              </div>
-            </div>
-
-            <button
-              onClick={handleRunMiniDemo}
-              disabled={isDemoLoading || !demoInput.trim()}
-              className="w-full py-3 rounded-2xl bg-[#7286D3] hover:bg-[#5066A1] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 transition-all cursor-pointer"
-            >
-              <Play className="w-3.5 h-3.5 fill-white" />
-              <span>{isDemoLoading ? "Đang phân tích..." : "Thử Xem AI Sẽ Hỏi Lại Thế Nào"}</span>
-            </button>
-          </div>
-
-          {/* Response Box */}
-          {demoResponse && (
-            <div className="p-4 rounded-2xl bg-[#FFF9F9] border border-[#FFDADA] space-y-2 animate-in fade-in">
-              <div className="flex items-center gap-2">
-                <img src={selectedPersona.avatar} alt="P" className="w-6 h-6 rounded-full object-cover" />
-                <span className="text-xs font-bold text-slate-800">{selectedPersona.name}:</span>
-              </div>
-              <p className="text-xs sm:text-sm text-slate-700 italic leading-relaxed">
-                "{demoResponse}"
-              </p>
-            </div>
-          )}
-        </div>
-      </section>
+      {/* Live 1:1 Feynman Interactive Playground */}
+      <FeynmanLiveTrialModule />
     </div>
   );
 };

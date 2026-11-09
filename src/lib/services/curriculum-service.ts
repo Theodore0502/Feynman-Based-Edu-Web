@@ -302,8 +302,12 @@ export const CurriculumService = {
 
       const topics: CatalogTopic[] = (topRes.data || []).map((t: any) => {
         const sub = subjects.find((s) => s.id === t.subject_id);
+        const link = domainSubjects.find((ds: any) => ds.subject_id === t.subject_id);
+        const dom = domains.find((d) => d.id === link?.domain_id);
         return {
           id: t.id,
+          domainId: dom?.id || link?.domain_id || "",
+          domainName: dom?.name || "",
           subjectId: t.subject_id,
           subjectSlug: sub?.slug,
           subjectName: sub?.name,
