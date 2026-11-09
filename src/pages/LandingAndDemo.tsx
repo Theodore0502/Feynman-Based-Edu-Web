@@ -247,40 +247,8 @@ export const LandingAndDemo: React.FC = () => {
             </p>
           </div>
 
-          {/* Thẻ Thống Kê Tò Mò (Curiosity Metrics) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-3xl mx-auto pt-2">
-            <div className="p-4 rounded-2xl bg-white/85 backdrop-blur-md border border-white/90 shadow-2xs space-y-1 text-center">
-              <div className="flex items-center justify-center gap-1.5 text-rose-500 font-black text-xl sm:text-2xl">
-                <span>94.2%</span>
-              </div>
-              <p className="text-[11px] text-slate-500 leading-snug font-medium">
-                Người học giật mình nhận ra mình chỉ "nhớ mặt chữ" chứ chưa hề thấu hiểu bản chất
-              </p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white/85 backdrop-blur-md border border-white/90 shadow-2xs space-y-1 text-center">
-              <div className="flex items-center justify-center gap-1.5 text-emerald-600 font-black text-xl sm:text-2xl">
-                <Sprout className="w-5 h-5 text-emerald-500" />
-                <span>18,500+</span>
-              </div>
-              <p className="text-[11px] text-slate-500 leading-snug font-medium">
-                Hạt mầm tri thức đã nở hoa thành công qua các phép ẩn dụ đời thường gần gũi
-              </p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-white/85 backdrop-blur-md border border-white/90 shadow-2xs space-y-1 text-center">
-              <div className="flex items-center justify-center gap-1.5 text-[#5066A1] font-black text-xl sm:text-2xl">
-                <Eye className="w-5 h-5 text-[#7286D3]" />
-                <span>0%</span>
-              </div>
-              <p className="text-[11px] text-slate-500 leading-snug font-medium">
-                Thuật ngữ đao to búa lớn có thể "qua mặt" được sự tò mò trong trẻo của Bé Bắp
-              </p>
-            </div>
-          </div>
-
           {/* Action CTAs */}
-          <div className="flex flex-wrap items-center justify-center gap-4 pt-3">
+          <div className="flex flex-wrap items-center justify-center gap-4 pt-1">
             <a
               href="#feynman-live-trial"
               className="px-7 py-3.5 rounded-2xl bg-[#7286D3] hover:bg-[#5066A1] text-white text-sm font-bold flex items-center gap-2.5 shadow-card hover:shadow-lg transition-all cursor-pointer transform hover:-translate-y-0.5"
