@@ -485,10 +485,6 @@ export const FeynmanLiveTrialModule: React.FC = () => {
     <section id="feynman-live-trial" className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-12 space-y-10">
       {/* 1. Header khu vực */}
       <div className="text-center max-w-3xl mx-auto space-y-3">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#EEF2FC] text-[#5066A1] text-xs font-bold border border-[#D5E1FA]">
-          <Sparkles className="w-4 h-4 text-[#7286D3]" />
-          <span>Trải Nghiệm Trực Tuyến Live 1-Click • Không Cần Đăng Nhập</span>
-        </div>
         <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
           Giảng Đài Feynman Thử Nghiệm: Thử Tài Bình Dân Hóa
         </h2>

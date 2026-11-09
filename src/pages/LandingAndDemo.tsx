@@ -272,10 +272,6 @@ export const LandingAndDemo: React.FC = () => {
             ========================================================================= */}
         <section id="bi-mat-tri-thuc" className="max-w-5xl mx-auto px-6 py-12 space-y-8 scroll-mt-6">
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
-              <Leaf className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Bí Mật Của Chiếc Kính Lúp Feynman</span>
-            </div>
             <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
               Hãy Thử Soi Vào Một Kiến Thức Bất Kỳ...
             </h2>
@@ -393,10 +389,6 @@ export const LandingAndDemo: React.FC = () => {
             ========================================================================= */}
         <section id="4-mua-no-hoa" className="max-w-5xl mx-auto px-6 py-12 space-y-8 scroll-mt-6">
           <div className="text-center space-y-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-[#5066A1] border border-[#D5E1FA] text-xs font-bold">
-              <Sun className="w-3.5 h-3.5 text-amber-500" />
-              <span>Quy Luật Tự Nhiên Của Sự Thấu Suốt</span>
-            </div>
             <h2 className="text-2xl sm:text-3xl font-black text-slate-900">
               4 Mùa Nở Hoa Của Tâm Trí
             </h2>
@@ -480,10 +472,6 @@ export const LandingAndDemo: React.FC = () => {
             MỤC 4: LỜI MỜI BƯỚC VÀO PHÒNG THÍ NGHIỆM LIVE
             ========================================================================= */}
         <div className="max-w-6xl mx-auto px-6 pt-4 pb-2 text-center space-y-2">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#EEF2FC] text-[#5066A1] text-xs font-bold border border-[#D5E1FA]">
-            <Compass className="w-4 h-4 text-[#7286D3]" />
-            <span>Phòng Thử Nghiệm Trực Tiếp • Không Cần Đăng Nhập</span>
-          </div>
           <h3 className="text-xl sm:text-2xl font-black text-slate-800">
             Giờ Đến Lượt Bạn: Hãy Gieo Mầm Tri Thức Cho Bé Bắp
           </h3>
