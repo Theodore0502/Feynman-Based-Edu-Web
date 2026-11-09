@@ -424,6 +424,8 @@ export const CuratorValidationCenter: React.FC = () => {
         <div className="space-y-4">
           {/* Header Trang Danh Sách Đồng Bộ Chuẩn Dashboard */}
           <PageHeroBanner
+            mascotSrc="/images/theodore-curator-owl.png"
+            mascotAlt="Linh vật Thẩm định viên Theodore"
             badge={
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-200/60 shadow-2xs">
                 <span>Hội Đồng Thẩm Định Tri Thức (Curator Studio)</span>

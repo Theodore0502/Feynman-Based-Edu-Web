@@ -18,6 +18,7 @@ export interface PageHeroBannerProps {
   description: ReactNode;
   actions?: ReactNode;
   rightWidget?: ReactNode;
+  mascotSrc?: string;
   mascotAlt?: string;
   className?: string;
 }
@@ -28,6 +29,7 @@ export const PageHeroBanner: React.FC<PageHeroBannerProps> = ({
   description,
   actions,
   rightWidget,
+  mascotSrc = "/images/theodore-mascot.png",
   mascotAlt = "Linh vật Theodore",
   className = "",
 }) => {
@@ -66,7 +68,7 @@ export const PageHeroBanner: React.FC<PageHeroBannerProps> = ({
         <div className="flex items-center justify-center flex-1 my-1 lg:my-0 relative">
           <div className="relative group transition-transform duration-300 hover:scale-105">
             <img
-              src="/images/theodore-mascot.png"
+              src={mascotSrc}
               alt={mascotAlt}
               className="w-36 h-36 sm:w-48 sm:h-48 lg:w-56 lg:h-56 xl:w-60 xl:h-60 object-contain filter drop-shadow-[0_16px_32px_rgba(114,134,211,0.32)] animate-float select-none pointer-events-none"
             />
