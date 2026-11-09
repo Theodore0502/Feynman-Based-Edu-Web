@@ -217,12 +217,6 @@ export const LandingAndDemo: React.FC = () => {
             HERO SECTION: CÂU HỎI KÍCH HOẠT TRÍ TÒ MÒ CỰC ĐỘ
             ========================================================================= */}
         <section className="max-w-4xl mx-auto px-6 pt-8 pb-14 text-center space-y-7">
-          {/* Badge Vườn Ươm */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/90 backdrop-blur-md text-[#5066A1] text-xs font-extrabold border border-[#D5E1FA] shadow-xs">
-            <Flower2 className="w-4 h-4 text-[#7286D3] animate-pulse" />
-            <span>Khu Vườn Ươm Tri Thức • Chuẩn Socratic & Kỹ Thuật Feynman</span>
-          </div>
-
           {/* Tiêu đề tò mò đầy chiều sâu */}
           <h1 className="text-3xl sm:text-5xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.25]">
             Trí tuệ trong đầu bạn là một <br className="hidden sm:inline" />
