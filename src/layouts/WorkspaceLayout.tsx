@@ -26,24 +26,33 @@ export const WorkspaceLayout: React.FC = () => {
       {/* Sidebar Cố Định */}
       <AppSidebar />
 
-      {/* Vùng Làm Việc Chính Cuộn Độc Lập */}
-      <main
-        className={cn(
-          "flex-1 overflow-y-auto h-screen transition-all duration-300 ease-in-out min-w-0",
-          isTopicsPage
-            ? "p-3 sm:p-4 overflow-hidden flex flex-col h-screen"
-            : "p-4 sm:p-6 lg:p-8"
-        )}
-      >
-        <PageContainer
+      {/* Vùng Làm Việc Bên Phải: Cột gồm TopBar cố định và Vùng cuộn bên dưới */}
+      <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden">
+        {/* TopBar Cố Định Vị Trí (Không Bao Giờ Bị Mất Khi Scroll) */}
+        <div className="shrink-0 z-40 relative px-4 sm:px-6 lg:px-8 pt-3 sm:pt-4 pb-2 bg-[#F3F6FA]">
+          <div className={cn("w-full max-w-7xl mx-auto", isTopicsPage && "max-w-none")}>
+            <TopHeader />
+          </div>
+        </div>
+
+        {/* Vùng Nội Dung Cuộn Độc Lập Bên Dưới TopBar */}
+        <main
           className={cn(
-            isTopicsPage && "max-w-none w-full pb-0 flex-1 flex flex-col space-y-2 min-h-0 h-full"
+            "flex-1 overflow-y-auto transition-all duration-300 ease-in-out min-w-0",
+            isTopicsPage
+              ? "p-3 sm:p-4 overflow-hidden flex flex-col h-full"
+              : "px-4 sm:px-6 lg:px-8 pt-2 pb-8"
           )}
         >
-          <TopHeader />
-          <Outlet />
-        </PageContainer>
-      </main>
+          <PageContainer
+            className={cn(
+              isTopicsPage && "max-w-none w-full pb-0 flex-1 flex flex-col space-y-2 min-h-0 h-full"
+            )}
+          >
+            <Outlet />
+          </PageContainer>
+        </main>
+      </div>
     </div>
   );
 };

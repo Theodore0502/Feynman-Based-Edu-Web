@@ -122,7 +122,7 @@ export const TopHeader: React.FC<TopHeaderProps> = () => {
   const breadcrumbs = getBreadcrumbs();
 
   return (
-    <header className="relative z-40 bg-white/95 backdrop-blur-md rounded-2xl border border-[#E8EEF8] shadow-xs px-3.5 sm:px-4 py-2 flex items-center justify-between gap-3 mb-6 transition-all">
+    <header className="relative z-40 bg-white/95 backdrop-blur-md rounded-2xl border border-[#E8EEF8] shadow-xs px-3.5 sm:px-4 py-2 flex items-center justify-between gap-3 mb-0 transition-all">
       {/* 1. Left: Single-line Breadcrumbs */}
       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         {/* Breadcrumb Path (Single-line Dynamic Breadcrumbs) */}
