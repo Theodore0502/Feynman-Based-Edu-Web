@@ -266,16 +266,16 @@ export const MaterialUploadHub: React.FC = () => {
                 )}
               </div>
 
-              {/* AI Auto-Detection Details Preview (Closed-Set State) */}
+              {/* AI Auto-Detection Details Preview (System Knowledge Repository) */}
               {aiClassification && uploadedFile && (
                 <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-50/80 via-blue-50/60 to-purple-50/50 border border-indigo-100/90 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="text-xs font-black text-indigo-950 flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>Chiếu Xạ Dữ Liệu Học Thuật Chuẩn Hóa (Closed-Set Taxonomy State)</span>
+                      <span>Truy Vấn Kho Tri Thức Hệ Thống (Supabase Curriculum Repository)</span>
                     </div>
                     <span className="text-[10px] font-bold uppercase tracking-wider bg-white px-2.5 py-0.5 rounded-full text-indigo-700 border border-indigo-200/70 shadow-2xs">
-                      Tập Đóng Bất Biến
+                      Kho Dữ Liệu Sống
                     </span>
                   </div>
 
@@ -300,7 +300,7 @@ export const MaterialUploadHub: React.FC = () => {
 
                   {aiClassification.matchedKeywords.length > 0 && (
                     <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                      <span className="text-[11px] font-bold text-slate-500">Từ khóa đối soát:</span>
+                      <span className="text-[11px] font-bold text-slate-500">Từ khóa đối soát trong kho tri thức:</span>
                       {aiClassification.matchedKeywords.map((kw, i) => (
                         <span
                           key={i}
@@ -313,7 +313,7 @@ export const MaterialUploadHub: React.FC = () => {
                   )}
 
                   <p className="text-[11px] text-slate-500 italic">
-                    * Hệ thống cam kết tuyệt đối không phát sinh nhãn thừa. Toàn bộ Khái niệm cốt lõi & Bẫy thuật ngữ đều được kế thừa từ tệp Closed-Set JSON State có sẵn.
+                    * Agent trực tiếp truy vấn Kho dữ liệu Supabase để đối soát nhãn học thuật và tự động tổng hợp Khái niệm cốt lõi, Bẫy thuật ngữ & Ẩn dụ phù hợp nhất với nội dung tài liệu.
                   </p>
                 </div>
               )}

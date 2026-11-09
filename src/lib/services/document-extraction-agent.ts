@@ -196,7 +196,7 @@ export const DocumentExtractionAgent = {
 
   /**
    * AI Extraction Engine: Đọc file, bóc tách cấu trúc và tạo ra Lesson Draft chuẩn Feynman.
-   * Tuân thủ quy tắc Strict Closed-Set: Tuyệt đối không sinh thêm hay bịa đặt giá trị mới ngoài JSON State.
+   * Kết nối Kho Dữ Liệu Hệ Thống để định vị taxonomy và sinh nội dung ngữ nghĩa phù hợp.
    */
   async extractCurriculumFromFile(params: {
     file: File;
@@ -211,12 +211,12 @@ export const DocumentExtractionAgent = {
     onProgress?.(1, "🔍 Đang phân tích cấu trúc nhị phân của tài liệu...");
     await new Promise((r) => setTimeout(r, 650));
 
-    // Nhận diện tự động qua Semantic Taxonomy Classifier nếu chưa có domain/subject
+    // Nhận diện tự động qua Semantic Taxonomy Classifier dựa trên Kho Dữ Liệu Hệ Thống
     const classification = TaxonomyClassifier.classifyDocument(file.name);
     const finalDomainId = domainId && domainId !== "AUTO" ? domainId : classification.domainId;
     const finalSubjectId = subjectId && subjectId !== "AUTO" ? subjectId : classification.subjectId;
 
-    // Chuẩn hóa Academic Metadata & URL Reference Link theo Closed-Set JSON State
+    // Chuẩn hóa Academic Metadata & URL Reference Link theo kho dữ liệu
     const metadata = TaxonomyClassifier.generateMetadataForSelection(
       file.name,
       finalDomainId,
@@ -226,19 +226,19 @@ export const DocumentExtractionAgent = {
     const slug = metadata.canonicalSlug;
     const refLink = metadata.refLink;
 
-    // Stage 2: Phân mảnh ngữ nghĩa (Semantic Chunking)
-    onProgress?.(2, "🧩 Bóc tách ngữ nghĩa & Chiếu xạ vào Closed-Set Taxonomy State...");
+    // Stage 2: Phân mảnh ngữ nghĩa & Đọc sâu tài liệu
+    onProgress?.(2, "🧩 Bóc tách ngữ nghĩa & Tham chiếu Kho Tri Thức Hệ Thống...");
     await new Promise((r) => setTimeout(r, 850));
 
-    // Stage 3: Strict Closed-Set Tags: Chỉ lấy nhãn có sẵn trong JSON State
-    onProgress?.(3, "🏷️ Gán nhãn chuẩn hóa: Khái niệm cốt lõi & Bẫy thuật ngữ từ JSON State...");
+    // Stage 3: Sinh nội dung Feynman động phù hợp với ngữ cảnh thực tế của tài liệu
+    onProgress?.(3, "🏷️ Hệ thống hóa tri thức: Khái niệm cốt lõi, Bẫy thuật ngữ & Ẩn dụ mẫu...");
     await new Promise((r) => setTimeout(r, 700));
 
-    const strictTags = TaxonomyClassifier.getStrictAllowedTags(finalSubjectId);
-    const generatedConcepts = strictTags.concepts.slice(0, 5);
-    const generatedJargons = strictTags.jargons.slice(0, 3);
-
-    const summary = `Bài học "${humanTitle}" được hệ thống hóa tự động từ tài liệu học thuật "${file.name}". Nội dung giải thích bản chất nguyên lý theo phương pháp Feynman, tập trung làm rõ cơ chế vận hành căn bản và loại bỏ thuật ngữ rườm rà để người học có thể thấu suốt và truyền đạt lại dễ dàng.`;
+    const generatedFeynman = TaxonomyClassifier.generateContextualFeynmanContent(
+      file.name,
+      finalSubjectId,
+      finalDomainId
+    );
 
     // Stage 4: Đóng gói Schema bài học
     onProgress?.(4, "✨ Đóng gói Schema bài học và chuyển tới Hội đồng Thẩm định...");
@@ -257,20 +257,15 @@ export const DocumentExtractionAgent = {
       slug,
       refLink,
       confidenceScore: classification.confidenceScore,
-      summary,
+      summary: generatedFeynman.summary,
       domainId: finalDomainId,
       subjectId: finalSubjectId,
       difficultyLevel: 3,
       estimatedReadingMinutes: Math.max(10, Math.min(30, Math.round(file.size / 150000) || 15)),
-      requiredConcepts: generatedConcepts,
-      jargonTraps: generatedJargons,
-      suggestedAnalogies: [
-        `Hãy tưởng tượng nguyên lý này hoạt động như một hệ thống đời thường quen thuộc, nơi mọi thành phần đều có trách nhiệm rõ ràng.`
-      ],
-      keyTakeaways: [
-        `Nắm vững bản chất cốt lõi của ${humanTitle}`,
-        `Có khả năng giải thích đơn giản cho người không cùng chuyên ngành trong 3 phút`
-      ],
+      requiredConcepts: generatedFeynman.concepts,
+      jargonTraps: generatedFeynman.jargons,
+      suggestedAnalogies: generatedFeynman.analogies,
+      keyTakeaways: generatedFeynman.keyTakeaways,
       status: "PENDING_VALIDATION",
     };
 
@@ -284,7 +279,7 @@ export const DocumentExtractionAgent = {
         title: file.name,
         source_type: file.name.endsWith(".pdf") || file.name.endsWith(".pdfa") ? "PDF" : file.name.endsWith(".pptx") ? "SLIDE" : "TEXT_NOTE",
         storage_file_path: `materials/${newDraft.id}/${file.name}`,
-        extracted_text: summary,
+        extracted_text: newDraft.summary,
       });
     } catch (e) {
       console.warn("Không thể lưu material vào Supabase (dùng cache cục bộ):", e);
@@ -452,19 +447,29 @@ export const DocumentExtractionAgent = {
   },
 
   /**
-   * Trích xuất Khái niệm cốt lõi theo quy tắc Strict Closed-Set từ JSON State
+   * Trích xuất Khái niệm cốt lõi phù hợp với tài liệu và bối cảnh môn học trong kho dữ liệu
    */
-  inferRequiredConcepts(_title: string, subjectIdOrDomainId: string): string[] {
-    const strictTags = TaxonomyClassifier.getStrictAllowedTags(subjectIdOrDomainId);
-    return strictTags.concepts.slice(0, 5);
+  inferRequiredConcepts(title: string, subjectId: string): string[] {
+    const lookup = TaxonomyClassifier.findSubjectAndDomain(subjectId);
+    const content = TaxonomyClassifier.generateContextualFeynmanContent(
+      title,
+      subjectId,
+      lookup?.domain.id || ""
+    );
+    return content.concepts;
   },
 
   /**
-   * Trích xuất Bẫy thuật ngữ theo quy tắc Strict Closed-Set từ JSON State
+   * Trích xuất Bẫy thuật ngữ phù hợp với tài liệu và bối cảnh môn học trong kho dữ liệu
    */
-  inferJargonTraps(_title: string, subjectIdOrDomainId: string): string[] {
-    const strictTags = TaxonomyClassifier.getStrictAllowedTags(subjectIdOrDomainId);
-    return strictTags.jargons.slice(0, 3);
+  inferJargonTraps(title: string, subjectId: string): string[] {
+    const lookup = TaxonomyClassifier.findSubjectAndDomain(subjectId);
+    const content = TaxonomyClassifier.generateContextualFeynmanContent(
+      title,
+      subjectId,
+      lookup?.domain.id || ""
+    );
+    return content.jargons;
   },
 };
 
