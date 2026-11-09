@@ -3,7 +3,7 @@
  * Mục đích: Module thử nghiệm trực tiếp 1:1 trên Landing Page cho khách trải nghiệm giảng giải Feynman với Bé Bắp (Gemini AI).
  * Bố cục:
  *   - Phần trên: Bố cục 1:1 (Cột trái: Tài liệu chuẩn bị nạp từ Supabase | Cột phải: Khung chat/voice với Bé Bắp)
- *   - Phần dưới: Bảng minh bạch dữ liệu (Live Audit Console) hiển thị lịch sử đối thoại, các chỉ số chấm điểm từng lượt và Raw JSON State để người dùng copy đánh giá.
+ *   - Phần dưới: Bảng minh bạch dữ liệu (Live Audit Console) hiển thị lịch sử đối thoại, các chỉ số chấm điểm từng lượt, token used, thời gian phản hồi (giây) và Raw JSON State để người dùng copy đánh giá.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
@@ -32,6 +32,9 @@ import {
   ShieldCheck,
   Activity,
   Code2,
+  Clock,
+  Coins,
+  Cpu,
 } from "lucide-react";
 
 interface MessageItem {
@@ -45,7 +48,20 @@ interface MessageItem {
   logicGaps?: LogicGapItem[];
 }
 
-interface TurnRecord {
+export interface TurnTelemetry {
+  durationMs: number;
+  durationSeconds: number;
+  promptTokens: number;
+  candidatesTokens: number;
+  totalTokens: number;
+  analysisDurationSeconds: number;
+  personaDurationSeconds: number;
+  model: string;
+  executionMode: "GEMINI_LIVE_API" | "FALLBACK";
+  fallbackReason?: string;
+}
+
+export interface TurnRecord {
   turnIndex: number;
   userExplanation: string;
   clarityScore: number;
@@ -54,6 +70,7 @@ interface TurnRecord {
   logicGaps: LogicGapItem[];
   assistantResponse: string;
   timestamp: string;
+  telemetry: TurnTelemetry;
 }
 
 export const FeynmanLiveTrialModule: React.FC = () => {
@@ -83,7 +100,7 @@ export const FeynmanLiveTrialModule: React.FC = () => {
   const [isAiThinking, setIsAiThinking] = useState(false);
   const [currentClarityScore, setCurrentClarityScore] = useState<number | null>(null);
 
-  // Lưu trữ danh sách các lượt giảng giải đã phân tích (dùng cho bảng chấm điểm & JSON State)
+  // Lưu trữ danh sách các lượt giảng giải đã phân tích (kèm telemetry latency & token)
   const [turnRecords, setTurnRecords] = useState<TurnRecord[]>([]);
 
   // Tab xem ở bảng minh bạch: 'card' (thẻ trực quan) hoặc 'json' (raw json state)
@@ -139,13 +156,14 @@ export const FeynmanLiveTrialModule: React.FC = () => {
     loadFeynmanData();
   }, []);
 
-  // 2. Gửi lời giảng sang Gemini AI
+  // 2. Gửi lời giảng sang Gemini AI và đo lường thời gian thực
   const handleSendMessage = async (textToSend?: string) => {
     const rawContent = (textToSend || inputText).trim();
     if (!rawContent || isAiThinking) return;
 
     setInputText("");
 
+    const turnStartTime = Date.now();
     const now = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
     const userMsgId = `user-${Date.now()}`;
 
@@ -163,7 +181,7 @@ export const FeynmanLiveTrialModule: React.FC = () => {
     try {
       const topicTitle = feynmanTopic?.title || "Phương Pháp Học Tập & Kỹ Thuật Feynman";
 
-      // Phân tích Clarity & Jargon thời gian thực
+      // 1. Phân tích Clarity & Jargon thời gian thực
       const analysis = await GeminiCurriculumService.analyzeTurnRealtime(topicTitle, rawContent);
       setCurrentClarityScore(analysis.currentClarityScore);
 
@@ -189,13 +207,15 @@ export const FeynmanLiveTrialModule: React.FC = () => {
 
       historyForGemini.push({ role: "user", content: rawContent });
 
-      // Gọi Gemini LLM tạo phản ứng Socratic của Bé Bắp
-      const personaReply = await GeminiCurriculumService.generatePersonaChatResponse({
+      // 2. Gọi Gemini LLM tạo phản ứng Socratic của Bé Bắp kèm đo lường Telemetry
+      const personaDetailed = await GeminiCurriculumService.generatePersonaChatResponseDetailed({
         topic: topicTitle,
         persona: beBapPersona,
         chatHistory: historyForGemini,
         userMessage: rawContent,
       });
+
+      const personaReply = personaDetailed.reply;
 
       const assistantMsg: MessageItem = {
         id: `assistant-${Date.now()}`,
@@ -205,6 +225,47 @@ export const FeynmanLiveTrialModule: React.FC = () => {
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
+
+      // 3. Tính toán Telemetry (Thời gian phản hồi & Token)
+      const turnDurationMs = Date.now() - turnStartTime;
+      const turnDurationSeconds = Number((turnDurationMs / 1000).toFixed(2));
+
+      const analysisMetrics = analysis.metrics || {
+        durationMs: 0,
+        durationSeconds: 0,
+        promptTokens: 0,
+        candidatesTokens: 0,
+        totalTokens: 0,
+        isFallback: false,
+        fallbackReason: undefined as string | undefined,
+      };
+
+      const personaMetrics = personaDetailed.metrics;
+
+      const totalTokens = (analysisMetrics.totalTokens || 0) + (personaMetrics.totalTokens || 0);
+      const promptTokens = (analysisMetrics.promptTokens || 0) + (personaMetrics.promptTokens || 0);
+      const candidatesTokens = (analysisMetrics.candidatesTokens || 0) + (personaMetrics.candidatesTokens || 0);
+
+      const isFallback = analysisMetrics.isFallback || personaMetrics.isFallback;
+      const executionMode = isFallback ? "FALLBACK" : "GEMINI_LIVE_API";
+
+      const telemetry: TurnTelemetry = {
+        durationMs: turnDurationMs,
+        durationSeconds: turnDurationSeconds,
+        analysisDurationSeconds: analysisMetrics.durationSeconds,
+        personaDurationSeconds: personaMetrics.durationSeconds,
+        promptTokens,
+        candidatesTokens,
+        totalTokens,
+        model: personaMetrics.model || "gemini-3.1-flash-lite",
+        executionMode,
+        fallbackReason: personaMetrics.fallbackReason || analysisMetrics.fallbackReason,
+      };
+
+      console.info(
+        `%c[Feynman Live Trial] Lượt #${turnRecords.length + 1} | Thời gian: ${turnDurationSeconds}s | Tokens: ${totalTokens} (Prompt: ${promptTokens}, Gen: ${candidatesTokens}) | Mode: ${executionMode}`,
+        executionMode === "GEMINI_LIVE_API" ? "color: #10b981; font-weight: bold" : "color: #f59e0b; font-weight: bold"
+      );
 
       // Ghi nhận vào danh mục các lượt chấm điểm chi tiết (Turn Records)
       setTurnRecords((prev) => [
@@ -218,10 +279,14 @@ export const FeynmanLiveTrialModule: React.FC = () => {
           logicGaps: analysis.logicGaps || [],
           assistantResponse: personaReply,
           timestamp: now,
+          telemetry,
         },
       ]);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Lỗi tương tác Gemini:", error);
+      const turnDurationMs = Date.now() - turnStartTime;
+      const turnDurationSeconds = Number((turnDurationMs / 1000).toFixed(2));
+
       const fallbackReply =
         "Dạ chú ơi, chú nói từ 'nguyên lý' với 'trừu tượng' con chưa hiểu lắm ạ. Chú có thể ví dụ như một trò chơi hay một món ăn con hay thấy được không chú?";
 
@@ -244,6 +309,18 @@ export const FeynmanLiveTrialModule: React.FC = () => {
           logicGaps: [],
           assistantResponse: fallbackReply,
           timestamp: now,
+          telemetry: {
+            durationMs: turnDurationMs,
+            durationSeconds: turnDurationSeconds,
+            analysisDurationSeconds: 0,
+            personaDurationSeconds: 0,
+            promptTokens: 0,
+            candidatesTokens: 0,
+            totalTokens: 0,
+            model: "fallback",
+            executionMode: "FALLBACK",
+            fallbackReason: error?.message || "Lỗi mạng hoặc API",
+          },
         },
       ]);
     } finally {
@@ -269,6 +346,12 @@ export const FeynmanLiveTrialModule: React.FC = () => {
 
   // Tạo đối tượng JSON State hoàn chỉnh cho toàn bộ phiên
   const sessionInspectionState = useMemo(() => {
+    const totalTokensAcrossSession = turnRecords.reduce((sum, t) => sum + (t.telemetry?.totalTokens || 0), 0);
+    const avgLatency =
+      turnRecords.length > 0
+        ? Number((turnRecords.reduce((sum, t) => sum + (t.telemetry?.durationSeconds || 0), 0) / turnRecords.length).toFixed(2))
+        : 0;
+
     return {
       session_id: sessionId,
       topic: feynmanTopic?.title || "Phương Pháp Học Tập & Kỹ Thuật Feynman",
@@ -289,8 +372,36 @@ export const FeynmanLiveTrialModule: React.FC = () => {
         jargon_traps_triggered: turnRecords.reduce((sum, t) => sum + (t.jargonDetected?.length || 0), 0),
         logic_gaps_flagged: turnRecords.reduce((sum, t) => sum + (t.logicGaps?.length || 0), 0),
         status: turnRecords.length === 0 ? "NOT_STARTED" : "ACTIVE_TESTING",
+        performance_metrics: {
+          total_tokens_used: totalTokensAcrossSession,
+          average_response_time_seconds: avgLatency,
+          active_model: "gemini-3.1-flash-lite",
+          latest_turn_mode: turnRecords.length > 0 ? turnRecords[turnRecords.length - 1].telemetry?.executionMode : "N/A",
+        },
       },
-      turns_log: turnRecords,
+      turns_log: turnRecords.map((t) => ({
+        turn_index: t.turnIndex,
+        timestamp: t.timestamp,
+        user_explanation: t.userExplanation,
+        clarity_score: t.clarityScore,
+        detected_analogy: t.detectedAnalogy,
+        jargon_detected: t.jargonDetected,
+        logic_gaps: t.logicGaps,
+        assistant_response: t.assistantResponse,
+        telemetry: {
+          response_time_seconds: t.telemetry.durationSeconds,
+          analysis_latency_seconds: t.telemetry.analysisDurationSeconds,
+          persona_latency_seconds: t.telemetry.personaDurationSeconds,
+          tokens_used: {
+            prompt_tokens: t.telemetry.promptTokens,
+            candidates_tokens: t.telemetry.candidatesTokens,
+            total_tokens: t.telemetry.totalTokens,
+          },
+          model: t.telemetry.model,
+          execution_mode: t.telemetry.executionMode,
+          fallback_reason: t.telemetry.fallbackReason || null,
+        },
+      })),
       raw_messages: messages.map((m) => ({
         id: m.id,
         role: m.role,
@@ -303,7 +414,7 @@ export const FeynmanLiveTrialModule: React.FC = () => {
       system_meta: {
         ai_engine: "gemini-3.1-flash-lite",
         runtime: "Theodore Feynman Engine 2.0",
-        transparency_mode: "FULL_AUDIT_LOG",
+        transparency_mode: "FULL_AUDIT_LOG_WITH_TELEMETRY",
         exported_at: new Date().toISOString(),
       },
     };
@@ -318,7 +429,9 @@ export const FeynmanLiveTrialModule: React.FC = () => {
     md += `- **Mã phiên (Session ID):** \`${sessionId}\`\n`;
     md += `- **Thời gian xuất:** ${new Date().toLocaleString("vi-VN")}\n`;
     md += `- **Độ Sáng Rõ (Clarity Score):** ${currentClarityScore !== null ? `${currentClarityScore}/100` : "Chưa có"}\n`;
-    md += `- **Tổng số lượt giảng:** ${turnRecords.length}\n\n`;
+    md += `- **Tổng số lượt giảng:** ${turnRecords.length}\n`;
+    const totalTokensAcrossSession = turnRecords.reduce((sum, t) => sum + (t.telemetry?.totalTokens || 0), 0);
+    md += `- **Tổng Token Tiêu Thụ:** ${totalTokensAcrossSession} tokens\n\n`;
     md += `## CHI TIẾT TỪNG LƯỢT GIẢNG GIẢI (TURN-BY-TURN):\n\n`;
 
     if (turnRecords.length === 0) {
@@ -328,6 +441,9 @@ export const FeynmanLiveTrialModule: React.FC = () => {
         md += `### 🔹 Lượt #${t.turnIndex} (${t.timestamp})\n`;
         md += `* **Người học:** "${t.userExplanation}"\n`;
         md += `* **Độ sáng rõ:** \`${t.clarityScore}/100\`\n`;
+        md += `* **Thời gian phản hồi AI:** \`${t.telemetry.durationSeconds}s\` (Phân tích: ${t.telemetry.analysisDurationSeconds}s, Bé Bắp: ${t.telemetry.personaDurationSeconds}s)\n`;
+        md += `* **Tokens Tiêu Thụ:** \`${t.telemetry.totalTokens}\` (Prompt: ${t.telemetry.promptTokens}, Gen: ${t.telemetry.candidatesTokens})\n`;
+        md += `* **Trạng thái kết nối:** \`${t.telemetry.executionMode}\` (${t.telemetry.model})\n`;
         if (t.detectedAnalogy) {
           md += `* **Phép ẩn dụ phát hiện:** ✅ "${t.detectedAnalogy}"\n`;
         }
@@ -772,7 +888,7 @@ export const FeynmanLiveTrialModule: React.FC = () => {
               </h3>
             </div>
             <p className="text-xs text-slate-500">
-              Dữ liệu được cập nhật trực tiếp sau mỗi lượt bạn nói. Bạn có thể sao chép nhanh JSON để gửi cho AI hoặc giáo viên đánh giá.
+              Minh bạch 100% thời gian phản hồi AI (giây), số token tiêu thụ, trạng thái kết nối Gemini và JSON State từng lượt giảng.
             </p>
           </div>
 
@@ -815,7 +931,7 @@ export const FeynmanLiveTrialModule: React.FC = () => {
           </div>
         </div>
 
-        {/* Thống kê nhanh tổng quan (Metric Badges) */}
+        {/* Thống kê nhanh tổng quan (Metric Badges với Latency & Token) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="p-3.5 rounded-2xl bg-[#F8FAFD] border border-slate-200/80 space-y-1">
             <span className="text-[11px] text-slate-500 font-semibold block flex items-center gap-1">
@@ -837,30 +953,47 @@ export const FeynmanLiveTrialModule: React.FC = () => {
 
           <div className="p-3.5 rounded-2xl bg-[#F8FAFD] border border-slate-200/80 space-y-1">
             <span className="text-[11px] text-slate-500 font-semibold block flex items-center gap-1">
-              <Layers className="w-3.5 h-3.5 text-purple-500" />
-              Tổng Lượt Giảng
+              <Clock className="w-3.5 h-3.5 text-emerald-500" />
+              Tốc Độ Phản Hồi AI
             </span>
-            <span className="text-xl font-black text-slate-800">{turnRecords.length} lượt</span>
+            <span className="text-xl font-black text-slate-800">
+              {turnRecords.length > 0 ? `${turnRecords[turnRecords.length - 1].telemetry?.durationSeconds ?? 0}s` : "--s"}
+            </span>
           </div>
 
           <div className="p-3.5 rounded-2xl bg-[#F8FAFD] border border-slate-200/80 space-y-1">
             <span className="text-[11px] text-slate-500 font-semibold block flex items-center gap-1">
-              <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-              Ẩn Dụ Đã Kiến Tạo
+              <Coins className="w-3.5 h-3.5 text-amber-500" />
+              Tổng Token Sử Dụng
             </span>
             <span className="text-xl font-black text-amber-700">
-              {turnRecords.filter((t) => !!t.detectedAnalogy).length} ẩn dụ
+              {turnRecords.reduce((sum, t) => sum + (t.telemetry?.totalTokens || 0), 0)} tok
             </span>
           </div>
 
           <div className="p-3.5 rounded-2xl bg-[#F8FAFD] border border-slate-200/80 space-y-1">
             <span className="text-[11px] text-slate-500 font-semibold block flex items-center gap-1">
-              <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
-              Biệt Ngữ Bị Bắt Bẻ
+              <Cpu className="w-3.5 h-3.5 text-purple-500" />
+              Trạng Thái Kết Nối
             </span>
-            <span className="text-xl font-black text-rose-600">
-              {turnRecords.reduce((sum, t) => sum + (t.jargonDetected?.length || 0), 0)} từ khó
-            </span>
+            <div className="flex items-center gap-1.5 pt-0.5">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  turnRecords.length === 0
+                    ? "bg-slate-300"
+                    : turnRecords[turnRecords.length - 1].telemetry?.executionMode === "GEMINI_LIVE_API"
+                    ? "bg-emerald-500 animate-pulse"
+                    : "bg-amber-500"
+                }`}
+              />
+              <span className="text-xs font-black text-slate-700 truncate">
+                {turnRecords.length === 0
+                  ? "Sẵn Sàng"
+                  : turnRecords[turnRecords.length - 1].telemetry?.executionMode === "GEMINI_LIVE_API"
+                  ? "Gemini Live API"
+                  : "Fallback"}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -910,7 +1043,7 @@ export const FeynmanLiveTrialModule: React.FC = () => {
                 <Terminal className="w-8 h-8 text-slate-300 mx-auto" />
                 <p className="text-xs font-bold text-slate-600">Chưa có lượt tương tác nào được ghi nhận</p>
                 <p className="text-[11px] text-slate-400 max-w-md mx-auto">
-                  Hãy nhập một câu giảng giải cho Bé Bắp ở khung chat bên trên (ví dụ: "Chào Bắp, phương pháp Feynman giống như việc con xếp hình Lego..."), bảng chấm điểm và JSON State sẽ hiển thị ngay tại đây.
+                  Hãy nhập một câu giảng giải cho Bé Bắp ở khung chat bên trên (ví dụ: "Chào Bắp, phương pháp Feynman giống như việc con xếp hình Lego..."), bảng chấm điểm, token và thời gian phản hồi AI sẽ hiển thị ngay tại đây.
                 </p>
               </div>
             ) : (
@@ -921,7 +1054,7 @@ export const FeynmanLiveTrialModule: React.FC = () => {
                     className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 shadow-2xs space-y-3"
                   >
                     {/* Header của Lượt */}
-                    <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
                       <div className="flex items-center gap-2">
                         <span className="w-6 h-6 rounded-lg bg-[#EEF2FC] text-[#5066A1] text-xs font-black flex items-center justify-center">
                           #{turn.turnIndex}
@@ -1004,6 +1137,43 @@ export const FeynmanLiveTrialModule: React.FC = () => {
                       <p className="text-xs sm:text-sm text-slate-700 bg-[#EEF2FC]/40 p-3 rounded-xl border border-[#E2EAFD]">
                         "{turn.assistantResponse}"
                       </p>
+                    </div>
+
+                    {/* Dải Telemetry: Latency, Token Usage, Status */}
+                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-[11px]">
+                      <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-mono font-medium">
+                        <Clock className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Phản hồi: <strong>{turn.telemetry?.durationSeconds ?? 0}s</strong></span>
+                      </span>
+
+                      <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-mono font-medium">
+                        <Coins className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Tokens: <strong>{turn.telemetry?.totalTokens ?? 0}</strong> (Prompt: {turn.telemetry?.promptTokens ?? 0}, Gen: {turn.telemetry?.candidatesTokens ?? 0})</span>
+                      </span>
+
+                      <span
+                        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-[10px] border ${
+                          turn.telemetry?.executionMode === "GEMINI_LIVE_API"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : "bg-amber-50 text-amber-700 border-amber-200"
+                        }`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            turn.telemetry?.executionMode === "GEMINI_LIVE_API" ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+                          }`}
+                        />
+                        <span>{turn.telemetry?.executionMode === "GEMINI_LIVE_API" ? "Gemini 3.1 Flash Lite (Live)" : "Fallback Mode"}</span>
+                      </span>
+
+                      {turn.telemetry?.fallbackReason && (
+                        <span
+                          className="text-[10px] text-rose-500 italic truncate max-w-xs pl-1"
+                          title={turn.telemetry.fallbackReason}
+                        >
+                          Lý do: {turn.telemetry.fallbackReason}
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}

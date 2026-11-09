@@ -27,6 +27,16 @@ export interface AnalyticalResult {
   currentClarityScore: number;
   detectedAnalogy: string | null;
   isReadyToComplete: boolean;
+  metrics?: {
+    durationMs: number;
+    durationSeconds: number;
+    promptTokens: number;
+    candidatesTokens: number;
+    totalTokens: number;
+    model: string;
+    isFallback: boolean;
+    fallbackReason?: string;
+  };
 }
 
 export interface MasteryEvaluation {

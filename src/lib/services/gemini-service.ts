@@ -41,23 +41,42 @@ export interface GeminiCurriculumAnalysisResult {
 
 const metaEnv = typeof import.meta !== "undefined" ? (import.meta as any).env : undefined;
 
-function getGeminiApiKey(): string | undefined {
-  return (
+export interface GeminiCallMetrics {
+  durationMs: number;
+  durationSeconds: number;
+  promptTokens: number;
+  candidatesTokens: number;
+  totalTokens: number;
+  model: string;
+  isFallback: boolean;
+  fallbackReason?: string;
+}
+
+export interface PersonaResponseDetailed {
+  reply: string;
+  metrics: GeminiCallMetrics;
+}
+
+function getGeminiApiKey(): string {
+  const key =
     metaEnv?.VITE_GEMINI_API_KEY ||
-    (typeof process !== "undefined" && process.env?.GEMINI_API_KEY) ||
-    (typeof process !== "undefined" && process.env?.VITE_GEMINI_API_KEY)
-  );
+    (typeof process !== "undefined" && (process.env?.VITE_GEMINI_API_KEY || process.env?.GEMINI_API_KEY));
+  return key || "";
 }
 
 function getGeminiModelName(): string {
   return (
     metaEnv?.VITE_MODEL_NAME ||
-    (typeof process !== "undefined" && process.env?.MODEL_NAME) ||
+    (typeof process !== "undefined" && (process.env?.VITE_MODEL_NAME || process.env?.MODEL_NAME)) ||
     "gemini-3.1-flash-lite"
   );
 }
 
-async function callGeminiRest(prompt: string, jsonMode: boolean = false): Promise<string> {
+export async function callGeminiRestWithMetrics(
+  prompt: string,
+  jsonMode: boolean = false
+): Promise<{ text: string; metrics: GeminiCallMetrics }> {
+  const startTime = Date.now();
   const apiKey = getGeminiApiKey();
   const modelName = getGeminiModelName();
 
@@ -84,18 +103,42 @@ async function callGeminiRest(prompt: string, jsonMode: boolean = false): Promis
     body: JSON.stringify(bodyPayload),
   });
 
+  const durationMs = Date.now() - startTime;
+  const durationSeconds = Number((durationMs / 1000).toFixed(2));
+
   if (!res.ok) {
     const errorText = await res.text();
-    throw new Error(`Gemini API HTTP ${res.status}: ${errorText}`);
+    throw new Error(`Gemini API HTTP ${res.status} [${durationMs}ms]: ${errorText}`);
   }
 
   const resData = await res.json();
   const text = resData?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) {
-    throw new Error("Gemini không trả về nội dung");
+    throw new Error(`Gemini không trả về nội dung [${durationMs}ms]`);
   }
 
-  return text;
+  const usage = resData?.usageMetadata || {};
+  const promptTokens = usage.promptTokenCount || Math.ceil(prompt.length / 4);
+  const candidatesTokens = usage.candidatesTokenCount || Math.ceil(text.length / 4);
+  const totalTokens = usage.totalTokenCount || promptTokens + candidatesTokens;
+
+  return {
+    text,
+    metrics: {
+      durationMs,
+      durationSeconds,
+      promptTokens,
+      candidatesTokens,
+      totalTokens,
+      model: modelName,
+      isFallback: false,
+    },
+  };
+}
+
+async function callGeminiRest(prompt: string, jsonMode: boolean = false): Promise<string> {
+  const result = await callGeminiRestWithMetrics(prompt, jsonMode);
+  return result.text;
 }
 
 export const GeminiCurriculumService = {
@@ -294,8 +337,8 @@ Trả về DUY NHẤT một JSON hợp lệ:
 }`;
 
     try {
-      const res = await callGeminiRest(prompt, true);
-      const clean = res.replace(/^```json\s*/i, "").replace(/\s*```$/, "").trim();
+      const res = await callGeminiRestWithMetrics(prompt, true);
+      const clean = res.text.replace(/^```json\s*/i, "").replace(/\s*```$/, "").trim();
       const parsed = JSON.parse(clean);
       return {
         jargonDetected: parsed.jargonDetected || [],
@@ -303,6 +346,7 @@ Trả về DUY NHẤT một JSON hợp lệ:
         currentClarityScore: parsed.currentClarityScore || 75,
         detectedAnalogy: parsed.detectedAnalogy || null,
         isReadyToComplete: parsed.isReadyToComplete || false,
+        metrics: res.metrics,
       };
     } catch (e: any) {
       SystemLogger.warn("GEMINI_LLM_SERVICE", "ANALYZE_TURN", `Fallback phân tích turn: ${e.message}`);
@@ -319,19 +363,29 @@ Trả về DUY NHẤT một JSON hợp lệ:
         currentClarityScore: hasAnalogy ? 82 : 68,
         detectedAnalogy: hasAnalogy ? "Đã dùng phép so sánh trực quan" : null,
         isReadyToComplete: userMessage.length > 150,
+        metrics: {
+          durationMs: 0,
+          durationSeconds: 0,
+          promptTokens: 0,
+          candidatesTokens: 0,
+          totalTokens: 0,
+          model: "fallback",
+          isFallback: true,
+          fallbackReason: e.message,
+        },
       };
     }
   },
 
   /**
-   * Sinh câu trả lời đóng vai Persona Socratic đối thoại trực tiếp trên Giảng Đài Live
+   * Sinh câu trả lời đóng vai Persona Socratic đối thoại trực tiếp kèm thông tin đo lường chi tiết (Latency, Tokens, Status)
    */
-  async generatePersonaChatResponse(params: {
+  async generatePersonaChatResponseDetailed(params: {
     topic: string;
     persona: PersonaDefinition;
     chatHistory: Array<{ role: string; content: string }>;
     userMessage: string;
-  }): Promise<string> {
+  }): Promise<PersonaResponseDetailed> {
     const { topic, persona, chatHistory, userMessage } = params;
 
     const historyStr = chatHistory
@@ -355,7 +409,7 @@ Người học vừa nói:
 "${userMessage}"
 
 QUY TẮC ĐỐI THOẠI FEYNMAN SOCRATIC:
-1. Bạn là người nghe với đúng tính cách và góc nhìn của nhân vật (Ví dụ nếu là Bé Bo 10 tuổi thì phải xưng con/cháu, dùng giọng ngây thơ, so sánh với đồ chơi, lớp học, kẹo bánh).
+1. Bạn là người nghe với đúng tính cách và góc nhìn của nhân vật (Ví dụ nếu là Bé Bo/Bé Bắp 10 tuổi thì phải xưng con/cháu, dùng giọng ngây thơ, so sánh với đồ chơi, lớp học, kẹo bánh).
 2. Nếu người học dùng từ khó hoặc thuật ngữ kỹ thuật, hãy ngơ ngác hỏi lại: "Ủa từ đó nghĩa là gì vậy ạ? Nó giống cái gì trong đời thực vậy?".
 3. Nếu người học giải thích dễ hiểu bằng ẩn dụ hay, hãy phấn khích khen ngợi và đặt 1 câu hỏi sâu hơn để đào sâu bản chất (Socratic probing).
 4. Phản hồi tự nhiên, ngắn gọn (2-4 câu), giữ đúng chất đàm thoại, TUYỆT ĐỐI KHÔNG thuyết giảng ngược lại người học.
@@ -363,15 +417,44 @@ QUY TẮC ĐỐI THOẠI FEYNMAN SOCRATIC:
 Hãy trả lời bằng tiếng Việt tự nhiên:`;
 
     try {
-      const response = await callGeminiRest(prompt, false);
-      return response.trim();
+      const result = await callGeminiRestWithMetrics(prompt, false);
+      return {
+        reply: result.text.trim(),
+        metrics: result.metrics,
+      };
     } catch (e: any) {
       SystemLogger.error("GEMINI_LLM_SERVICE", "PERSONA_CHAT", `Lỗi gọi Gemini cho Persona: ${e.message}`, e);
-      if (persona.id.includes("child")) {
-        return `Ủa chú ơi, con nghe chú nói nhưng con chưa tưởng tượng ra được. Chú ví von cái đó với một thứ gì quen thuộc ngoài đời được không ạ?`;
-      }
-      return `Mình hiểu ý bạn rồi, nhưng điểm mấu chốt làm sao để cơ chế này hoạt động an toàn trong thực tế vậy bạn?`;
+      const fallbackReply = persona.id.includes("child")
+        ? `Ủa chú ơi, con nghe chú nói nhưng con chưa tưởng tượng ra được. Chú ví von cái đó với một thứ gì quen thuộc ngoài đời được không ạ?`
+        : `Mình hiểu ý bạn rồi, nhưng điểm mấu chốt làm sao để cơ chế này hoạt động an toàn trong thực tế vậy bạn?`;
+
+      return {
+        reply: fallbackReply,
+        metrics: {
+          durationMs: 0,
+          durationSeconds: 0,
+          promptTokens: 0,
+          candidatesTokens: 0,
+          totalTokens: 0,
+          model: "fallback",
+          isFallback: true,
+          fallbackReason: e.message,
+        },
+      };
     }
+  },
+
+  /**
+   * Sinh câu trả lời đóng vai Persona Socratic đối thoại trực tiếp trên Giảng Đài Live
+   */
+  async generatePersonaChatResponse(params: {
+    topic: string;
+    persona: PersonaDefinition;
+    chatHistory: Array<{ role: string; content: string }>;
+    userMessage: string;
+  }): Promise<string> {
+    const detailed = await this.generatePersonaChatResponseDetailed(params);
+    return detailed.reply;
   },
 
   /**
