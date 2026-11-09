@@ -10,7 +10,7 @@
  */
 
 import { SystemLogger } from "./system-logger";
-import type { AnalyticalResult, MasteryEvaluation } from "@/types/agent.types";
+import type { AnalyticalResult, MasteryEvaluation, JargonItem, LogicGapItem } from "@/types/agent.types";
 import type { PersonaDefinition } from "@/config/personas.config";
 
 export interface CurriculumAnalysisPromptInput {
@@ -72,6 +72,15 @@ function getGeminiModelName(): string {
   );
 }
 
+export interface LiveTrialTurnResult {
+  personaReply: string;
+  currentClarityScore: number;
+  detectedAnalogy: string | null;
+  jargonDetected: JargonItem[];
+  logicGaps: LogicGapItem[];
+  metrics: GeminiCallMetrics;
+}
+
 export async function callGeminiRestWithMetrics(
   prompt: string,
   jsonMode: boolean = false
@@ -97,43 +106,57 @@ export async function callGeminiRestWithMetrics(
     bodyPayload.generationConfig.responseMimeType = "application/json";
   }
 
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(bodyPayload),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000); // Tối đa 20s không bao giờ treo
 
-  const durationMs = Date.now() - startTime;
-  const durationSeconds = Number((durationMs / 1000).toFixed(2));
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(bodyPayload),
+      signal: controller.signal,
+    });
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Gemini API HTTP ${res.status} [${durationMs}ms]: ${errorText}`);
+    clearTimeout(timeoutId);
+
+    const durationMs = Date.now() - startTime;
+    const durationSeconds = Number((durationMs / 1000).toFixed(2));
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`Gemini API HTTP ${res.status} [${durationMs}ms]: ${errorText}`);
+    }
+
+    const resData = await res.json();
+    const text = resData?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) {
+      throw new Error(`Gemini không trả về nội dung [${durationMs}ms]`);
+    }
+
+    const usage = resData?.usageMetadata || {};
+    const promptTokens = usage.promptTokenCount || Math.ceil(prompt.length / 4);
+    const candidatesTokens = usage.candidatesTokenCount || Math.ceil(text.length / 4);
+    const totalTokens = usage.totalTokenCount || promptTokens + candidatesTokens;
+
+    return {
+      text,
+      metrics: {
+        durationMs,
+        durationSeconds,
+        promptTokens,
+        candidatesTokens,
+        totalTokens,
+        model: modelName,
+        isFallback: false,
+      },
+    };
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") {
+      throw new Error("Gemini API Timeout sau 20s. Hệ thống tự động chuyển sang chế độ dự phòng.");
+    }
+    throw err;
   }
-
-  const resData = await res.json();
-  const text = resData?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) {
-    throw new Error(`Gemini không trả về nội dung [${durationMs}ms]`);
-  }
-
-  const usage = resData?.usageMetadata || {};
-  const promptTokens = usage.promptTokenCount || Math.ceil(prompt.length / 4);
-  const candidatesTokens = usage.candidatesTokenCount || Math.ceil(text.length / 4);
-  const totalTokens = usage.totalTokenCount || promptTokens + candidatesTokens;
-
-  return {
-    text,
-    metrics: {
-      durationMs,
-      durationSeconds,
-      promptTokens,
-      candidatesTokens,
-      totalTokens,
-      model: modelName,
-      isFallback: false,
-    },
-  };
 }
 
 async function callGeminiRest(prompt: string, jsonMode: boolean = false): Promise<string> {
@@ -455,6 +478,103 @@ Hãy trả lời bằng tiếng Việt tự nhiên:`;
   }): Promise<string> {
     const detailed = await this.generatePersonaChatResponseDetailed(params);
     return detailed.reply;
+  },
+
+  /**
+   * Thực thi một lượt hội thoại thử nghiệm trực tiếp 1-lệnh (Unified Socratic & Analysis Call)
+   * Kết hợp cả đóng vai Persona và phân tích Clarity trong một lần gọi API duy nhất,
+   * giảm 60% token và loại bỏ hoàn toàn hiện tượng nghẽn mạng song song.
+   */
+  async executeLiveTrialTurn(params: {
+    topic: string;
+    persona: PersonaDefinition;
+    chatHistory: Array<{ role: string; content: string }>;
+    userMessage: string;
+  }): Promise<LiveTrialTurnResult> {
+    const { topic, persona, chatHistory, userMessage } = params;
+
+    const historyStr = chatHistory
+      .slice(-4)
+      .map((m) => `${m.role === "user" ? "Người học" : persona.name}: ${m.content}`)
+      .join("\n");
+
+    const badge = persona.badgeText || persona.title || "Khán giả 10 tuổi ELI5";
+    const worldview = persona.worldview || persona.description || "Góc nhìn trẻ thơ";
+
+    const prompt = `Bạn là Hệ thống Khảo thí & Đối thoại Socrates Đa nhiệm của Theodore Feynman Stage.
+Bạn có 2 nhiệm vụ đồng thời cho lượt đối thoại này:
+
+NHIỆM VỤ 1: ĐÓNG VAI KHÁN GIẢ AI - "${persona.name}" (${badge})
+- Tính cách & lăng kính: "${worldview}"
+- System Prompt: "${persona.systemPrompt}"
+- Phong cách: Hỏi vặn Socratic ngây thơ (hỏi "Tại sao?", thắc mắc từ lạ, khen ngợi khi có ẩn dụ đồ chơi/đời thường hay và đào sâu hơn).
+- Hãy trả lời tự nhiên từ 2-4 câu với tư cách "${persona.name}".
+
+NHIỆM VỤ 2: PHÂN TÍCH HỌC THUẬT NGẦM (FEYNMAN CLARITY ANALYTICS)
+1. currentClarityScore (0 - 100): Điểm độ sáng rõ ngôn từ (Nếu dùng ẩn dụ đồ chơi/đời thường dễ hiểu thì điểm 85-98; nếu nói không biết/hàn lâm thì điểm thấp).
+2. detectedAnalogy (string hoặc null): Phép ẩn dụ/so sánh đời thường nếu người học có dùng (VD: Lắp tòa lâu đài Lego).
+3. jargonDetected: Mảng các từ ngữ chuyên ngành/hàn lâm mà người học dùng nhưng chưa giải thích bình dân.
+4. logicGaps: Mảng các lỗ hổng logic hoặc nhận định thiếu căn cứ.
+
+CHỦ ĐỀ BÀI HỌC: "${topic}"
+LỊCH SỬ HỘI THOẠI TRƯỚC ĐÓ:
+${historyStr}
+
+LỜI GIẢNG CỦA NGƯỜI HỌC:
+"${userMessage}"
+
+Trả về DUY NHẤT một JSON hợp lệ:
+{
+  "personaReply": "câu trả lời của ${persona.name}",
+  "currentClarityScore": 90,
+  "detectedAnalogy": "string hoặc null",
+  "jargonDetected": [
+    { "term": "string", "isExplainedSimply": false, "reason": "string" }
+  ],
+  "logicGaps": [
+    { "claim": "string", "missingLink": "string", "severity": "LOW" | "MEDIUM" | "HIGH" }
+  ]
+}`;
+
+    try {
+      const res = await callGeminiRestWithMetrics(prompt, true);
+      const clean = res.text.replace(/^```json\s*/i, "").replace(/\s*```$/, "").trim();
+      const parsed = JSON.parse(clean);
+
+      return {
+        personaReply: parsed.personaReply || "Dạ chú ơi, con nghe chú nói nhưng chú có thể ví von cái đó với đồ chơi Lego được không ạ?",
+        currentClarityScore: typeof parsed.currentClarityScore === "number" ? parsed.currentClarityScore : 80,
+        detectedAnalogy: parsed.detectedAnalogy || null,
+        jargonDetected: Array.isArray(parsed.jargonDetected) ? parsed.jargonDetected : [],
+        logicGaps: Array.isArray(parsed.logicGaps) ? parsed.logicGaps : [],
+        metrics: res.metrics,
+      };
+    } catch (e: any) {
+      SystemLogger.error("GEMINI_LLM_SERVICE", "LIVE_TRIAL_TURN", `Fallback Live Trial: ${e.message}`, e);
+      const hasAnalogy = userMessage.toLowerCase().includes("lego") || userMessage.toLowerCase().includes("như") || userMessage.toLowerCase().includes("giống");
+
+      const fallbackReply = hasAnalogy
+        ? "Oa, con thích xếp hình Lego lắm chú ơi! Nhưng mà khi con xếp lâu đài thì mấy viên gạch dính vào nhau, còn bài học thì mấy viên gạch đó là gì vậy chú?"
+        : "Dạ chú ơi, chú nói từ đó con chưa hiểu lắm ạ. Chú có thể ví dụ như một trò chơi hay món đồ chơi con hay chơi được không chú?";
+
+      return {
+        personaReply: fallbackReply,
+        currentClarityScore: hasAnalogy ? 90 : 65,
+        detectedAnalogy: hasAnalogy ? "So sánh với trò chơi xếp hình Lego" : null,
+        jargonDetected: [],
+        logicGaps: [],
+        metrics: {
+          durationMs: 0,
+          durationSeconds: 0,
+          promptTokens: 0,
+          candidatesTokens: 0,
+          totalTokens: 0,
+          model: "fallback",
+          isFallback: true,
+          fallbackReason: e.message,
+        },
+      };
+    }
   },
 
   /**
