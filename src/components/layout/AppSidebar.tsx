@@ -80,7 +80,7 @@ export const AppSidebar: React.FC = () => {
       <div>
         <Link
           to="/about"
-          className="flex items-center h-12 mb-6 group transition-all overflow-hidden whitespace-nowrap"
+          className="flex items-center justify-center w-full h-12 mb-6 group transition-all overflow-hidden whitespace-nowrap"
           title="Khám phá triết lý học tập"
         >
           <div className="w-11 h-11 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105">
