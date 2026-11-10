@@ -169,40 +169,6 @@ export const LandingAndDemo: React.FC = () => {
               </span>
             </div>
           </Link>
-
-          <nav className="flex items-center gap-2 sm:gap-4">
-            <a
-              href="#bi-mat-tri-thuc"
-              className="text-xs font-semibold text-slate-600 hover:text-[#5066A1] transition-colors hidden md:inline-block px-2 py-1"
-            >
-              Bí Mật 2 Loại Tri Thức
-            </a>
-            <a
-              href="#4-mua-no-hoa"
-              className="text-xs font-semibold text-slate-600 hover:text-[#5066A1] transition-colors hidden md:inline-block px-2 py-1"
-            >
-              4 Mùa Nở Hoa
-            </a>
-            <Link
-              to="/about"
-              className="text-xs font-semibold text-slate-600 hover:text-[#5066A1] transition-colors px-2 py-1"
-            >
-              Về Elis
-            </Link>
-            <Link
-              to="/auth"
-              className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors px-2.5 py-1.5"
-            >
-              Đăng Nhập
-            </Link>
-            <a
-              href="#feynman-live-trial"
-              className="px-4 sm:px-5 py-2.5 rounded-2xl bg-[#7286D3] hover:bg-[#5066A1] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
-            >
-              <Sprout className="w-3.5 h-3.5" />
-              <span>Thử Giảng Live</span>
-            </a>
-          </nav>
         </header>
 
         {/* =========================================================================
