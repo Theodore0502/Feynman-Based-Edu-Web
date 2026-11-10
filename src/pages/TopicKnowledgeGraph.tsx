@@ -548,6 +548,11 @@ export const TopicKnowledgeGraph: React.FC = () => {
       const numTopics = subTopics.length;
       if (numTopics === 0) return;
 
+      const sPrimaryDomain =
+        s.domainId ||
+        subjectDomainsMap.get(s.id)?.[0] ||
+        (domains[0]?.id || "dom-it");
+
       const numTiers = 2; // 2 tầng cánh quạt
 
       subTopics.forEach((topic, tIdx) => {
@@ -581,7 +586,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
         const tNode: RadialTreeNode = {
           id: `topic-${topic.id}`,
           level: 3,
-          domainId: topic.domainId || s.domainId,
+          domainId: topic.domainId || s.domainId || sPrimaryDomain,
           subjectId: s.id,
           name: topic.title,
           shortLabel: topic.title.slice(0, 10),
@@ -899,7 +904,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
     }
   };
 
-  // Search handler
+  // Search handler: focus camera directly on the selected topic node
   const handleSelectTopicFromSearch = useCallback(
     (topic: CatalogTopic) => {
       setFilterState((prev) => ({
@@ -908,10 +913,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
         domainId: topic.domainId || "ALL",
       }));
       const found = graphData.nodes.find(
-        (n) =>
-          n.id === `topic-${topic.id}` ||
-          n.id === topic.id ||
-          n.subjectId === topic.subjectId
+        (n) => n.id === `topic-${topic.id}` || n.id === topic.id
       );
       if (found) {
         setSelectedNode(found);
@@ -924,17 +926,31 @@ export const TopicKnowledgeGraph: React.FC = () => {
     [graphData.nodes, centerCamera]
   );
 
-  // Auto-focus camera on domain filter
-  useEffect(() => {
-    if (filterState.domainId && filterState.domainId !== "ALL") {
-      const dNode = graphData.nodes.find((n) => n.id === `domain-${filterState.domainId}`);
-      if (dNode && dNode.x != null && dNode.y != null) {
-        centerCamera(dNode.x, dNode.y, 0.95, 800);
-      }
-    } else if (filterState.domainId === "ALL" && !filterState.selectedTopicId && !filterState.keyword) {
-      centerCamera(0, 0, 0.72, 800);
-    }
-  }, [filterState.domainId, filterState.selectedTopicId, filterState.keyword, graphData.nodes, centerCamera]);
+  // Auto-focus camera on filter changes initiated from the search bar
+  const handleFilterChangeFromSearch = useCallback(
+    (newFilter: SearchFilterState) => {
+      setFilterState((prev) => {
+        // Only pan camera if user deliberately changed domain in the search toolbar
+        if (newFilter.domainId !== prev.domainId) {
+          if (newFilter.domainId && newFilter.domainId !== "ALL") {
+            const dNode = graphData.nodes.find((n) => n.id === `domain-${newFilter.domainId}`);
+            if (dNode && dNode.x != null && dNode.y != null) {
+              centerCamera(dNode.x, dNode.y, 0.95, 800);
+            }
+          } else if (newFilter.domainId === "ALL" && !newFilter.selectedTopicId && !newFilter.keyword) {
+            centerCamera(0, 0, 0.72, 800);
+          }
+        } else if (newFilter.fieldId !== prev.fieldId && newFilter.fieldId !== "ALL") {
+          const sNode = graphData.nodes.find((n) => n.id === `subject-${newFilter.fieldId}`);
+          if (sNode && sNode.x != null && sNode.y != null) {
+            centerCamera(sNode.x, sNode.y, 1.05, 800);
+          }
+        }
+        return newFilter;
+      });
+    },
+    [graphData.nodes, centerCamera]
+  );
 
   // Vòng nền tinh tế làm mốc cự ly hình Oval (Watermark Oval Tree Rings)
   const handleRenderFramePre = useCallback((ctx: CanvasRenderingContext2D, globalScale: number) => {
@@ -1346,7 +1362,7 @@ export const TopicKnowledgeGraph: React.FC = () => {
     <div className="flex flex-col flex-1 h-full min-h-0 space-y-2">
       {/* 3-Level Hierarchical Search Toolbar */}
       <TopicHierarchySearch
-        onFilterChange={setFilterState}
+        onFilterChange={handleFilterChangeFromSearch}
         onSelectTopic={handleSelectTopicFromSearch}
         domains={curriculumData.domains}
         subjects={curriculumData.subjects}

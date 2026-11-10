@@ -104,26 +104,21 @@ export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
   topics = THREE_TIER_LECTURES,
   externalFilter,
 }) => {
-  const [domainId, setDomainId] = useState<string>(externalFilter?.domainId || "ALL");
-  const [fieldId, setFieldId] = useState<string>(externalFilter?.fieldId || "ALL");
+  // Controlled domain & field from externalFilter (Single Source of Truth)
+  const domainId = externalFilter?.domainId || "ALL";
+  const fieldId = externalFilter?.fieldId || "ALL";
+
+  // Local state for search query to keep typing responsive
   const [searchQuery, setSearchQuery] = useState<string>(externalFilter?.keyword || "");
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
-  // Đồng bộ với externalFilter từ bên ngoài (khi người dùng click node trên Cây Tri Thức)
+  // Sync external search keyword when modified outside (e.g., node click or reset)
   useEffect(() => {
-    if (!externalFilter) return;
-
-    if (externalFilter.domainId !== undefined && externalFilter.domainId !== domainId) {
-      setDomainId(externalFilter.domainId);
-    }
-    if (externalFilter.fieldId !== undefined && externalFilter.fieldId !== fieldId) {
-      setFieldId(externalFilter.fieldId);
-    }
-    if (externalFilter.keyword !== undefined && externalFilter.keyword !== searchQuery) {
+    if (externalFilter?.keyword !== undefined && externalFilter.keyword !== searchQuery) {
       setSearchQuery(externalFilter.keyword);
     }
-  }, [externalFilter?.domainId, externalFilter?.fieldId, externalFilter?.keyword]);
+  }, [externalFilter?.keyword]);
 
   // Danh sách các Domain (bao gồm lựa chọn "Tất cả")
   const activeDomainsList = useMemo(() => {
@@ -161,28 +156,37 @@ export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
       }));
   }, [domainId, subjects, domainSubjects]);
 
-  // When domain changes, reset field if it no longer belongs
+  // When domain changes, broadcast to parent with fieldId reset to ALL
   const handleDomainSelect = (dId: string) => {
-    setDomainId(dId);
-    if (dId !== "ALL" && fieldId !== "ALL") {
-      const allowedSubjectIds = new Set(
-        domainSubjects.filter((ds) => ds.domain_id === dId).map((ds) => ds.subject_id)
-      );
-      if (!allowedSubjectIds.has(fieldId)) {
-        setFieldId("ALL");
-      }
-    }
+    onFilterChange({
+      domainId: dId,
+      fieldId: "ALL",
+      keyword: searchQuery.trim(),
+      selectedTopicId: null,
+    });
   };
 
-  // Broadcast filter state to graph parent
-  useEffect(() => {
+  // When subject changes, broadcast to parent
+  const handleFieldSelect = (fId: string) => {
+    onFilterChange({
+      domainId,
+      fieldId: fId,
+      keyword: searchQuery.trim(),
+      selectedTopicId: null,
+    });
+  };
+
+  // When search keyword changes, update local state and broadcast
+  const handleSearchChange = (val: string) => {
+    setSearchQuery(val);
+    setIsDropdownOpen(true);
     onFilterChange({
       domainId,
       fieldId,
-      keyword: searchQuery.trim(),
-      selectedTopicId: externalFilter?.selectedTopicId || null,
+      keyword: val.trim(),
+      selectedTopicId: null,
     });
-  }, [domainId, fieldId, searchQuery, onFilterChange, externalFilter?.selectedTopicId]);
+  };
 
   // Close search suggestions when clicking outside
   useEffect(() => {
@@ -268,10 +272,14 @@ export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
   const hasActiveFilters = domainId !== "ALL" || fieldId !== "ALL" || searchQuery.trim().length > 0;
 
   const handleReset = () => {
-    setDomainId("ALL");
-    setFieldId("ALL");
     setSearchQuery("");
     setIsDropdownOpen(false);
+    onFilterChange({
+      domainId: "ALL",
+      fieldId: "ALL",
+      keyword: "",
+      selectedTopicId: null,
+    });
   };
 
   const handleSelectTopicResult = (topic: CatalogTopic) => {
@@ -314,7 +322,7 @@ export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
         <div className="relative">
           <select
             value={fieldId}
-            onChange={(e) => setFieldId(e.target.value)}
+            onChange={(e) => handleFieldSelect(e.target.value)}
             className="w-full appearance-none bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3 py-2 pr-8 text-xs font-bold text-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer"
           >
             <option value="ALL">Toàn bộ Môn Học</option>
@@ -347,10 +355,7 @@ export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setIsDropdownOpen(true);
-            }}
+            onChange={(e) => handleSearchChange(e.target.value)}
             onFocus={() => {
               if (searchQuery.trim().length > 0) setIsDropdownOpen(true);
             }}
@@ -363,6 +368,12 @@ export const TopicHierarchySearch: React.FC<TopicHierarchySearchProps> = ({
               onClick={() => {
                 setSearchQuery("");
                 setIsDropdownOpen(false);
+                onFilterChange({
+                  domainId,
+                  fieldId,
+                  keyword: "",
+                  selectedTopicId: null,
+                });
               }}
               className="p-1 rounded-full text-slate-400 hover:text-slate-700 absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer"
             >
