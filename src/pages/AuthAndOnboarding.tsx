@@ -116,7 +116,7 @@ export const AuthAndOnboarding: React.FC = () => {
       }
     });
 
-    // Bắt query parameters nếu redirect về từ email
+    // Bắt query parameters nếu redirect về từ email hoặc từ landing page
     const params = new URLSearchParams(window.location.search);
     if (params.get("confirmed") === "true") {
       toast.success("Email đã được xác nhận thành công! Bạn có thể đăng nhập ngay.");
@@ -125,6 +125,11 @@ export const AuthAndOnboarding: React.FC = () => {
     if (params.get("mode") === "recovery") {
       setActiveTab("FORGOT_PASSWORD");
       setForgotStep(2);
+    }
+    if (params.get("mode") === "register" || params.get("tab") === "register") {
+      setActiveTab("REGISTER");
+    } else if (params.get("mode") === "login" || params.get("tab") === "login") {
+      setActiveTab("LOGIN");
     }
 
     return () => {

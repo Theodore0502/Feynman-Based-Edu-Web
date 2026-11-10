@@ -151,14 +151,18 @@ export const LandingAndDemo: React.FC = () => {
 
       {/* 3. NỘI DUNG CHÍNH (Z-INDEX NỔI BẬT HOÀN TOÀN TRÊN NỀN) */}
       <div className="relative z-10">
-        {/* Top Navbar: Brand Logo & Title Centered & Enlarged */}
-        <header className="max-w-6xl mx-auto px-6 pt-8 pb-4 flex items-center justify-center">
+        {/* Top Navbar: Brand Logo & Title Centered & Auth Buttons */}
+        <header className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 pb-4 flex items-center justify-between relative">
+          {/* Left spacer for perfect centering balance */}
+          <div className="flex-1 flex items-center justify-start" />
+
+          {/* Center: Brand Logo & Title */}
           <Link
             to="/"
-            className="inline-flex items-center justify-center gap-3.5 sm:gap-4 group transition-transform duration-300 hover:scale-105"
+            className="inline-flex items-center justify-center gap-2.5 sm:gap-4 group transition-transform duration-300 hover:scale-105 shrink-0"
           >
-            <div className="w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center shrink-0">
-              <EliseCatMascot className="w-14 h-14 sm:w-16 sm:h-16 object-contain drop-shadow-sm transition-transform duration-300 group-hover:rotate-3" />
+            <div className="w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center shrink-0">
+              <EliseCatMascot className="w-12 h-12 sm:w-16 sm:h-16 object-contain drop-shadow-sm transition-transform duration-300 group-hover:rotate-3" />
             </div>
             <span
               className="font-black text-4xl sm:text-5xl lg:text-6xl tracking-tight text-slate-800 leading-none block select-none group-hover:text-[#5066A1] transition-colors pt-1"
@@ -167,6 +171,22 @@ export const LandingAndDemo: React.FC = () => {
               Elis
             </span>
           </Link>
+
+          {/* Right: Auth Buttons (Đăng nhập & Đăng ký) */}
+          <div className="flex-1 flex items-center justify-end gap-2 sm:gap-3 shrink-0">
+            <Link
+              to="/auth?mode=login"
+              className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold text-slate-700 hover:text-[#5066A1] bg-white/80 hover:bg-white border border-slate-200/80 hover:border-[#CBD8F8] shadow-2xs hover:shadow-xs transition-all cursor-pointer whitespace-nowrap"
+            >
+              Đăng Nhập
+            </Link>
+            <Link
+              to="/auth?mode=register"
+              className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold text-white bg-[#7286D3] hover:bg-[#5066A1] shadow-card hover:shadow-md transition-all cursor-pointer transform hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap"
+            >
+              Đăng Ký
+            </Link>
+          </div>
         </header>
 
         {/* =========================================================================
