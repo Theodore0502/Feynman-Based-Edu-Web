@@ -17,6 +17,7 @@ import {
   getLecturesBySubjectSlug,
 } from "@/data/three-tier-curriculum.data";
 import type { DomainCategory, AcademicSubject, CatalogTopic } from "@/types/catalog.types";
+import { SystemLogger } from "./system-logger";
 
 export const CurriculumService = {
   /**
@@ -324,9 +325,21 @@ export const CurriculumService = {
         };
       });
 
+      SystemLogger.info(
+        "CURRICULUM",
+        "FETCH_GRAPH_DATA_SUCCESS",
+        `Đã tải Cây Tri Thức từ Supabase: ${domains.length} Ngành, ${subjects.length} Môn, ${topics.length} Bài học`,
+        { domains: domains.length, subjects: subjects.length, domainSubjects: domainSubjects.length, topics: topics.length }
+      );
+
       return { domains, subjects, domainSubjects, topics };
     } catch (err) {
-      console.warn("CurriculumService.getAllCurriculumGraphData fallback:", err);
+      SystemLogger.warn(
+        "CURRICULUM",
+        "FETCH_GRAPH_DATA_FALLBACK",
+        "Supabase không phản hồi, tự động dùng dataset tĩnh Three-Tier",
+        err
+      );
       return {
         domains: THREE_TIER_DOMAINS,
         subjects: THREE_TIER_SUBJECTS,

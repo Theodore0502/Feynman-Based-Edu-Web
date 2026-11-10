@@ -140,24 +140,47 @@ export async function callGeminiRestWithMetrics(
     const candidatesTokens = usage.candidatesTokenCount || Math.ceil(text.length / 4);
     const totalTokens = usage.totalTokenCount || promptTokens + candidatesTokens;
 
+    const metrics: GeminiCallMetrics = {
+      durationMs,
+      durationSeconds,
+      promptTokens,
+      candidatesTokens,
+      totalTokens,
+      model: modelName,
+      isFallback: false,
+    };
+
+    SystemLogger.geminiCall({
+      action: jsonMode ? "GENERATE_CONTENT_JSON" : "GENERATE_CONTENT_TEXT",
+      model: modelName,
+      durationMs,
+      tokens: { prompt: promptTokens, candidates: candidatesTokens, total: totalTokens },
+      promptPreview: prompt.slice(0, 160) + (prompt.length > 160 ? "..." : ""),
+      responsePreview: text.slice(0, 160) + (text.length > 160 ? "..." : ""),
+    });
+
     return {
       text,
-      metrics: {
-        durationMs,
-        durationSeconds,
-        promptTokens,
-        candidatesTokens,
-        totalTokens,
-        model: modelName,
-        isFallback: false,
-      },
+      metrics,
     };
   } catch (err: any) {
     clearTimeout(timeoutId);
-    if (err.name === "AbortError") {
-      throw new Error("Gemini API Timeout sau 20s. Hệ thống tự động chuyển sang chế độ dự phòng.");
-    }
-    throw err;
+    const durationMs = Date.now() - startTime;
+    const finalErr =
+      err.name === "AbortError"
+        ? new Error("Gemini API Timeout sau 20s. Hệ thống tự động chuyển sang chế độ dự phòng.")
+        : err;
+
+    SystemLogger.geminiCall({
+      action: "GENERATE_CONTENT_ERROR",
+      model: modelName,
+      durationMs,
+      tokens: { prompt: 0, candidates: 0, total: 0 },
+      promptPreview: prompt.slice(0, 160) + (prompt.length > 160 ? "..." : ""),
+      error: finalErr,
+    });
+
+    throw finalErr;
   }
 }
 
@@ -551,7 +574,7 @@ Trả về DUY NHẤT một JSON hợp lệ:
       const clean = res.text.replace(/^```json\s*/i, "").replace(/\s*```$/, "").trim();
       const parsed = JSON.parse(clean);
 
-      return {
+      const result: LiveTrialTurnResult = {
         personaReply: parsed.personaReply || "Dạ chú ơi, con nghe chú nói nhưng chú có thể ví von cái đó với đồ chơi Lego được không ạ?",
         currentClarityScore: typeof parsed.currentClarityScore === "number" ? parsed.currentClarityScore : 80,
         isMastered: parsed.isMastered === true,
@@ -561,6 +584,22 @@ Trả về DUY NHẤT một JSON hợp lệ:
         logicGaps: Array.isArray(parsed.logicGaps) ? parsed.logicGaps : [],
         metrics: res.metrics,
       };
+
+      // Bắn log chi tiết lên Console DevTools
+      SystemLogger.liveTrialTurn({
+        turnIndex: Math.floor(chatHistory.length / 2) + 1,
+        userExplanation: userMessage,
+        assistantResponse: result.personaReply,
+        clarityScore: result.currentClarityScore,
+        detectedAnalogy: result.detectedAnalogy,
+        jargonDetected: result.jargonDetected,
+        logicGaps: result.logicGaps,
+        telemetry: result.metrics,
+        isMastered: result.isMastered,
+        masterySummary: result.masterySummary,
+      });
+
+      return result;
     } catch (e: any) {
       SystemLogger.error("GEMINI_LLM_SERVICE", "LIVE_TRIAL_TURN", `Fallback Live Trial: ${e.message}`, e);
       const hasAnalogy = userMessage.toLowerCase().includes("lego") || userMessage.toLowerCase().includes("như") || userMessage.toLowerCase().includes("giống");
@@ -569,7 +608,7 @@ Trả về DUY NHẤT một JSON hợp lệ:
         ? "Oa, con thích xếp hình Lego lắm chú ơi! Nhưng mà khi con xếp lâu đài thì mấy viên gạch dính vào nhau, còn bài học thì mấy viên gạch đó là gì vậy chú?"
         : "Dạ chú ơi, chú nói từ đó con chưa hiểu lắm ạ. Chú có thể ví dụ như một trò chơi hay món đồ chơi con hay chơi được không chú?";
 
-      return {
+      const fallbackResult: LiveTrialTurnResult = {
         personaReply: fallbackReply,
         currentClarityScore: hasAnalogy ? 90 : 65,
         detectedAnalogy: hasAnalogy ? "So sánh với trò chơi xếp hình Lego" : null,
@@ -586,6 +625,20 @@ Trả về DUY NHẤT một JSON hợp lệ:
           fallbackReason: e.message,
         },
       };
+
+      // Bắn log fallback lên Console DevTools
+      SystemLogger.liveTrialTurn({
+        turnIndex: Math.floor(chatHistory.length / 2) + 1,
+        userExplanation: userMessage,
+        assistantResponse: fallbackReply,
+        clarityScore: fallbackResult.currentClarityScore,
+        detectedAnalogy: fallbackResult.detectedAnalogy,
+        jargonDetected: [],
+        logicGaps: [],
+        telemetry: fallbackResult.metrics,
+      });
+
+      return fallbackResult;
     }
   },
 

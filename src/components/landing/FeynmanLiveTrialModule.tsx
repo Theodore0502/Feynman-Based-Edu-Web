@@ -9,6 +9,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { GeminiCurriculumService } from "@/lib/services/gemini-service";
+import { SystemLogger } from "@/lib/services/system-logger";
 import { DEFAULT_PERSONAS, type PersonaDefinition } from "@/config/personas.config";
 import type { JargonItem, LogicGapItem } from "@/types/agent.types";
 import { VoiceRecorderButton } from "@/components/shared/VoiceRecorderButton";
@@ -321,6 +322,7 @@ export const FeynmanLiveTrialModule: React.FC = () => {
 
   // Reset cuộc đối thoại (chỉ cuộn hộp chat lên đầu, không nhảy màn hình)
   const handleResetChat = () => {
+    SystemLogger.info("LIVE_TRIAL", "RESET_SESSION", "Khởi động lại phiên đối thoại Live Trial với Bé Bắp");
     setMessages([
       {
         id: "msg-welcome-reset",
@@ -461,9 +463,10 @@ export const FeynmanLiveTrialModule: React.FC = () => {
     try {
       await navigator.clipboard.writeText(JSON.stringify(sessionInspectionState, null, 2));
       setCopiedType("json");
+      SystemLogger.info("LIVE_TRIAL", "COPY_JSON_AUDIT", "Đã sao chép biên bản JSON Live Audit vào Clipboard");
       setTimeout(() => setCopiedType(null), 2000);
     } catch (err) {
-      console.error("Không thể copy JSON:", err);
+      SystemLogger.error("LIVE_TRIAL", "COPY_JSON_ERROR", "Không thể copy JSON", err);
     }
   };
 
@@ -472,9 +475,10 @@ export const FeynmanLiveTrialModule: React.FC = () => {
     try {
       await navigator.clipboard.writeText(markdownTranscript);
       setCopiedType("markdown");
+      SystemLogger.info("LIVE_TRIAL", "COPY_MARKDOWN_AUDIT", "Đã sao chép biên bản Markdown Live Audit vào Clipboard");
       setTimeout(() => setCopiedType(null), 2000);
     } catch (err) {
-      console.error("Không thể copy Markdown:", err);
+      SystemLogger.error("LIVE_TRIAL", "COPY_MARKDOWN_ERROR", "Không thể copy Markdown", err);
     }
   };
 

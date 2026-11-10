@@ -42,6 +42,7 @@ import { CurriculumService } from "@/lib/services/curriculum-service";
 import { CatalogTopic, DomainCategory, AcademicSubject } from "@/types/catalog.types";
 import { useStudyStore } from "@/hooks/useStudyStore";
 import TopicHierarchySearch, { SearchFilterState } from "@/components/topics/TopicHierarchySearch";
+import { SystemLogger } from "@/lib/services/system-logger";
 
 // Định nghĩa Node cho Cây Tri Thức
 export interface RadialTreeNode {
@@ -760,6 +761,20 @@ export const TopicKnowledgeGraph: React.FC = () => {
         setIsDrawerOpen(true);
       }
 
+      SystemLogger.graphEvent(
+        "NODE_CLICK",
+        `Chọn [Cấp ${node.level}] ${node.name} (${node.id})`,
+        {
+          id: node.id,
+          name: node.name,
+          level: node.level,
+          domainId: node.domainId,
+          subjectId: node.subjectId,
+          clarityScore: node.clarityScore,
+          status: node.status,
+        }
+      );
+
       // ĐỒNG BỘ BỘ LỌC TÌM KIẾM THEO CÁC NODE THỪA KẾ
       if (node.level === 3) {
         // Cấp 3 (Bài học): gán domainId của bài, fieldId là subjectId của bài
@@ -922,6 +937,12 @@ export const TopicKnowledgeGraph: React.FC = () => {
         }
         setIsDrawerOpen(true);
       }
+
+      SystemLogger.graphEvent(
+        "SEARCH_SELECT_TOPIC",
+        `Chọn bài học từ kết quả tìm kiếm: "${topic.title}" (${topic.id})`,
+        topic
+      );
     },
     [graphData.nodes, centerCamera]
   );
@@ -929,6 +950,12 @@ export const TopicKnowledgeGraph: React.FC = () => {
   // Auto-focus camera on filter changes initiated from the search bar
   const handleFilterChangeFromSearch = useCallback(
     (newFilter: SearchFilterState) => {
+      SystemLogger.graphEvent(
+        "FILTER_CHANGE",
+        `Lọc Cây Tri Thức: Ngành=${newFilter.domainId}, Môn=${newFilter.fieldId}, Từ khóa="${newFilter.keyword || ""}"`,
+        newFilter
+      );
+
       setFilterState((prev) => {
         // Only pan camera if user deliberately changed domain in the search toolbar
         if (newFilter.domainId !== prev.domainId) {
