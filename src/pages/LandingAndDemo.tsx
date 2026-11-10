@@ -151,23 +151,21 @@ export const LandingAndDemo: React.FC = () => {
 
       {/* 3. NỘI DUNG CHÍNH (Z-INDEX NỔI BẬT HOÀN TOÀN TRÊN NỀN) */}
       <div className="relative z-10">
-        {/* Top Navbar */}
-        <header className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-11 h-11 flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-105">
-              <EliseCatMascot className="w-10 h-10 object-contain drop-shadow-xs" />
+        {/* Top Navbar: Brand Logo & Title Centered & Enlarged */}
+        <header className="max-w-6xl mx-auto px-6 pt-8 pb-4 flex items-center justify-center">
+          <Link
+            to="/"
+            className="inline-flex items-center justify-center gap-3.5 sm:gap-4 group transition-transform duration-300 hover:scale-105"
+          >
+            <div className="w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center shrink-0">
+              <EliseCatMascot className="w-14 h-14 sm:w-16 sm:h-16 object-contain drop-shadow-sm transition-transform duration-300 group-hover:rotate-3" />
             </div>
-            <div>
-              <span
-                className="font-black text-2xl tracking-tight text-slate-800 leading-none block"
-                style={{ fontFamily: "'Nahla Script', cursive, sans-serif" }}
-              >
-                Elis
-              </span>
-              <span className="text-[10px] text-slate-400 font-bold tracking-widest uppercase block mt-0.5">
-                Khu Vườn Feynman
-              </span>
-            </div>
+            <span
+              className="font-black text-4xl sm:text-5xl lg:text-6xl tracking-tight text-slate-800 leading-none block select-none group-hover:text-[#5066A1] transition-colors pt-1"
+              style={{ fontFamily: "'Nahla Script', cursive, sans-serif" }}
+            >
+              Elis
+            </span>
           </Link>
         </header>
 
