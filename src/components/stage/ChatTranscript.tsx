@@ -14,18 +14,26 @@ import type { ChatMessage } from "@/types/session.types";
 import type { PersonaDefinition } from "@/config/personas.config";
 import { JargonBadge } from "@/components/shared/JargonBadge";
 import { useModalStore } from "@/hooks/useModalStore";
-import { User, Sparkles } from "lucide-react";
+import { User, Sparkles, Volume2, VolumeX } from "lucide-react";
 
 interface ChatTranscriptProps {
   messages: ChatMessage[];
   persona: PersonaDefinition;
   isStreaming?: boolean;
+  onSpeakMessage?: (msg: ChatMessage) => void;
+  speakingMessageId?: string | null;
+  isSpeaking?: boolean;
+  onStopSpeaking?: () => void;
 }
 
 export const ChatTranscript: React.FC<ChatTranscriptProps> = ({
   messages,
   persona,
   isStreaming = false,
+  onSpeakMessage,
+  speakingMessageId,
+  isSpeaking = false,
+  onStopSpeaking,
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const { openModal } = useModalStore();
@@ -73,7 +81,7 @@ export const ChatTranscript: React.FC<ChatTranscriptProps> = ({
             )}
 
             {/* Bubble */}
-            <div className={`max-w-[80%] space-y-2 ${isUser ? "items-end" : "items-start"}`}>
+            <div className={`max-w-[80%] space-y-1.5 ${isUser ? "items-end" : "items-start"}`}>
               <div
                 className={`p-4 rounded-3xl text-xs sm:text-sm leading-relaxed shadow-xs ${
                   isUser
@@ -83,6 +91,44 @@ export const ChatTranscript: React.FC<ChatTranscriptProps> = ({
               >
                 {msg.content}
               </div>
+
+              {/* Loa phát giọng nói tiếng Việt cho tin nhắn của AI Persona */}
+              {!isUser && onSpeakMessage && (
+                <div className="flex items-center gap-2 pt-0.5 pl-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (speakingMessageId === msg.id && isSpeaking) {
+                        onStopSpeaking?.();
+                      } else {
+                        onSpeakMessage(msg);
+                      }
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                      speakingMessageId === msg.id && isSpeaking
+                        ? "bg-purple-100 text-purple-700 animate-pulse border border-purple-300"
+                        : "text-slate-400 hover:text-[#5066A1] hover:bg-[#EEF2FC]/90"
+                    }`}
+                    title={
+                      speakingMessageId === msg.id && isSpeaking
+                        ? "Đang phát giọng nói... Bấm để dừng"
+                        : `Nghe giọng nói của ${persona.name}`
+                    }
+                  >
+                    {speakingMessageId === msg.id && isSpeaking ? (
+                      <>
+                        <Volume2 className="w-3.5 h-3.5 text-purple-600 animate-bounce" />
+                        <span>Đang đọc...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Nghe {persona.name} nói</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
 
               {/* Jargon Badges nếu có trong phân tích của tin nhắn người dùng */}
               {isUser && analysis && analysis.jargonDetected?.length > 0 && (

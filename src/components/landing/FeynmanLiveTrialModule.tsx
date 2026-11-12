@@ -14,6 +14,8 @@ import { DEFAULT_PERSONAS, type PersonaDefinition } from "@/config/personas.conf
 import type { JargonItem, LogicGapItem } from "@/types/agent.types";
 import { VoiceRecorderButton } from "@/components/shared/VoiceRecorderButton";
 import { useSpeechToText } from "@/hooks/useSpeechToText";
+import { useTextToSpeech } from "@/hooks/useTextToSpeech";
+import { getPersonaVoiceProfile } from "@/config/persona-voice.config";
 import {
   Sparkles,
   Send,
@@ -36,6 +38,8 @@ import {
   Clock,
   Coins,
   Cpu,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 
 interface MessageItem {
@@ -116,6 +120,25 @@ export const FeynmanLiveTrialModule: React.FC = () => {
   const { isListening, toggleListening, isSupported } = useSpeechToText((transcript) => {
     setInputText((prev) => (prev ? `${prev} ${transcript}` : transcript));
   });
+
+  // Web Speech-to-Speech (TTS) hook
+  const {
+    isSpeaking,
+    speakingMessageId,
+    autoSpeak,
+    isMuted,
+    speak,
+    stop: stopSpeech,
+    toggleAutoSpeak,
+  } = useTextToSpeech();
+
+  // Ngắt TTS ngay khi người học bắt đầu nói qua micro
+  const handleToggleListening = () => {
+    if (!isListening) {
+      stopSpeech();
+    }
+    toggleListening();
+  };
 
   // Tự động cuộn CHỈ TRONG KHUNG CHAT, không bao giờ cuộn cửa sổ màn hình (window scroll)
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
@@ -236,6 +259,12 @@ export const FeynmanLiveTrialModule: React.FC = () => {
           .concat(assistantMsg)
       );
 
+      // Tự động phát âm thanh tiếng Việt với cao độ trẻ em của Bé Bắp
+      if (autoSpeak && !isMuted) {
+        const voiceProfile = getPersonaVoiceProfile(beBapPersona.id);
+        speak(result.personaReply, voiceProfile, assistantMsg.id);
+      }
+
       // 3. Tính toán Telemetry (Thời gian phản hồi & Token)
       const turnDurationMs = Date.now() - turnStartTime;
       const turnDurationSeconds = Number((turnDurationMs / 1000).toFixed(2));
@@ -290,6 +319,11 @@ export const FeynmanLiveTrialModule: React.FC = () => {
       };
       setMessages((prev) => [...prev, assistantMsg]);
 
+      if (autoSpeak && !isMuted) {
+        const voiceProfile = getPersonaVoiceProfile(beBapPersona.id);
+        speak(fallbackReply, voiceProfile, assistantMsg.id);
+      }
+
       setTurnRecords((prev) => [
         ...prev,
         {
@@ -322,6 +356,7 @@ export const FeynmanLiveTrialModule: React.FC = () => {
 
   // Reset cuộc đối thoại (chỉ cuộn hộp chat lên đầu, không nhảy màn hình)
   const handleResetChat = () => {
+    stopSpeech();
     SystemLogger.info("LIVE_TRIAL", "RESET_SESSION", "Khởi động lại phiên đối thoại Live Trial với Bé Bắp");
     setMessages([
       {
@@ -721,7 +756,7 @@ export const FeynmanLiveTrialModule: React.FC = () => {
               </div>
             </div>
 
-            {/* Clarity Score Gauge */}
+            {/* Clarity Score Gauge & Voice / Reset Controls */}
             <div className="flex items-center gap-2">
               {currentClarityScore !== null && (
                 <div className="text-right">
@@ -739,6 +774,30 @@ export const FeynmanLiveTrialModule: React.FC = () => {
                   </span>
                 </div>
               )}
+
+              {/* Nút bật/tắt tự động đọc giọng Bé Bắp */}
+              <button
+                type="button"
+                onClick={toggleAutoSpeak}
+                className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  autoSpeak && !isMuted
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-slate-100 text-slate-500 border-slate-200"
+                }`}
+                title={autoSpeak && !isMuted ? "Tự động phát giọng Bé Bắp (Bấm để tắt)" : "Đã tắt giọng AI (Bấm để bật)"}
+              >
+                {autoSpeak && !isMuted ? (
+                  <>
+                    <Volume2 className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+                    <span className="hidden sm:inline text-[11px]">Giọng Bé Bắp</span>
+                  </>
+                ) : (
+                  <>
+                    <VolumeX className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="hidden sm:inline text-[11px]">Tắt tiếng</span>
+                  </>
+                )}
+              </button>
 
               <button
                 type="button"
@@ -782,6 +841,45 @@ export const FeynmanLiveTrialModule: React.FC = () => {
                     >
                       <p>{msg.content}</p>
                     </div>
+
+                    {/* Nút phát giọng nói tiếng Việt cho tin nhắn của Bé Bắp */}
+                    {!isUser && (
+                      <div className="flex items-center gap-2 pt-0.5 pl-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (speakingMessageId === msg.id && isSpeaking) {
+                              stopSpeech();
+                            } else {
+                              const voiceProfile = getPersonaVoiceProfile(beBapPersona.id);
+                              speak(msg.content, voiceProfile, msg.id);
+                            }
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer ${
+                            speakingMessageId === msg.id && isSpeaking
+                              ? "bg-purple-100 text-purple-700 animate-pulse border border-purple-300"
+                              : "text-slate-400 hover:text-[#5066A1] hover:bg-[#EEF2FC]/90"
+                          }`}
+                          title={
+                            speakingMessageId === msg.id && isSpeaking
+                              ? "Đang phát giọng nói... Bấm để dừng"
+                              : "Nghe Bé Bắp nói"
+                          }
+                        >
+                          {speakingMessageId === msg.id && isSpeaking ? (
+                            <>
+                              <Volume2 className="w-3.5 h-3.5 text-purple-600 animate-bounce" />
+                              <span>Đang đọc...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Volume2 className="w-3.5 h-3.5 text-slate-400" />
+                              <span>Nghe Bé Bắp nói</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
 
                     {/* Metadata phân tích theo lượt dưới tin nhắn người dùng */}
                     {isUser && (msg.detectedAnalogy || (msg.jargonDetected && msg.jargonDetected.length > 0)) && (
@@ -925,7 +1023,7 @@ export const FeynmanLiveTrialModule: React.FC = () => {
               {/* Nút Mic Voice Web Speech */}
               <VoiceRecorderButton
                 isListening={isListening}
-                onToggle={toggleListening}
+                onToggle={handleToggleListening}
                 isSupported={isSupported}
               />
 

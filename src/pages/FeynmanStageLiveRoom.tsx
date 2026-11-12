@@ -21,9 +21,10 @@ import { useNotificationStore } from "@/hooks/useNotificationStore";
 import { getSubjectBySlug } from "@/data/three-tier-curriculum.data";
 import { toast } from "sonner";
 import { GeminiCurriculumService } from "@/lib/services/gemini-service";
+import { useTextToSpeech } from "@/hooks/useTextToSpeech";
 import type { ChatMessage } from "@/types/session.types";
 import type { AnalyticalResult } from "@/types/agent.types";
-import { Send, ArrowLeft, BookOpen, Edit3 } from "lucide-react";
+import { Send, ArrowLeft, BookOpen, Edit3, Volume2, VolumeX } from "lucide-react";
 
 export const FeynmanStageLiveRoom: React.FC = () => {
   const navigate = useNavigate();
@@ -47,8 +48,21 @@ export const FeynmanStageLiveRoom: React.FC = () => {
 
   const persona = getPersonaById(personaId);
 
+  // Hook phát giọng nói AI hai chiều (Speech-to-Speech)
+  const {
+    isSpeaking,
+    speakingMessageId,
+    isMuted,
+    autoSpeak,
+    speak,
+    stop,
+    toggleMute,
+    toggleAutoSpeak,
+  } = useTextToSpeech();
+
   // Điều hướng quay lại theo đúng trình tự cấp bậc
   const handleGoBack = () => {
+    stop();
     if (domain && subject) {
       navigate(`/lectures/${domain}/${subject}`);
     } else if (domain) {
@@ -63,6 +77,14 @@ export const FeynmanStageLiveRoom: React.FC = () => {
   const { isListening, toggleListening, isSupported } = useSpeechToText((text) =>
     setInput((prev) => (prev ? `${prev} ${text}` : text))
   );
+
+  // Khi bắt đầu nói qua micro, dừng ngay lập tức âm thanh TTS để tránh xung đột
+  const handleToggleListening = () => {
+    if (isSpeaking) {
+      stop();
+    }
+    toggleListening();
+  };
 
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -113,6 +135,16 @@ export const FeynmanStageLiveRoom: React.FC = () => {
 
       // Lưu Assistant message vào Supabase
       await SupabaseService.addMessage(sessionId, "assistant", assistantText);
+
+      // 3. Tự động phát âm thanh giọng nói Persona AI nếu autoSpeak được bật
+      if (autoSpeak && !isMuted) {
+        speak(assistantText, {
+          personaId: persona?.id,
+          customAge: persona?.age,
+          skepticismLevel: persona?.skepticismLevel,
+          messageId: assistantMsg.id,
+        });
+      }
     } catch (err: any) {
       console.error("Lỗi Feynman Stage Live:", err);
       toast.error("Lỗi khi kết nối với AI: " + err.message);
@@ -122,6 +154,7 @@ export const FeynmanStageLiveRoom: React.FC = () => {
   };
 
   const handleFinishSession = async () => {
+    stop();
     try {
       const chatHistory = messages.map((m) => ({ role: m.role, content: m.content }));
       const evaluation = await GeminiCurriculumService.generateSessionMasteryEvaluation({
@@ -213,6 +246,34 @@ export const FeynmanStageLiveRoom: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 self-end sm:self-center">
+          {/* Nút bật/tắt đọc giọng nói AI */}
+          <button
+            type="button"
+            onClick={toggleAutoSpeak}
+            className={`px-3 py-2 rounded-2xl font-bold text-xs border transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+              autoSpeak && !isMuted
+                ? "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+                : "bg-[#F8FAFD] text-slate-500 border-[#E2EAFD] hover:bg-slate-100"
+            }`}
+            title={
+              autoSpeak && !isMuted
+                ? `Tự động phát âm thanh ${persona.name}: Đang BẬT (Bấm để tắt)`
+                : `Tự động phát âm thanh ${persona.name}: Đang TẮT (Bấm để bật)`
+            }
+          >
+            {autoSpeak && !isMuted ? (
+              <>
+                <Volume2 className="w-3.5 h-3.5 text-purple-600" />
+                <span className="hidden sm:inline">Giọng AI: Bật</span>
+              </>
+            ) : (
+              <>
+                <VolumeX className="w-3.5 h-3.5 text-slate-400" />
+                <span className="hidden sm:inline">Giọng AI: Tắt</span>
+              </>
+            )}
+          </button>
+
           <button
             onClick={() => setIsScratchpadOpen(true)}
             className="px-3.5 py-2 rounded-2xl bg-[#F8FAFD] hover:bg-[#EEF2FC] text-slate-700 hover:text-[#5066A1] font-bold text-xs border border-[#E2EAFD] transition-colors flex items-center gap-1.5 cursor-pointer"
@@ -241,6 +302,17 @@ export const FeynmanStageLiveRoom: React.FC = () => {
             messages={messages}
             persona={persona}
             isStreaming={isStreaming}
+            onSpeakMessage={(msg) =>
+              speak(msg.content, {
+                personaId: persona?.id,
+                customAge: persona?.age,
+                skepticismLevel: persona?.skepticismLevel,
+                messageId: msg.id,
+              })
+            }
+            speakingMessageId={speakingMessageId}
+            isSpeaking={isSpeaking}
+            onStopSpeaking={stop}
           />
 
           {/* Input Box with Voice Recorder */}
@@ -256,7 +328,7 @@ export const FeynmanStageLiveRoom: React.FC = () => {
             <div className="absolute right-2 flex items-center gap-1.5">
               <VoiceRecorderButton
                 isListening={isListening}
-                onToggle={toggleListening}
+                onToggle={handleToggleListening}
                 isSupported={isSupported}
               />
               <button
