@@ -20,7 +20,7 @@ export const ShareMasteryModal: React.FC = () => {
 
   if (!isOpen) return null;
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://theodore.feynman.app";
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://elis.vn";
   const shareToken = `cert-${Date.now().toString(36).toUpperCase()}`;
   const shareUrl = `${origin}/share/${shareToken}?topic=${encodeURIComponent(topic)}&score=${score}`;
 

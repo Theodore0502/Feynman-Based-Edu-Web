@@ -207,7 +207,7 @@ export const GeminiCurriculumService = {
       .map((s) => `- [${s.id}] "${s.name}" (Thuộc domain: ${s.domainId || "Chung"})`)
       .join("\n");
 
-    const systemPrompt = `Bạn là Theodore Academic Curator Agent - Tác nhân AI thẩm định và phân loại tài liệu học thuật theo phương pháp Feynman.
+    const systemPrompt = `Bạn là Elis Academic Curator Agent - Tác nhân AI thẩm định và phân loại tài liệu học thuật theo phương pháp Feynman.
 Nhiệm vụ: Phân tích TOÀN BỘ nội dung văn bản dưới đây để:
 1. Chọn chính xác Nhóm Ngành (domainId) và Môn Học (subjectId) từ danh sách hợp lệ có sẵn trong hệ thống (Supabase).
    LƯU Ý ĐẶC BIỆT: Nếu tài liệu nói về Phương pháp học tập, Kỹ thuật Feynman, Kỹ năng sinh viên, Siêu nhận thức (Metacognition) -> Hãy chọn Môn học và Ngành học về Kỹ năng / Phương pháp học tập (dom-edu / sub-feynman-technique), TUYỆT ĐỐI KHÔNG gán ép vào Toán rời rạc hay CNTT.
@@ -311,7 +311,7 @@ ${truncatedText}`;
     generatedSummary: string;
     suggestedAnalogies: string[];
   }> {
-    const prompt = `Bạn là trợ lý AI học tập phương pháp Feynman của Theodore.
+    const prompt = `Bạn là trợ lý AI học tập phương pháp Feynman của Elis.
 Nhiệm vụ: Phân tích đoạn tài liệu học tập của người dùng để:
 1. Đặt lại tiêu đề cô đọng, chuẩn học thuật.
 2. Trích xuất 3-5 khái niệm cốt lõi bắt buộc phải thấu hiểu.
@@ -526,7 +526,7 @@ Hãy trả lời bằng tiếng Việt tự nhiên:`;
     const badge = persona.badgeText || persona.title || "Khán giả 10 tuổi ELI5";
     const worldview = persona.worldview || persona.description || "Góc nhìn trẻ thơ";
 
-    const prompt = `Bạn là Hệ thống Khảo thí & Đối thoại Socrates Đa nhiệm của Theodore Feynman Stage.
+    const prompt = `Bạn là Hệ thống Khảo thí & Đối thoại Socrates Đa nhiệm của Elis Feynman Stage.
 Bạn có 2 nhiệm vụ đồng thời cho lượt đối thoại này:
 
 NHIỆM VỤ 1: ĐÓNG VAI KHÁN GIẢ AI - "${persona.name}" (${badge})
@@ -657,7 +657,7 @@ Trả về DUY NHẤT một JSON hợp lệ:
       .join("\n");
 
     const badge = persona.badgeText || persona.title || "Người nghe phản biện";
-    const prompt = `Bạn là Trưởng Ban Khảo Thí Học Thuật Theodore Feynman Stage.
+    const prompt = `Bạn là Trưởng Ban Khảo Thí Học Thuật Elis Feynman Stage.
 Nhiệm vụ: Đánh giá toàn bộ buổi giảng giải của người học về chủ đề: "${topic}".
 Người nghe phản biện: ${persona.name} (${badge}).
 

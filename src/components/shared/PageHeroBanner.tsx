@@ -32,7 +32,7 @@ export const PageHeroBanner: React.FC<PageHeroBannerProps> = ({
   actions,
   rightWidget,
   mascotSrc = "/images/theodore-mascot.png",
-  mascotAlt = "Linh vật Theodore",
+  mascotAlt = "Linh vật Elis",
   mascotClassName,
   className = "",
 }) => {

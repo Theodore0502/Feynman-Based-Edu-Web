@@ -64,9 +64,9 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
   learn123: {
     password: "123123",
     profile: {
-      id: "usr-learner-001",
+      id: "9d99b36f-148f-441b-a272-25faaae6e076",
       username: "learn123",
-      email: "learn123@theodore.edu",
+      email: "learn123@elis.edu.vn",
       fullName: "Nguyễn Giảng Viên (Learner)",
       displayName: "Nguyễn Giảng Viên (Learner)",
       role: "learner",
@@ -79,9 +79,9 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
   curator123: {
     password: "123123",
     profile: {
-      id: "usr-curator-777",
+      id: "5f998525-0951-4988-af1d-036f3cc61ad5",
       username: "curator123",
-      email: "curator123@theodore.edu",
+      email: "curator123@elis.edu.vn",
       fullName: "Lê Thẩm Định (Knowledge Curator)",
       displayName: "Lê Thẩm Định (Knowledge Curator)",
       role: "curator",
@@ -95,9 +95,9 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
   admin123: {
     password: "123123",
     profile: {
-      id: "usr-admin-999",
+      id: "bdbfaae1-c1e0-4ec0-bec5-f132345a71f6",
       username: "admin123",
-      email: "admin123@theodore.edu",
+      email: "admin123@elis.edu.vn",
       fullName: "Trần Kiểm Chuẩn (Moderator Admin)",
       displayName: "Trần Kiểm Chuẩn (Moderator Admin)",
       role: "admin",
@@ -124,7 +124,7 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
     profile: {
       id: "126b06d4-d9b6-4832-adf5-23183fc36b48",
       username: "minhanh_it",
-      email: "minhanh.it@theodore.edu",
+      email: "minhanh.it@elis.edu.vn",
       fullName: "Trần Minh Anh",
       displayName: "Trần Minh Anh",
       role: "learner",
@@ -139,7 +139,7 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
     profile: {
       id: "babb1001-d5a0-4cb1-b0c5-5032f3c974d7",
       username: "hoangnam_ecom",
-      email: "hoangnam.ecom@theodore.edu",
+      email: "hoangnam.ecom@elis.edu.vn",
       fullName: "Nguyễn Hoàng Nam",
       displayName: "Nguyễn Hoàng Nam",
       role: "learner",
@@ -154,7 +154,7 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
     profile: {
       id: "9977e224-7beb-4db4-b49b-64f7b63afb7c",
       username: "thuha_med",
-      email: "thuha.med@theodore.edu",
+      email: "thuha.med@elis.edu.vn",
       fullName: "Phạm Thu Hà",
       displayName: "Phạm Thu Hà",
       role: "learner",
@@ -169,7 +169,7 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
     profile: {
       id: "fa9bae41-b01a-417b-ae15-a46629f62a52",
       username: "quocbao_curator",
-      email: "quocbao.curator@theodore.edu",
+      email: "quocbao.curator@elis.edu.vn",
       fullName: "Đặng Quốc Bảo",
       displayName: "Đặng Quốc Bảo",
       role: "curator",
@@ -185,7 +185,7 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
     profile: {
       id: "1eac20a1-477d-4a44-a2c9-3173dd5dc721",
       username: "phuonglinh_admin",
-      email: "phuonglinh.admin@theodore.edu",
+      email: "phuonglinh.admin@elis.edu.vn",
       fullName: "Vũ Phương Linh",
       displayName: "Vũ Phương Linh",
       role: "admin",
@@ -313,8 +313,8 @@ export const useAuthStore = create<AuthState>()(
               id: data.user.id,
               username: userMeta.username || data.user.email?.split("@")[0] || "user",
               email: data.user.email || "",
-              fullName: userMeta.full_name || data.user.email?.split("@")[0] || "Học viên Theodore",
-              displayName: userMeta.full_name || data.user.email?.split("@")[0] || "Học viên Theodore",
+              fullName: userMeta.full_name || data.user.email?.split("@")[0] || "Học viên Elis",
+              displayName: userMeta.full_name || data.user.email?.split("@")[0] || "Học viên Elis",
               role: (userMeta.role as UserRole) || "learner",
               fieldOfStudy: userMeta.field_of_study || "Phương pháp Feynman",
               masteryPoints: 0,
@@ -448,8 +448,8 @@ export const useAuthStore = create<AuthState>()(
               id: data.user.id,
               username: userMeta.username || data.user.email?.split("@")[0] || "user",
               email: data.user.email || email,
-              fullName: userMeta.full_name || "Học viên Theodore",
-              displayName: userMeta.full_name || "Học viên Theodore",
+              fullName: userMeta.full_name || "Học viên Elis",
+              displayName: userMeta.full_name || "Học viên Elis",
               role: (userMeta.role as UserRole) || "learner",
               fieldOfStudy: userMeta.field_of_study || "Phương pháp Feynman",
               masteryPoints: 0,

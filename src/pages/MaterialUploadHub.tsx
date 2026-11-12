@@ -178,9 +178,9 @@ export const MaterialUploadHub: React.FC = () => {
         user: user || {
           id: "usr_guest",
           username: "guest",
-          email: "guest@theodore.edu.vn",
-          fullName: "Người học Theodore",
-          displayName: "Người học Theodore",
+          email: "guest@elis.edu.vn",
+          fullName: "Người học Elis",
+          displayName: "Người học Elis",
           role: "learner",
           createdAt: new Date().toISOString(),
         },
@@ -216,7 +216,7 @@ export const MaterialUploadHub: React.FC = () => {
       {/* Top Banner Header Đồng Bộ Chuẩn Dashboard */}
       <PageHeroBanner
         mascotSrc="/images/theodore-upload-owl.png"
-        mascotAlt="Linh vật Tải tài liệu Theodore"
+        mascotAlt="Linh vật Tải tài liệu Elis"
         mascotClassName="w-52 h-52 sm:w-64 sm:h-64 lg:w-80 lg:h-80 xl:w-96 xl:h-96"
         title={
           <>

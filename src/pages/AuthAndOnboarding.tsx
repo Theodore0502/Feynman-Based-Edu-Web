@@ -250,7 +250,7 @@ export const AuthAndOnboarding: React.FC = () => {
     try {
       const res = await verifySignupOtp(confirmEmail, signupOtp.trim());
       if (res.success) {
-        toast.success("Xác thực email thành công! Chào mừng bạn gia nhập Theodore.");
+        toast.success("Xác thực email thành công! Chào mừng bạn gia nhập Elis.");
         navigate("/dashboard");
       } else {
         setLocalError(res.error || "Mã OTP không chính xác hoặc đã hết hạn.");
@@ -409,7 +409,7 @@ export const AuthAndOnboarding: React.FC = () => {
               <EliseCatMascot size={44} className="drop-shadow-xs" />
             </div>
             <h2 className="text-lg sm:text-xl font-black text-slate-800 tracking-tight transition-all duration-200">
-              {activeTab === "LOGIN" && "Đăng Nhập Theodore"}
+              {activeTab === "LOGIN" && "Đăng Nhập Elis"}
               {activeTab === "REGISTER" && "Đăng Ký Tài Khoản"}
               {activeTab === "CONFIRM_EMAIL" && "Xác Nhận Email Kích Hoạt"}
               {activeTab === "FORGOT_PASSWORD" && "Đặt Lại Mật Khẩu"}

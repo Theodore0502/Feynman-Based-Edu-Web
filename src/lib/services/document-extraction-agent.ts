@@ -208,7 +208,7 @@ export const DocumentExtractionAgent = {
       fileSize: parsedDoc.fileSizeBytes,
       rawTextSnippet: parsedDoc.extractedText.slice(0, 400),
       uploadedById: user.id,
-      uploadedByName: user.displayName || user.email || "Thành viên Theodore",
+      uploadedByName: user.displayName || user.email || "Thành viên Elis",
       uploadedAt: new Date().toISOString(),
       title: humanTitle,
       slug,

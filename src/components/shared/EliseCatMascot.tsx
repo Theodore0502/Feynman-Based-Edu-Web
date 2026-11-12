@@ -15,7 +15,7 @@ interface EliseCatMascotProps {
 export const EliseCatMascot: React.FC<EliseCatMascotProps> = ({
   className = "w-6 h-6",
   size,
-  alt = "Theodore Owl Logo",
+  alt = "Elis Logo",
 }) => {
   return (
     <img
@@ -30,6 +30,7 @@ export const EliseCatMascot: React.FC<EliseCatMascotProps> = ({
 
 // Re-export với các tên alias tiện dụng
 export const ElisCatMascot = EliseCatMascot;
+export const ElisLogo = EliseCatMascot;
 export const TheodoreOwlLogo = EliseCatMascot;
 export const AppBrandLogo = EliseCatMascot;
 export default EliseCatMascot;

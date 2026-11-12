@@ -267,7 +267,7 @@ export const TaxonomyClassifier = {
     const canonicalSlug = toUrlSlug(suggestedTitle);
     const domainSlug = bestDomain.slug;
     const subjectSlug = bestSubject.slug;
-    const refLink = `https://theodore.edu.vn/materials/${domainSlug}/${subjectSlug}/${canonicalSlug}`;
+    const refLink = `https://elis.edu.vn/materials/${domainSlug}/${subjectSlug}/${canonicalSlug}`;
 
     // Sinh động nội dung Feynman phù hợp với bài học chuẩn trên Supabase
     const generatedContent = this.generateContextualFeynmanContent(
@@ -326,7 +326,7 @@ export const TaxonomyClassifier = {
     const domainName = domain?.name || "Lĩnh Vực Chung";
     const subjectName = subject?.name || "Môn Học";
 
-    const refLink = `https://theodore.edu.vn/materials/${domainSlug}/${subjectSlug}/${canonicalSlug}`;
+    const refLink = `https://elis.edu.vn/materials/${domainSlug}/${subjectSlug}/${canonicalSlug}`;
 
     const generated = this.generateContextualFeynmanContent(
       fileName,

@@ -449,7 +449,7 @@ export const FeynmanLiveTrialModule: React.FC = () => {
       })),
       system_meta: {
         ai_engine: "gemini-3.1-flash-lite",
-        runtime: "Theodore Feynman Engine 2.0",
+        runtime: "Elis Feynman Engine 2.0",
         transparency_mode: "FULL_AUDIT_LOG_WITH_TELEMETRY",
         exported_at: new Date().toISOString(),
       },

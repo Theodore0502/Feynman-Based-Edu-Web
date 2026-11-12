@@ -29,7 +29,7 @@ const supabase = createClient(supabaseUrl, serviceKey, {
 const NEW_USERS = [
   {
     username: "minhanh_it",
-    email: "minhanh.it@theodore.edu",
+    email: "minhanh.it@elis.edu.vn",
     password: "Password@123",
     fullName: "Trần Minh Anh",
     role: "learner",
@@ -37,7 +37,7 @@ const NEW_USERS = [
   },
   {
     username: "hoangnam_ecom",
-    email: "hoangnam.ecom@theodore.edu",
+    email: "hoangnam.ecom@elis.edu.vn",
     password: "Password@123",
     fullName: "Nguyễn Hoàng Nam",
     role: "learner",
@@ -45,7 +45,7 @@ const NEW_USERS = [
   },
   {
     username: "thuha_med",
-    email: "thuha.med@theodore.edu",
+    email: "thuha.med@elis.edu.vn",
     password: "Password@123",
     fullName: "Phạm Thu Hà",
     role: "learner",
@@ -53,7 +53,7 @@ const NEW_USERS = [
   },
   {
     username: "quocbao_curator",
-    email: "quocbao.curator@theodore.edu",
+    email: "quocbao.curator@elis.edu.vn",
     password: "Password@123",
     fullName: "Đặng Quốc Bảo",
     role: "curator",
@@ -61,7 +61,7 @@ const NEW_USERS = [
   },
   {
     username: "phuonglinh_admin",
-    email: "phuonglinh.admin@theodore.edu",
+    email: "phuonglinh.admin@elis.edu.vn",
     password: "Password@123",
     fullName: "Vũ Phương Linh",
     role: "admin",

@@ -127,7 +127,7 @@ export const CommandDashboard: React.FC = () => {
             <div className="relative group transition-transform duration-300 hover:scale-105">
               <img
                 src="/images/theodore-mascot.png"
-                alt="Linh vật Theodore"
+                alt="Linh vật Elis"
                 className="w-40 h-40 sm:w-52 sm:h-52 lg:w-60 lg:h-60 xl:w-64 xl:h-64 object-contain filter drop-shadow-[0_16px_32px_rgba(114,134,211,0.32)] animate-float select-none pointer-events-none"
               />
             </div>

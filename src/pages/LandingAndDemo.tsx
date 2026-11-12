@@ -467,7 +467,7 @@ export const LandingAndDemo: React.FC = () => {
             FOOTER
             ========================================================================= */}
         <footer className="max-w-6xl mx-auto px-6 py-8 border-t border-slate-200/80 mt-12 text-center text-xs text-slate-400 font-medium">
-          <p>Copyright © Theodore0502</p>
+          <p>Copyright © Elis</p>
         </footer>
       </div>
     </div>

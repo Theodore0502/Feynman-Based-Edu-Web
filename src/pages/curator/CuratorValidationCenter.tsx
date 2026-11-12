@@ -425,7 +425,7 @@ export const CuratorValidationCenter: React.FC = () => {
           {/* Header Trang Danh Sách Đồng Bộ Chuẩn Dashboard */}
           <PageHeroBanner
             mascotSrc="/images/theodore-curator-owl.png"
-            mascotAlt="Linh vật Thẩm định viên Theodore"
+            mascotAlt="Linh vật Thẩm định viên Elis"
             badge={
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold border border-indigo-200/60 shadow-2xs">
                 <span>Hội Đồng Thẩm Định Tri Thức (Curator Studio)</span>
@@ -803,7 +803,7 @@ export const CuratorValidationCenter: React.FC = () => {
                   </span>
                   <span className="font-mono text-xs text-indigo-700 block truncate select-all">
                     {selectedDraft.refLink ||
-                      `https://theodore.edu.vn/materials/${selectedDraft.domainId}/${selectedDraft.subjectId}/${editSlug}`}
+                      `https://elis.edu.vn/materials/${selectedDraft.domainId}/${selectedDraft.subjectId}/${editSlug}`}
                   </span>
                 </div>
               </div>
