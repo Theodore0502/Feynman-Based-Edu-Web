@@ -344,13 +344,13 @@ export const AuthAndOnboarding: React.FC = () => {
     }
   };
 
-  const fillQuickAccount = (userKey: "learn123" | "curator123" | "admin123") => {
+  const fillQuickAccount = (userKey: string, customPass?: string) => {
     setUsername(userKey);
-    setPassword("123123");
+    setPassword(customPass || "123123");
     setLocalError(null);
     clearError();
     setIsAccountNotFound(false);
-    toast.info(`Đã điền tài khoản mẫu: ${userKey}`);
+    toast.info(`Đã điền tài khoản: ${userKey}`);
   };
 
   return (
@@ -487,11 +487,42 @@ export const AuthAndOnboarding: React.FC = () => {
               ===================================================================== */}
           {activeTab === "LOGIN" && (
             <div className="space-y-3 animate-fade-in">
-              {/* Quick Fill Pills for Demo */}
+              {/* Quick Fill Pills for Demo & 5 Fresh Accounts */}
               <div className="space-y-1.5">
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block text-center">
-                  Tài Khoản Kiểm Thử Nhanh (Mật khẩu: 123123)
-                </span>
+                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  <span>Tài Khoản Kiểm Thử Nhanh</span>
+                  <span className="text-slate-400 font-normal">MK: 123123 hoặc Password@123</span>
+                </div>
+
+                {/* 5 Tài khoản mới tinh (0 XP) */}
+                <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+                  <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 shrink-0">
+                    Mới tinh:
+                  </span>
+                  {[
+                    { key: "minhanh_it", name: "Minh Anh", role: "IT", icon: "💻" },
+                    { key: "hoangnam_ecom", name: "Hoàng Nam", role: "Ecom", icon: "🛒" },
+                    { key: "thuha_med", name: "Thu Hà", role: "Y Dược", icon: "🩺" },
+                    { key: "quocbao_curator", name: "Quốc Bảo", role: "Curator", icon: "📜" },
+                    { key: "phuonglinh_admin", name: "Phương Linh", role: "Admin", icon: "🛡️" },
+                  ].map((u) => (
+                    <button
+                      key={u.key}
+                      type="button"
+                      onClick={() => fillQuickAccount(u.key, "Password@123")}
+                      className={`px-2 py-0.5 rounded-lg border text-[10px] font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
+                        username === u.key
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-300 ring-1 ring-emerald-300/40"
+                          : "bg-white text-slate-600 border-[#E2EAFD] hover:bg-slate-50"
+                      }`}
+                      title={`${u.name} (${u.role}) - Tài khoản mới tinh 0 điểm`}
+                    >
+                      <span>{u.icon}</span>
+                      <span>{u.name}</span>
+                    </button>
+                  ))}
+                </div>
+
                 <div className="grid grid-cols-3 gap-1.5">
                   <button
                     type="button"
