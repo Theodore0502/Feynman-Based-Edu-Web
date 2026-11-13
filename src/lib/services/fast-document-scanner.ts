@@ -10,6 +10,7 @@
 
 import { DocumentParser } from "./document-parser";
 import { CurriculumService } from "./curriculum-service";
+import { extractBestVietnameseTitle } from "./vietnamese-title-formatter";
 import {
   THREE_TIER_DOMAINS,
   THREE_TIER_SUBJECTS,
@@ -226,7 +227,7 @@ export const FastDocumentScanner = {
     const fullText = parsed.extractedText || "";
     const rawTokens = extractTokens(fullText);
     const textUnaccented = removeVietnameseTones(fullText);
-    const suggestedTitle = formatAcademicTitle(file.name);
+    const suggestedTitle = extractBestVietnameseTitle(fullText, file.name);
 
     // 1. Phân tách các chương / đề mục lớn (Heading / Section Segmentation)
     const lines = fullText.split("\n").map((l) => l.trim()).filter(Boolean);

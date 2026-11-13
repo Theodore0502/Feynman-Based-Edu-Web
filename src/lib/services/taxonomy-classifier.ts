@@ -7,6 +7,7 @@
 
 import { CurriculumService } from "@/lib/services/curriculum-service";
 import { SystemLogger } from "@/lib/services/system-logger";
+import { restoreVietnameseFromFilename } from "@/lib/services/vietnamese-title-formatter";
 import type { DomainCategory, AcademicSubject, CatalogTopic } from "@/types/catalog.types";
 
 export interface TaxonomyClassificationResult {
@@ -71,17 +72,7 @@ function toUrlSlug(text: string): string {
 }
 
 function formatAcademicTitle(rawFileName: string): string {
-  let clean = rawFileName.replace(/\.[^/.]+$/, "");
-  clean = clean.replace(/[-_]?(v\d+|final|draft|copy|bản-nháp|preview)$/i, "");
-  clean = clean.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
-
-  return clean
-    .split(" ")
-    .map((word) => {
-      if (word.length === 0) return "";
-      return word.charAt(0).toUpperCase() + word.slice(1);
-    })
-    .join(" ");
+  return restoreVietnameseFromFilename(rawFileName);
 }
 
 export const TaxonomyClassifier = {

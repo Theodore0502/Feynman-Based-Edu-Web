@@ -4,6 +4,11 @@
  * Trải nghiệm người dùng:
  *   - Layout 2 cột cố định xuyên suốt (Cột trái: Tải lên & Danh sách tệp; Cột phải: Bảng thông tin học thuật).
  *   - Dữ liệu Agent đọc lướt (Fast Scan) và trích xuất sâu (Deep Feynman Extraction) CẬP NHẬT TRỰC TIẾP lên bảng thông tin bên phải.
+ *   - Tiêu đề bài giảng đề xuất có FULL CHỮ TIẾNG VIỆT CÓ DẤU (Title Case chuẩn mực).
+ *   - Chức năng kiểm tra trùng tiêu đề trong cơ sở dữ liệu của user (Bàn thẩm định, Cây tri thức, tệp đang nạp):
+ *       + Gợi ý thêm số phiên bản: (Phiên Bản 2, 3, 4...)
+ *       + Gợi ý thêm số phần: (Phần 2, 3, 4...)
+ *       + Gợi ý gộp nội dung vào bài giảng hiện có.
  *   - Tuyệt đối không chuyển sang trang mới hoặc layout mới toàn màn hình.
  *   - Hỗ trợ xem từng tệp hoặc gom nhóm theo bộ chuyên ngành.
  *   - Phương án A: Ma trận phân bổ % ngữ nghĩa (GitHub-style language bar).
@@ -25,7 +30,11 @@ import {
   FastDocumentScanner,
   FastScanResult,
 } from "@/lib/services/fast-document-scanner";
-import { DomainCategory, AcademicSubject, TaxonomyClassificationResult } from "@/types/catalog.types";
+import {
+  TitleDuplicateAdvisor,
+  TitleConflictAdvice,
+} from "@/lib/services/title-duplicate-advisor";
+import { DomainCategory, AcademicSubject, CatalogTopic, TaxonomyClassificationResult } from "@/types/catalog.types";
 import { PageHeroBanner } from "@/components/shared/PageHeroBanner";
 
 const ALLOWED_EXTENSIONS = [".pdf", ".pdfa", ".doc", ".docx", ".pptx"];
@@ -43,6 +52,8 @@ export interface UploadedDocRecord {
   extractedDraft: ExtractedLessonDraft | null;
   isScanning: boolean;
   isExtracting: boolean;
+  isMerged?: boolean;
+  mergeTargetTitle?: string;
   selectedSplitMode: "integrated" | "split";
   status: "ready" | "processing" | "extracted";
 }
@@ -56,6 +67,8 @@ export const MaterialUploadHub: React.FC = () => {
   const [domainSubjects, setDomainSubjects] = useState<
     Array<{ domain_id: string; subject_id: string }>
   >([]);
+  const [catalogTopics, setCatalogTopics] = useState<CatalogTopic[]>([]);
+  const [userDrafts, setUserDrafts] = useState<ExtractedLessonDraft[]>([]);
 
   const [selectedDomainId, setSelectedDomainId] = useState<string>("");
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>("");
@@ -82,7 +95,7 @@ export const MaterialUploadHub: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load domains & subjects from Supabase
+  // Load domains, subjects, catalog topics & user drafts from Supabase & LocalStorage
   useEffect(() => {
     let mounted = true;
     CurriculumService.getAllCurriculumGraphData().then((data) => {
@@ -90,11 +103,18 @@ export const MaterialUploadHub: React.FC = () => {
       setDomains(data.domains);
       setSubjects(data.subjects);
       setDomainSubjects(data.domainSubjects);
+      setCatalogTopics(data.topics || []);
 
       if (data.domains.length > 0) {
         setSelectedDomainId(data.domains[0].id);
       }
     });
+
+    DocumentExtractionAgent.getAllDrafts().then((drafts) => {
+      if (!mounted) return;
+      setUserDrafts(drafts || []);
+    });
+
     return () => {
       mounted = false;
     };
@@ -121,6 +141,21 @@ export const MaterialUploadHub: React.FC = () => {
       setSelectedSubjectId("");
     }
   }, [selectedDomainId, availableSubjects, selectedSubjectId]);
+
+  // Kiểm tra xung đột / trùng lặp tiêu đề trong cơ sở dữ liệu của user
+  const titleConflictAdvice: TitleConflictAdvice | null = useMemo(() => {
+    if (!activeDoc || !activeDoc.suggestedTitle) return null;
+    return TitleDuplicateAdvisor.checkTitleConflict({
+      currentTitle: activeDoc.suggestedTitle,
+      currentDocId: activeDoc.id,
+      userDrafts,
+      catalogTopics,
+      otherUploadedDocs: uploadedDocs.map((d) => ({
+        id: d.id,
+        suggestedTitle: d.suggestedTitle,
+      })),
+    });
+  }, [activeDoc?.suggestedTitle, activeDoc?.id, userDrafts, catalogTopics, uploadedDocs]);
 
   // Gom nhóm các tệp tải lên theo Bộ chuyên ngành (Bundle Clustering)
   const clusteredBundles = useMemo(() => {
@@ -273,6 +308,7 @@ export const MaterialUploadHub: React.FC = () => {
         extractedDraft: null,
         isScanning: true,
         isExtracting: false,
+        isMerged: false,
         selectedSplitMode: "integrated",
         status: "ready",
       });
@@ -366,6 +402,47 @@ export const MaterialUploadHub: React.FC = () => {
     );
   };
 
+  // Áp dụng số phiên bản / phần khi bị trùng tiêu đề
+  const handleApplyVersionedTitle = (newTitle: string) => {
+    if (!activeDoc) return;
+    handleUpdateActiveTitle(newTitle);
+    setUploadedDocs((prev) =>
+      prev.map((d) =>
+        d.id === activeDoc.id ? { ...d, isMerged: false, mergeTargetTitle: undefined } : d
+      )
+    );
+    toast.success(`Đã áp dụng tiêu đề phiên bản mới: "${newTitle}"`);
+  };
+
+  // Áp dụng chế độ Gộp vào bài giảng hiện có
+  const handleApplyMergeWithExisting = (targetTitle: string) => {
+    if (!activeDoc) return;
+    setUploadedDocs((prev) =>
+      prev.map((d) =>
+        d.id === activeDoc.id
+          ? {
+              ...d,
+              isMerged: true,
+              mergeTargetTitle: targetTitle,
+            }
+          : d
+      )
+    );
+    toast.success(
+      `Đã kích hoạt chế độ gộp! Nội dung sẽ được tích hợp bổ sung vào bài giảng: "${targetTitle}".`
+    );
+  };
+
+  const handleCancelMerge = () => {
+    if (!activeDoc) return;
+    setUploadedDocs((prev) =>
+      prev.map((d) =>
+        d.id === activeDoc.id ? { ...d, isMerged: false, mergeTargetTitle: undefined } : d
+      )
+    );
+    toast.info("Đã hủy chế độ gộp nội dung.");
+  };
+
   // Nạp nhanh tệp mẫu thử nghiệm
   const handleLoadSampleDoc = async (fileName: string) => {
     try {
@@ -428,6 +505,14 @@ export const MaterialUploadHub: React.FC = () => {
         draft.suggestedRoadmapPosition = `[Bài Học Liên Ngành] ${draft.suggestedRoadmapPosition} • Chuyên môn kết nối: ${activeScanResult.secondarySubject?.subjectName}`;
       }
 
+      // Nếu người dùng chọn chế độ GỘP vào bài giảng hiện có
+      if (activeDoc.isMerged && activeDoc.mergeTargetTitle) {
+        draft.title = `${activeDoc.mergeTargetTitle} (Đã Gộp Nội Dung)`;
+        draft.summary = `[Nội Dung Gộp Bổ Sung Cho Bài: ${activeDoc.mergeTargetTitle}]\n${draft.summary}`;
+      } else {
+        draft.title = activeDoc.suggestedTitle;
+      }
+
       // Cập nhật kết quả trích xuất trực tiếp vào bản ghi của tệp đang chọn
       setUploadedDocs((prev) =>
         prev.map((d) =>
@@ -437,13 +522,20 @@ export const MaterialUploadHub: React.FC = () => {
                 extractedDraft: draft,
                 isExtracting: false,
                 status: "extracted",
-                suggestedTitle: draft.title || d.suggestedTitle,
+                suggestedTitle: draft.title,
               }
             : d
         )
       );
 
-      toast.success("AI Agent đã trích xuất & cập nhật dữ liệu thành công vào bảng thông tin bên phải!");
+      // Cập nhật user drafts cache
+      setUserDrafts((prev) => [draft, ...prev.filter((d) => d.id !== draft.id)]);
+
+      toast.success(
+        activeDoc.isMerged
+          ? `AI Agent đã hệ thống hóa và gộp bài học thành công vào "${activeDoc.mergeTargetTitle}"!`
+          : "AI Agent đã trích xuất & cập nhật dữ liệu thành công vào bảng thông tin bên phải!"
+      );
     } catch (err: any) {
       console.error("Lỗi trích xuất:", err);
       toast.error("Có lỗi xảy ra trong quá trình xử lý bài học: " + err.message);
@@ -548,7 +640,7 @@ export const MaterialUploadHub: React.FC = () => {
                   Định dạng: .DOCX, .DOC, .PDF, .PDFA, .PPTX • Tối đa 25MB
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  Khi tải lên, AI sẽ tự động đọc lướt và điền thẳng thông tin sang bảng bên phải
+                  Khi tải lên, AI tự động đọc lướt và điền thẳng tiêu đề tiếng Việt có dấu sang bảng bên phải
                 </p>
               </div>
             </div>
@@ -734,7 +826,7 @@ export const MaterialUploadHub: React.FC = () => {
 
                           <div className="min-w-0 space-y-0.5">
                             <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">
-                              {doc.name}
+                              {doc.suggestedTitle || doc.name}
                             </p>
                             <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
                               <span className="font-semibold text-slate-600">{sizeInMB} MB</span>
@@ -744,6 +836,10 @@ export const MaterialUploadHub: React.FC = () => {
                               {doc.isScanning ? (
                                 <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px] animate-pulse">
                                   [ AI Đang Đọc Lướt... ]
+                                </span>
+                              ) : doc.isMerged ? (
+                                <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-bold text-[10px]">
+                                  [ Gộp Vào: {doc.mergeTargetTitle} ]
                                 </span>
                               ) : doc.extractedDraft ? (
                                 <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">
@@ -859,7 +955,7 @@ export const MaterialUploadHub: React.FC = () => {
                               <span className="font-mono text-[10px] text-slate-500 font-bold shrink-0">
                                 [{doc.extension}]
                               </span>
-                              <span className="text-slate-800 truncate">{doc.name}</span>
+                              <span className="text-slate-800 truncate">{doc.suggestedTitle || doc.name}</span>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                               {doc.extractedDraft && (
@@ -924,14 +1020,18 @@ export const MaterialUploadHub: React.FC = () => {
                 </div>
                 <p className="text-[11px] text-slate-500">
                   {activeDoc
-                    ? `Đang hiển thị dữ liệu của tệp: ${activeDoc.name}`
+                    ? `Đang hiển thị dữ liệu của: ${activeDoc.suggestedTitle || activeDoc.name}`
                     : "Chưa chọn tệp nào từ danh sách bên trái"}
                 </p>
               </div>
 
               {activeDoc && (
                 <div className="flex items-center gap-2">
-                  {activeExtractedDraft ? (
+                  {activeDoc.isMerged ? (
+                    <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-900 text-[11px] font-black border border-purple-300">
+                      [ CHẾ ĐỘ GỘP ]
+                    </span>
+                  ) : activeExtractedDraft ? (
                     <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-black border border-emerald-300">
                       [ ĐÃ TRÍCH XUẤT FEYNMAN ]
                     </span>
@@ -1048,18 +1148,102 @@ export const MaterialUploadHub: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Tiêu đề bài giảng đề xuất (Cho phép chỉnh sửa trực tiếp) */}
-                  <div className="space-y-1 pt-1">
-                    <label className="text-[11px] font-bold text-slate-700 block">
-                      Tiêu Đề Bài Giảng Đề Xuất (AI gợi ý)
-                    </label>
+                  {/* Tiêu đề bài giảng đề xuất (Full chữ tiếng Việt có dấu) */}
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-700 block">
+                        Tiêu Đề Bài Giảng Đề Xuất (Tiếng Việt chuẩn có dấu)
+                      </label>
+                      <span className="text-[10px] text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                        AI Chuẩn Hóa
+                      </span>
+                    </div>
+
                     <input
                       type="text"
                       value={activeDoc.suggestedTitle}
                       onChange={(e) => handleUpdateActiveTitle(e.target.value)}
                       disabled={isCurrentlyExtracting}
-                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50"
+                      className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50 shadow-2xs"
+                      placeholder="Nhập hoặc chỉnh sửa tiêu đề bài giảng..."
                     />
+
+                    {/* KHỐI TRẠNG THÁI GỘP NỘI DUNG (NẾU ĐÃ CHỌN GỘP) */}
+                    {activeDoc.isMerged && (
+                      <div className="p-3 rounded-2xl bg-purple-50 border border-purple-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+                        <div className="space-y-0.5">
+                          <span className="font-mono text-[10px] font-black uppercase text-purple-800 bg-purple-200/80 px-2 py-0.5 rounded inline-block">
+                            [CHẾ ĐỘ GỘP BÀI GIẢNG ĐANG BẬT]
+                          </span>
+                          <p className="text-[11px] text-purple-900 font-medium">
+                            Nội dung tài liệu này sẽ được tích hợp bổ sung vào bài:{" "}
+                            <strong>"{activeDoc.mergeTargetTitle}"</strong>
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleCancelMerge}
+                          className="px-2.5 py-1 rounded-xl bg-white hover:bg-purple-100 text-purple-800 text-[11px] font-bold border border-purple-300 transition-colors cursor-pointer shrink-0"
+                        >
+                          [Hủy Chế Độ Gộp]
+                        </button>
+                      </div>
+                    )}
+
+                    {/* KHỐI CẢNH BÁO TRÙNG TIÊU ĐỀ & RECOMMEND PHIÊN BẢN 2 3 4 HOẶC GỘP */}
+                    {!activeDoc.isMerged && titleConflictAdvice?.hasConflict && (
+                      <div className="p-3 rounded-2xl bg-amber-50/90 border border-amber-200/90 space-y-2 text-xs animate-fade-in">
+                        <div className="flex items-center justify-between flex-wrap gap-1">
+                          <span className="font-mono text-[10px] font-black uppercase text-amber-800 bg-amber-200/80 px-2 py-0.5 rounded">
+                            [PHÁT HIỆN TRÙNG TIÊU ĐỀ TRONG HỆ THỐNG]
+                          </span>
+                          <span className="text-[10px] text-amber-700 font-bold">
+                            Nguồn: {titleConflictAdvice.matchedRecord?.source}
+                          </span>
+                        </div>
+
+                        <p className="text-[11px] text-amber-900 leading-snug">
+                          Hệ thống ghi nhận bạn đã có bài giảng:{" "}
+                          <strong>"{titleConflictAdvice.matchedRecord?.title}"</strong>. Bạn có thể chọn cách xử lý nhanh:
+                        </p>
+
+                        <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                          {/* Gợi ý 1: Thêm số phiên bản 2, 3, 4 */}
+                          <button
+                            type="button"
+                            onClick={() => handleApplyVersionedTitle(titleConflictAdvice.versionedTitle)}
+                            className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-amber-600 text-amber-900 hover:text-white border border-amber-300 text-[11px] font-bold transition-all shadow-2xs cursor-pointer"
+                            title={`Đổi tên thành: ${titleConflictAdvice.versionedTitle}`}
+                          >
+                            [ Thêm Số: (Phiên Bản {titleConflictAdvice.nextVersionNumber}) ]
+                          </button>
+
+                          {/* Gợi ý 2: Thêm số phần 2, 3, 4 */}
+                          <button
+                            type="button"
+                            onClick={() => handleApplyVersionedTitle(titleConflictAdvice.partTitle)}
+                            className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-amber-600 text-amber-900 hover:text-white border border-amber-300 text-[11px] font-bold transition-all shadow-2xs cursor-pointer"
+                            title={`Đổi tên thành: ${titleConflictAdvice.partTitle}`}
+                          >
+                            [ Thêm Số: (Phần {titleConflictAdvice.nextVersionNumber}) ]
+                          </button>
+
+                          {/* Gợi ý 3: Gộp vào bài giảng hiện có */}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleApplyMergeWithExisting(
+                                titleConflictAdvice.matchedRecord?.title || titleConflictAdvice.rootTitle
+                              )
+                            }
+                            className="px-2.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-black transition-all shadow-2xs cursor-pointer"
+                            title="Tích hợp bổ sung khái niệm và bẫy thuật ngữ vào bài giảng đã có"
+                          >
+                            [ Gộp Vào Bài Giảng Hiện Có ]
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* URL Reference Link chuẩn */}
