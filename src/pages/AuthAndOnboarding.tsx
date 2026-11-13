@@ -35,9 +35,129 @@ import {
   Clock,
   Eye,
   EyeOff,
+  Users,
+  Copy,
+  Check,
+  LogIn,
+  X,
+  ExternalLink,
 } from "lucide-react";
 import { UserRole } from "@/types/auth.types";
 import { supabase } from "@/lib/supabase";
+
+export interface QuickAccountItem {
+  key: string;
+  name: string;
+  username: string;
+  email: string;
+  password: string;
+  role: UserRole;
+  roleLabel: string;
+  field: string;
+  isFresh: boolean;
+  avatarIcon: string;
+}
+
+export const QUICK_ACCOUNTS_LIST: QuickAccountItem[] = [
+  // 5 Tài khoản mới tinh (0 XP)
+  {
+    key: "minhanh_it",
+    name: "Trần Minh Anh",
+    username: "minhanh_it",
+    email: "minhanh.it@elis.edu.vn",
+    password: "Password@123",
+    role: "learner",
+    roleLabel: "Học Viên",
+    field: "Khoa Học Máy Tính & Lập Trình Web",
+    isFresh: true,
+    avatarIcon: "💻",
+  },
+  {
+    key: "hoangnam_ecom",
+    name: "Nguyễn Hoàng Nam",
+    username: "hoangnam_ecom",
+    email: "hoangnam.ecom@elis.edu.vn",
+    password: "Password@123",
+    role: "learner",
+    roleLabel: "Học Viên",
+    field: "Thương Mại Điện Tử & Marketing Số",
+    isFresh: true,
+    avatarIcon: "🛒",
+  },
+  {
+    key: "thuha_med",
+    name: "Phạm Thu Hà",
+    username: "thuha_med",
+    email: "thuha.med@elis.edu.vn",
+    password: "Password@123",
+    role: "learner",
+    roleLabel: "Học Viên",
+    field: "Y Khoa & Dược Học Cơ Bản",
+    isFresh: true,
+    avatarIcon: "🩺",
+  },
+  {
+    key: "quocbao_curator",
+    name: "Đặng Quốc Bảo",
+    username: "quocbao_curator",
+    email: "quocbao.curator@elis.edu.vn",
+    password: "Password@123",
+    role: "curator",
+    roleLabel: "Thẩm Định Viên",
+    field: "Kiểm Định Tri Thức & Sư Phạm",
+    isFresh: true,
+    avatarIcon: "📜",
+  },
+  {
+    key: "phuonglinh_admin",
+    name: "Vũ Phương Linh",
+    username: "phuonglinh_admin",
+    email: "phuonglinh.admin@elis.edu.vn",
+    password: "Password@123",
+    role: "admin",
+    roleLabel: "Quản Trị Viên",
+    field: "Quản Trị Hệ Thống & Kiểm Chuẩn AI",
+    isFresh: true,
+    avatarIcon: "🛡️",
+  },
+  // 3 Tài khoản mẫu có sẵn
+  {
+    key: "learn123",
+    name: "Nguyễn Giảng Viên",
+    username: "learn123",
+    email: "learn123@elis.edu.vn",
+    password: "123123",
+    role: "learner",
+    roleLabel: "Học Viên (Demo 480 XP)",
+    field: "Công Nghệ Thông Tin & Toán",
+    isFresh: false,
+    avatarIcon: "🎓",
+  },
+  {
+    key: "curator123",
+    name: "Lê Thẩm Định",
+    username: "curator123",
+    email: "curator123@elis.edu.vn",
+    password: "123123",
+    role: "curator",
+    roleLabel: "Thẩm Định (Demo 1600 XP)",
+    field: "Kiểm Định & Gán Nhãn Tri Thức",
+    isFresh: false,
+    avatarIcon: "✨",
+  },
+  {
+    key: "admin123",
+    name: "Trần Kiểm Chuẩn",
+    username: "admin123",
+    email: "admin123@elis.edu.vn",
+    password: "123123",
+    role: "admin",
+    roleLabel: "Quản Trị (Demo 2500 XP)",
+    field: "Quản Trị Học Thuật & Đánh Giá AI",
+    isFresh: false,
+    avatarIcon: "👑",
+  },
+];
 
 export const AuthAndOnboarding: React.FC = () => {
   const navigate = useNavigate();
@@ -89,6 +209,40 @@ export const AuthAndOnboarding: React.FC = () => {
 
   // Trạng thái tài khoản không tồn tại khi đăng nhập
   const [isAccountNotFound, setIsAccountNotFound] = useState(false);
+
+  // Modal hiển thị danh sách toàn bộ tài khoản
+  const [showAccountListModal, setShowAccountListModal] = useState(false);
+  const [accountFilter, setAccountFilter] = useState<"all" | "fresh" | "demo">("all");
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const handleCopyText = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    toast.success(`Đã sao chép: ${text}`);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const handleDirectLogin = async (userKey: string, pass: string) => {
+    setUsername(userKey);
+    setPassword(pass);
+    setIsSubmitting(true);
+    setLocalError(null);
+    clearError();
+    try {
+      const res = await login(userKey, pass);
+      if (res.success) {
+        toast.success(`Đăng nhập thành công với tài khoản ${userKey}!`);
+        setShowAccountListModal(false);
+        navigate("/dashboard");
+      } else {
+        setLocalError(res.error || "Đăng nhập thất bại.");
+      }
+    } catch (err: any) {
+      setLocalError(err.message || "Lỗi đăng nhập.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Countdown timer cho nút Gửi lại mã
   useEffect(() => {
@@ -491,7 +645,15 @@ export const AuthAndOnboarding: React.FC = () => {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-slate-400">
                   <span>Tài Khoản Kiểm Thử Nhanh</span>
-                  <span className="text-slate-400 font-normal">MK: 123123 hoặc Password@123</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowAccountListModal(true)}
+                    className="flex items-center gap-1 text-[10.5px] font-extrabold text-[#5066A1] hover:text-[#7286D3] bg-[#EEF2FC] hover:bg-[#E2EAFD] px-2 py-0.5 rounded-lg border border-[#D5E1FA] transition-all cursor-pointer shadow-2xs"
+                    title="Mở danh sách chi tiết và đăng nhập 1-click cho tất cả 8 tài khoản"
+                  >
+                    <Users className="w-3 h-3 text-[#7286D3]" />
+                    <span>Xem Bảng 8 Acc</span>
+                  </button>
                 </div>
 
                 {/* 5 Tài khoản mới tinh (0 XP) */}
@@ -1116,6 +1278,188 @@ export const AuthAndOnboarding: React.FC = () => {
           - Richard Feynman -
         </span>
       </div>
+
+      {/* =========================================================================
+          MODAL: BẢNG DANH SÁCH TOÀN BỘ TÀI KHOẢN ĐĂNG NHẬP NHANH (QUICK ACCOUNT LIST)
+          ========================================================================= */}
+      {showAccountListModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-[#E2EAFD] shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-4 sm:px-6 bg-gradient-to-r from-[#F8FAFD] via-[#EEF2FC] to-white border-b border-[#E2EAFD] flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#EEF2FC] text-[#5066A1] flex items-center justify-center shadow-2xs">
+                  <Users className="w-5 h-5 text-[#7286D3]" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-800">
+                    Danh Sách Tài Khoản Đăng Nhập Nhanh
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Bấm <strong>"Đăng nhập ngay"</strong> để vào thẳng hệ thống với đầy đủ phân quyền
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAccountListModal(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Đóng bảng tài khoản"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="px-4 sm:px-6 py-2.5 bg-slate-50/70 border-b border-slate-100 flex items-center gap-2 shrink-0">
+              <span className="text-xs font-bold text-slate-400">Lọc:</span>
+              <button
+                type="button"
+                onClick={() => setAccountFilter("all")}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  accountFilter === "all"
+                    ? "bg-[#7286D3] text-white shadow-2xs"
+                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                }`}
+              >
+                Tất cả (8)
+              </button>
+              <button
+                type="button"
+                onClick={() => setAccountFilter("fresh")}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                  accountFilter === "fresh"
+                    ? "bg-emerald-600 text-white shadow-2xs"
+                    : "bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-200"
+                }`}
+              >
+                <span>✨ 5 Tài khoản mới tinh (0 XP)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAccountFilter("demo")}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                  accountFilter === "demo"
+                    ? "bg-indigo-600 text-white shadow-2xs"
+                    : "bg-white text-indigo-700 hover:bg-indigo-50 border border-indigo-200"
+                }`}
+              >
+                <span>🎓 3 Tài khoản mẫu</span>
+              </button>
+            </div>
+
+            {/* Account List Grid */}
+            <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-3">
+              {QUICK_ACCOUNTS_LIST.filter((acc) => {
+                if (accountFilter === "fresh") return acc.isFresh;
+                if (accountFilter === "demo") return !acc.isFresh;
+                return true;
+              }).map((acc) => (
+                <div
+                  key={acc.key}
+                  className={`p-3.5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                    username === acc.key
+                      ? "bg-blue-50/70 border-[#7286D3] ring-1 ring-[#7286D3]/40 shadow-xs"
+                      : "bg-[#FDFEFE] hover:bg-[#F8FAFD] border-[#E2EAFD]"
+                  }`}
+                >
+                  {/* Left: Info */}
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl select-none shrink-0 p-1.5 rounded-xl bg-slate-100/80">
+                      {acc.avatarIcon}
+                    </span>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-extrabold text-slate-800">{acc.name}</span>
+                        <span
+                          className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                            acc.role === "admin"
+                              ? "bg-purple-50 text-purple-700 border-purple-200"
+                              : acc.role === "curator"
+                              ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                              : "bg-blue-50 text-blue-700 border-blue-200"
+                          }`}
+                        >
+                          {acc.roleLabel}
+                        </span>
+                        {acc.isFresh && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Mới tinh (0 XP)
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 font-medium">
+                        <span className="font-mono text-slate-700">
+                          user: <strong>{acc.username}</strong>
+                        </span>
+                        <span>•</span>
+                        <span className="font-mono text-slate-700">{acc.email}</span>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                        <span>Chuyên ngành: <em>{acc.field}</em></span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right: Actions */}
+                  <div className="flex items-center gap-2 sm:self-center shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText(acc.username, `user-${acc.key}`)}
+                      className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer text-xs"
+                      title="Sao chép username"
+                    >
+                      {copiedKey === `user-${acc.key}` ? (
+                        <Check className="w-4 h-4 text-emerald-600" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        fillQuickAccount(acc.key, acc.password);
+                        setShowAccountListModal(false);
+                      }}
+                      className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      Điền Form
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      onClick={() => handleDirectLogin(acc.key, acc.password)}
+                      className="px-3.5 py-2 rounded-xl bg-[#7286D3] hover:bg-[#5066A1] text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <LogIn className="w-3.5 h-3.5" />
+                      <span>Đăng Nhập Ngay</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3.5 sm:px-6 bg-[#F8FAFD] border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 shrink-0">
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>Mật khẩu: <strong>Password@123</strong> (hoặc <strong>123123</strong>)</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAccountListModal(false)}
+                className="px-4 py-1.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 font-bold text-slate-700 text-xs cursor-pointer transition-colors"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
