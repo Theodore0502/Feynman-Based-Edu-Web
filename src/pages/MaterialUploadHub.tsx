@@ -1,35 +1,17 @@
 /**
  * File: src/pages/MaterialUploadHub.tsx
- * Mục đích: Trung tâm tải lên tài liệu học tập & Kích hoạt Agent Hệ thống hóa Tri thức (Curriculum Digestion Agent).
- * Đặc điểm:
- *   - Giới hạn định dạng nghiêm ngặt: Chỉ chấp nhận .pdf, .pdfa, .doc, .docx, .pptx.
- *   - Lựa chọn Nhóm Ngành (Cấp 1) và Môn Học (Cấp 2) theo chuẩn Supabase.
- *   - Trình diễn Agent 4 bước: Quét tài liệu -> Chunking -> Gán nhãn khái niệm & Bẫy thuật ngữ -> Schema Feynman.
- *   - Chuyển giao sang Bàn Thẩm Định (Curator Validation Center).
+ * Mục đích: Trung tâm tải lên tài liệu học tập & Kích hoạt AI Agent Hệ thống hóa Tri thức.
+ * Tính năng nâng cao:
+ *   1. Quét siêu tốc văn bản (.docx, .pdf) qua FastDocumentScanner & tính toán ma trận % phân bổ (GitHub-style language bar).
+ *   2. Tự động gom nhóm các tệp tải lên theo Bộ Chuyên Ngành (Bundle Clustering).
+ *   3. Xử lý tài liệu liên ngành đa môn:
+ *      - Phương án A: Phân bổ % ngữ nghĩa (GitHub-style multi-domain bar).
+ *      - Phương án B: Tự động phát hiện ranh giới chương/học phần (Semantic Chapter Splitter) với tùy chọn tách module độc lập.
+ *   4. Quy chuẩn UI: TUYỆT ĐỐI KHÔNG DÙNG ICON (No Lucide, no SVG, typographic badges, progress bars & status dots only).
  */
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  UploadCloud,
-  FileText,
-  CheckCircle2,
-  AlertCircle,
-  Sparkles,
-  Layers,
-  ArrowRight,
-  ShieldCheck,
-  RefreshCw,
-  Clock,
-  BookOpen,
-  X,
-  FileCheck,
-  Copy,
-  Check,
-  ExternalLink,
-  Trash2,
-  File as FileIcon,
-} from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/hooks/useAuthStore";
 import { CurriculumService } from "@/lib/services/curriculum-service";
@@ -38,6 +20,12 @@ import {
   ExtractedLessonDraft,
 } from "@/lib/services/document-extraction-agent";
 import { TaxonomyClassifier } from "@/lib/services/taxonomy-classifier";
+import {
+  FastDocumentScanner,
+  FastScanResult,
+  SubjectDistribution,
+  DetectedChapterModule,
+} from "@/lib/services/fast-document-scanner";
 import { DomainCategory, AcademicSubject, TaxonomyClassificationResult } from "@/types/catalog.types";
 import { PageHeroBanner } from "@/components/shared/PageHeroBanner";
 
@@ -51,6 +39,9 @@ export interface UploadedDocRecord {
   extension: string;
   uploadedAt: string;
   classification: TaxonomyClassificationResult | null;
+  scanResult: FastScanResult | null;
+  isScanning: boolean;
+  selectedSplitMode: "integrated" | "split";
   status: "ready" | "processing" | "extracted";
 }
 
@@ -71,9 +62,13 @@ export const MaterialUploadHub: React.FC = () => {
   const [uploadedDocs, setUploadedDocs] = useState<UploadedDocRecord[]>([]);
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
 
+  // Chế độ xem: Từng tệp hoặc Gom theo Bộ chuyên ngành
+  const [viewMode, setViewMode] = useState<"list" | "bundles">("list");
+
   const activeDoc = uploadedDocs.find((d) => d.id === activeDocId) || uploadedDocs[0] || null;
   const uploadedFile = activeDoc ? activeDoc.file : null;
   const aiClassification = activeDoc ? activeDoc.classification : null;
+  const activeScanResult = activeDoc ? activeDoc.scanResult : null;
 
   const [fileError, setFileError] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState<boolean>(false);
@@ -105,7 +100,7 @@ export const MaterialUploadHub: React.FC = () => {
   }, []);
 
   // Filter subjects based on selected domain
-  const availableSubjects = React.useMemo(() => {
+  const availableSubjects = useMemo(() => {
     if (!selectedDomainId) return subjects;
     const allowed = new Set(
       domainSubjects
@@ -118,13 +113,117 @@ export const MaterialUploadHub: React.FC = () => {
   // Update default subject when domain changes
   useEffect(() => {
     if (availableSubjects.length > 0) {
-      setSelectedSubjectId(availableSubjects[0].id);
+      if (!availableSubjects.some((s) => s.id === selectedSubjectId)) {
+        setSelectedSubjectId(availableSubjects[0].id);
+      }
     } else {
       setSelectedSubjectId("");
     }
-  }, [selectedDomainId, availableSubjects]);
+  }, [selectedDomainId, availableSubjects, selectedSubjectId]);
 
-  // Thêm tệp vào danh sách & Phân loại AI
+  // Gom nhóm các tệp tải lên theo Bộ chuyên ngành (Bundle Clustering)
+  const clusteredBundles = useMemo(() => {
+    const groups: Record<
+      string,
+      {
+        subjectName: string;
+        domainName: string;
+        subjectId: string;
+        domainId: string;
+        color: string;
+        docs: UploadedDocRecord[];
+      }
+    > = {};
+
+    uploadedDocs.forEach((doc) => {
+      const subjectName =
+        doc.scanResult?.primarySubject.subjectName ||
+        doc.classification?.subjectName ||
+        "Chưa Phân Loại";
+      const domainName =
+        doc.scanResult?.primarySubject.domainName ||
+        doc.classification?.domainName ||
+        "Đại Cương";
+      const subjectId =
+        doc.scanResult?.primarySubject.subjectId || doc.classification?.subjectId || "";
+      const domainId =
+        doc.scanResult?.primarySubject.domainId || doc.classification?.domainId || "";
+      const color = doc.scanResult?.primarySubject.color || "#3B82F6";
+
+      if (!groups[subjectName]) {
+        groups[subjectName] = {
+          subjectName,
+          domainName,
+          subjectId,
+          domainId,
+          color,
+          docs: [],
+        };
+      }
+      groups[subjectName].docs.push(doc);
+    });
+
+    return Object.values(groups);
+  }, [uploadedDocs]);
+
+  // Quét tài liệu bằng FastDocumentScanner trong nền
+  const runFastScanForDoc = async (recordId: string, file: File) => {
+    try {
+      const scanRes = await FastDocumentScanner.scanDocument(file);
+
+      setUploadedDocs((prev) =>
+        prev.map((doc) => {
+          if (doc.id !== recordId) return doc;
+          return {
+            ...doc,
+            scanResult: scanRes,
+            isScanning: false,
+            selectedSplitMode: scanRes.splitMode,
+            classification: {
+              domainId: scanRes.primarySubject.domainId,
+              domainSlug: scanRes.primarySubject.domainSlug,
+              domainName: scanRes.primarySubject.domainName,
+              subjectId: scanRes.primarySubject.subjectId,
+              subjectSlug: scanRes.primarySubject.subjectId.replace(/^sub-/, ""),
+              subjectName: scanRes.primarySubject.subjectName,
+              confidenceScore: Math.min(99, Math.max(75, scanRes.primarySubject.percentage)),
+              matchedKeywords: scanRes.primarySubject.matchedKeywords,
+              suggestedTitle: scanRes.suggestedTitle,
+              canonicalSlug: scanRes.canonicalSlug,
+              refLink: scanRes.refLink,
+              allowedConcepts: scanRes.primarySubject.matchedKeywords.slice(0, 4),
+              allowedJargons: ["Thuật ngữ chuyên ngành", "Cơ chế vận hành"],
+            },
+          };
+        })
+      );
+
+      // Nếu đây là tài liệu đang được chọn, đồng bộ nhóm ngành và môn học lên bảng thông tin
+      if (activeDocId === recordId || (!activeDocId && uploadedDocs[0]?.id === recordId)) {
+        setSelectedDomainId(scanRes.primarySubject.domainId);
+        setTimeout(() => {
+          setSelectedSubjectId(scanRes.primarySubject.subjectId);
+        }, 50);
+
+        if (scanRes.isMultiSubject) {
+          toast.success(
+            `Phát hiện tài liệu liên ngành: ${scanRes.primarySubject.subjectName} (${scanRes.primarySubject.percentage}%) và ${scanRes.secondarySubject?.subjectName} (${scanRes.secondarySubject?.percentage}%)`
+          );
+        } else {
+          toast.success(
+            `AI đã quét xong: ${scanRes.primarySubject.subjectName} (${scanRes.primarySubject.percentage}% khớp)`
+          );
+        }
+      }
+    } catch (err: any) {
+      console.warn("Fast scan non-blocking warning:", err);
+      setUploadedDocs((prev) =>
+        prev.map((doc) => (doc.id === recordId ? { ...doc, isScanning: false } : doc))
+      );
+    }
+  };
+
+  // Thêm tệp vào danh sách & Kích hoạt Quét AI
   const handleAddFiles = (files: FileList | File[]) => {
     setFileError(null);
     const fileArray = Array.from(files);
@@ -148,7 +247,7 @@ export const MaterialUploadHub: React.FC = () => {
 
       const parts = file.name.split(".");
       const ext = parts.length > 1 ? parts[parts.length - 1].toUpperCase() : "DOC";
-      const classification = TaxonomyClassifier.classifyDocument(file.name);
+      const fallbackClassification = TaxonomyClassifier.classifyDocument(file.name);
       const nowStr = new Date().toLocaleString("vi-VN", {
         hour: "2-digit",
         minute: "2-digit",
@@ -157,16 +256,24 @@ export const MaterialUploadHub: React.FC = () => {
         year: "numeric",
       });
 
+      const newId = `doc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
       newDocs.push({
-        id: `doc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        id: newId,
         file,
         name: file.name,
         size: file.size,
         extension: ext,
         uploadedAt: nowStr,
-        classification,
+        classification: fallbackClassification,
+        scanResult: null,
+        isScanning: true,
+        selectedSplitMode: "integrated",
         status: "ready",
       });
+
+      // Kích hoạt quét AI lướt siêu tốc
+      runFastScanForDoc(newId, file);
     });
 
     if (newDocs.length > 0) {
@@ -179,9 +286,6 @@ export const MaterialUploadHub: React.FC = () => {
         setTimeout(() => {
           setSelectedSubjectId(primary.classification!.subjectId);
         }, 50);
-        toast.success(
-          `AI đã nhận diện: ${primary.classification.domainName} › ${primary.classification.subjectName} (${primary.classification.confidenceScore}% khớp)`
-        );
       }
     }
   };
@@ -207,11 +311,34 @@ export const MaterialUploadHub: React.FC = () => {
 
   const handleSelectActiveDoc = (doc: UploadedDocRecord) => {
     setActiveDocId(doc.id);
-    if (doc.classification) {
-      setSelectedDomainId(doc.classification.domainId);
+    const domainId = doc.scanResult?.primarySubject.domainId || doc.classification?.domainId;
+    const subjectId = doc.scanResult?.primarySubject.subjectId || doc.classification?.subjectId;
+
+    if (domainId) {
+      setSelectedDomainId(domainId);
+    }
+    if (subjectId) {
       setTimeout(() => {
-        setSelectedSubjectId(doc.classification!.subjectId);
+        setSelectedSubjectId(subjectId);
       }, 50);
+    }
+  };
+
+  const handleToggleSplitMode = (mode: "integrated" | "split") => {
+    if (!activeDoc) return;
+    setUploadedDocs((prev) =>
+      prev.map((d) => {
+        if (d.id !== activeDoc.id) return d;
+        return {
+          ...d,
+          selectedSplitMode: mode,
+        };
+      })
+    );
+    if (mode === "split") {
+      toast.info("Chế độ Tách Module: AI sẽ trích xuất thành các bài học độc lập theo chương.");
+    } else {
+      toast.info("Chế độ Tích Hợp: AI sẽ đóng gói thành bài học liên ngành thống nhất.");
     }
   };
 
@@ -266,6 +393,11 @@ export const MaterialUploadHub: React.FC = () => {
         },
       });
 
+      // Bổ sung thông tin phân bổ nếu có
+      if (activeScanResult?.isMultiSubject && activeDoc?.selectedSplitMode === "integrated") {
+        draft.suggestedRoadmapPosition = `[Bài Học Liên Ngành] ${draft.suggestedRoadmapPosition} • Kết nối chuyên môn: ${activeScanResult.secondarySubject?.subjectName}`;
+      }
+
       setExtractedDraft(draft);
       toast.success("AI Agent đã hoàn tất hệ thống hóa bài học thành công!");
     } catch (err: any) {
@@ -289,12 +421,12 @@ export const MaterialUploadHub: React.FC = () => {
 
   return (
     <div className="w-full space-y-6 pb-12">
-      {/* Top Banner Header Đồng Bộ Chuẩn Dashboard - Mở Rộng Theo Nội Dung Kiểm Duyệt 2 Lớp */}
+      {/* Top Banner Header Đồng Bộ Chuẩn Dashboard - TUYỆT ĐỐI KHÔNG DÙNG ICON */}
       <PageHeroBanner
         badge={
-          <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-black border border-indigo-200/80 shadow-2xs">
-            <ShieldCheck className="w-4 h-4 text-indigo-600" />
-            <span>Quy Trình Kiểm Duyệt 2 Lớp</span>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-black border border-indigo-200/80 shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-indigo-600 inline-block animate-pulse" />
+            <span className="uppercase tracking-wider">Quy Trình Kiểm Duyệt 2 Lớp</span>
           </div>
         }
         title={
@@ -312,18 +444,16 @@ export const MaterialUploadHub: React.FC = () => {
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="px-5 py-2.5 rounded-2xl bg-[#7286D3] hover:bg-[#5066A1] text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+              className="px-5 py-2.5 rounded-2xl bg-[#7286D3] hover:bg-[#5066A1] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
             >
-              <UploadCloud className="w-4 h-4" />
-              <span>Chọn Tệp Tải Lên Ngay</span>
+              [ Chọn Tệp Tải Lên Ngay ]
             </button>
             <button
               type="button"
               onClick={() => navigate("/curator/validation")}
-              className="px-5 py-2.5 rounded-2xl bg-white/90 hover:bg-white text-slate-700 text-xs font-bold border border-slate-200/80 shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+              className="px-5 py-2.5 rounded-2xl bg-white/90 hover:bg-white text-slate-700 text-xs font-bold border border-slate-200/80 shadow-xs transition-all cursor-pointer"
             >
-              <FileCheck className="w-4 h-4 text-indigo-600" />
-              <span>Sang Bàn Thẩm Định</span>
+              [ Sang Bàn Thẩm Định ]
             </button>
           </>
         }
@@ -331,35 +461,37 @@ export const MaterialUploadHub: React.FC = () => {
 
       {!extractedDraft ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* CỘT TRÁI: Khu vực tải tài liệu lên & Danh sách tệp (7 cols) */}
+          {/* CỘT TRÁI: Khu vực tải tài liệu lên & Quản lý tệp/bộ chuyên ngành (7 cols) */}
           <div className="lg:col-span-7 space-y-5">
             <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-5">
-              {/* Header Box */}
+              {/* Header Box - Không Dùng Icon */}
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold shadow-2xs">
-                    <UploadCloud className="w-5 h-5" />
-                  </div>
-                  <div>
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[10px] font-black tracking-wider uppercase">
+                      TẢI LÊN
+                    </span>
                     <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider">
                       Khu Vực Tải Lên Tài Liệu
                     </h2>
-                    <p className="text-[11px] text-slate-500">
-                      Tự động trích xuất cấu trúc ngữ nghĩa và gán nhãn tri thức
-                    </p>
                   </div>
+                  <p className="text-[11px] text-slate-500">
+                    AI đọc lướt cấu trúc siêu tốc, phân tích nhãn đa ngành &amp; gom nhóm tự động
+                  </p>
                 </div>
-                <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200/60 shadow-2xs">
-                  {uploadedDocs.length} tệp
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200/60 shadow-2xs">
+                    {uploadedDocs.length} tệp
+                  </span>
+                </div>
               </div>
 
-              {/* Strict Upload Dropzone */}
+              {/* Dropzone Tải Lên - Hoàn toàn không dùng icon */}
               <div
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleFileDrop}
                 onClick={() => !isProcessing && fileInputRef.current?.click()}
-                className="border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/70 hover:bg-blue-50/30 rounded-2xl p-6 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-2.5 group"
+                className="border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/70 hover:bg-blue-50/30 rounded-2xl p-7 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group"
               >
                 <input
                   type="file"
@@ -370,106 +502,191 @@ export const MaterialUploadHub: React.FC = () => {
                   className="hidden"
                 />
 
-                <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner">
-                  <UploadCloud className="w-6 h-6" />
-                </div>
+                <span className="px-3.5 py-1.5 rounded-full bg-blue-600 text-white font-mono text-[11px] font-black tracking-wider uppercase shadow-xs group-hover:scale-105 transition-transform">
+                  [ KÉO THẢ TỆP VÀO ĐÂY HOẶC NHẤP ĐỂ TẢI ]
+                </span>
 
                 <div className="space-y-1">
-                  <p className="text-sm font-bold text-slate-700">
-                    Kéo thả tài liệu vào đây, hoặc <span className="text-blue-600 underline">chọn tệp từ máy tính</span>
+                  <p className="text-xs sm:text-sm font-bold text-slate-700">
+                    Hỗ trợ định dạng: .DOCX, .DOC, .PDF, .PDFA, .PPTX
                   </p>
-                  <p className="text-xs text-slate-400">
-                    Hỗ trợ định dạng: <strong className="text-slate-600">.pdf, .pdfa, .doc, .docx, .pptx</strong> • Tối đa 25MB
+                  <p className="text-[11px] text-slate-400">
+                    Dung lượng tối đa 25MB • AI sẽ quét nội dung và xác định tỷ lệ kiến thức trong giây lát
                   </p>
                 </div>
               </div>
 
               {/* Error Notice */}
               {fileError && (
-                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{fileError}</span>
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold">
+                  [LỖI] {fileError}
                 </div>
               )}
 
-              {/* Quick Sample Files Strip (Tải tệp mẫu thử nghiệm Ngành CNTT) */}
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/70 via-indigo-50/60 to-purple-50/50 border border-indigo-100/80 space-y-2.5">
+              {/* Quick Sample Files Strip (Tệp mẫu chuẩn và liên ngành đa môn) */}
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/80 via-indigo-50/70 to-purple-50/60 border border-indigo-100/90 space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Tệp Mẫu Ngành CNTT Có Sẵn (Bấm để nạp và test tự động điền):</span>
-                  </span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider bg-white px-2 py-0.5 rounded text-indigo-700 border border-indigo-200/60 shadow-2xs">
-                    5 Môn Học
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded bg-indigo-600 text-white font-mono text-[10px] font-black uppercase">
+                      MẪU TEST
+                    </span>
+                    <span className="text-xs font-bold text-indigo-950">
+                      Tệp Mẫu Ngành CNTT Có Sẵn (Bấm để nạp test luồng AI):
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-white px-2 py-0.5 rounded text-indigo-700 border border-indigo-200/70 shadow-2xs">
+                    7 Tệp Mẫu
                   </span>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { file: "Giao-Trinh-Co-So-Du-Lieu-SQL-Chuan-Hoa-ACID.docx", label: "Cơ Sở Dữ Liệu SQL" },
-                    { file: "Giao-Trinh-Mang-May-Tinh-Mo-Hinh-OSI-TCP-IP.docx", label: "Mạng Máy Tính (OSI/TCP)" },
-                    { file: "Giao-Trinh-Dien-Toan-Dam-May-Cloud-Container-Docker.docx", label: "Điện Toán Đám Mây (Docker)" },
-                    { file: "Giao-Trinh-An-Toan-Thong-Tin-Ma-Hoa-Cong-Khai-Cybersecurity.docx", label: "An Toàn Thông Tin" },
-                    { file: "Giao-Trinh-Phat-Trien-Ung-Dung-Web-RESTful-API.docx", label: "Phát Triển Web (REST API)" },
-                  ].map((s, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => handleLoadSampleDoc(s.file)}
-                      disabled={isProcessing}
-                      className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-indigo-600 text-slate-700 hover:text-white text-[11px] font-bold transition-all border border-indigo-100/90 shadow-2xs flex items-center gap-1.5 cursor-pointer group"
-                    >
-                      <FileIcon className="w-3 h-3 text-indigo-500 group-hover:text-white" />
-                      <span>{s.label}</span>
-                    </button>
-                  ))}
+                <div className="space-y-2">
+                  {/* Hàng 1: Tài liệu Liên ngành (2 môn trong 1 tệp) */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black text-purple-700 uppercase tracking-wider block">
+                      Tài Liệu Liên Ngành Đa Môn (Test Phương Án A &amp; B):
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleLoadSampleDoc("Do-An-Web-Dashboard-Va-Thi-Giac-May-Tinh-AI-Camera.docx")
+                        }
+                        disabled={isProcessing}
+                        className="px-2.5 py-1.5 rounded-xl bg-purple-100/80 hover:bg-purple-600 text-purple-900 hover:text-white text-[11px] font-bold transition-all border border-purple-300 shadow-2xs cursor-pointer"
+                      >
+                        [DOCX] Đồ Án Web + AI Camera (2 Môn)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleLoadSampleDoc("Giao-Trinh-Tich-Hop-Co-So-Du-Lieu-Va-Mang-May-Tinh.docx")
+                        }
+                        disabled={isProcessing}
+                        className="px-2.5 py-1.5 rounded-xl bg-purple-100/80 hover:bg-purple-600 text-purple-900 hover:text-white text-[11px] font-bold transition-all border border-purple-300 shadow-2xs cursor-pointer"
+                      >
+                        [DOCX] Giáo Trình CSDL + Mạng Máy Tính (2 Môn)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Hàng 2: Tài liệu Đơn môn */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                      Tài Liệu Đơn Môn Chuẩn:
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        {
+                          file: "Giao-Trinh-Phat-Trien-Ung-Dung-Web-RESTful-API.docx",
+                          label: "[DOCX] Phát Triển Web REST API",
+                        },
+                        {
+                          file: "Giao-Trinh-Co-So-Du-Lieu-SQL-Chuan-Hoa-ACID.docx",
+                          label: "[DOCX] Cơ Sở Dữ Liệu SQL",
+                        },
+                        {
+                          file: "Giao-Trinh-Mang-May-Tinh-Mo-Hinh-OSI-TCP-IP.docx",
+                          label: "[DOCX] Mạng Máy Tính (OSI/TCP)",
+                        },
+                        {
+                          file: "Giao-Trinh-Dien-Toan-Dam-May-Cloud-Container-Docker.docx",
+                          label: "[DOCX] Điện Toán Đám Mây",
+                        },
+                        {
+                          file: "Giao-Trinh-An-Toan-Thong-Tin-Ma-Hoa-Cong-Khai-Cybersecurity.docx",
+                          label: "[DOCX] An Toàn Thông Tin",
+                        },
+                      ].map((s, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleLoadSampleDoc(s.file)}
+                          disabled={isProcessing}
+                          className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-indigo-600 text-slate-700 hover:text-white text-[11px] font-bold transition-all border border-indigo-100/90 shadow-2xs cursor-pointer"
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* DANH SÁCH TÀI LIỆU (List View khi tải lên) */}
-              <div className="space-y-3 pt-1">
-                <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                  <span className="flex items-center gap-1.5">
-                    <FileText className="w-4 h-4 text-slate-500" />
-                    <span>Danh Sách Tài Liệu Đã Tải Lên ({uploadedDocs.length})</span>
+              {/* TÙY CHỌN CHẾ ĐỘ XEM: TỪNG TỆP vs GOM THEO BỘ CHUYÊN NGÀNH */}
+              <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Chế Độ Xem:
                   </span>
-                  {uploadedDocs.length > 0 && (
-                    <span className="text-[11px] text-slate-400 font-normal">
-                      Nhấp vào tệp để chọn đối soát học thuật
-                    </span>
-                  )}
+                  <div className="inline-flex rounded-xl bg-slate-100 p-0.5 text-[11px] font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("list")}
+                      className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                        viewMode === "list"
+                          ? "bg-white text-blue-700 shadow-2xs font-black"
+                          : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      Danh Sách Từng Tệp ({uploadedDocs.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("bundles")}
+                      className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                        viewMode === "bundles"
+                          ? "bg-white text-blue-700 shadow-2xs font-black"
+                          : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      Gom Nhóm Bộ Chuyên Ngành ({clusteredBundles.length} Bộ)
+                    </button>
+                  </div>
                 </div>
 
-                {uploadedDocs.length === 0 ? (
-                  <div className="p-8 rounded-2xl bg-slate-50/80 border border-dashed border-slate-200 text-center space-y-2">
-                    <FileText className="w-9 h-9 text-slate-300 mx-auto" />
-                    <p className="text-xs font-bold text-slate-600">Chưa có tài liệu nào trong danh sách</p>
-                    <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
-                      Hãy chọn hoặc kéo thả tệp tài liệu giáo trình, slide bài giảng vào khung phía trên để hiển thị thông tin và bắt đầu trích xuất.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
-                    {uploadedDocs.map((doc) => {
-                      const isSelected = activeDoc?.id === doc.id;
-                      const sizeInMB = (doc.size / (1024 * 1024)).toFixed(2);
-                      const isPDF = doc.extension === "PDF" || doc.extension === "PDFA";
-                      const isWord = doc.extension === "DOC" || doc.extension === "DOCX";
+                <span className="text-[11px] text-slate-400">
+                  {viewMode === "list"
+                    ? "Nhấp vào từng tệp để kiểm tra nhãn"
+                    : "AI tự động phân loại tệp vào các bộ môn"}
+                </span>
+              </div>
 
-                      return (
-                        <div
-                          key={doc.id}
-                          onClick={() => handleSelectActiveDoc(doc)}
-                          className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                            isSelected
-                              ? "border-[#7286D3] bg-[#F4F6FD] shadow-xs"
-                              : "border-slate-200/90 bg-white hover:bg-slate-50/80"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            {/* File Icon Badge */}
-                            <div
-                              className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 font-black text-[10px] ${
+              {/* DANH SÁCH TÀI LIỆU HOẶC GOM NHÓM THEO BỘ */}
+              {uploadedDocs.length === 0 ? (
+                <div className="p-8 rounded-2xl bg-slate-50/80 border border-dashed border-slate-200 text-center space-y-2">
+                  <span className="px-3 py-1 rounded-md bg-slate-200 text-slate-600 font-mono text-[11px] font-black uppercase inline-block">
+                    DANH SÁCH TRỐNG
+                  </span>
+                  <p className="text-xs font-bold text-slate-600">Chưa có tài liệu nào được nạp</p>
+                  <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                    Hãy bấm chọn tệp mẫu phía trên hoặc kéo thả tệp giáo trình từ máy tính để AI tiến hành phân loại và đối soát.
+                  </p>
+                </div>
+              ) : viewMode === "list" ? (
+                /* CHẾ ĐỘ XEM 1: DANH SÁCH TỪNG TỆP */
+                <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+                  {uploadedDocs.map((doc) => {
+                    const isSelected = activeDoc?.id === doc.id;
+                    const sizeInMB = (doc.size / (1024 * 1024)).toFixed(2);
+                    const isPDF = doc.extension === "PDF" || doc.extension === "PDFA";
+                    const isWord = doc.extension === "DOC" || doc.extension === "DOCX";
+                    const scan = doc.scanResult;
+
+                    return (
+                      <div
+                        key={doc.id}
+                        onClick={() => handleSelectActiveDoc(doc)}
+                        className={`p-3.5 rounded-2xl border transition-all cursor-pointer space-y-2 ${
+                          isSelected
+                            ? "border-blue-500 bg-blue-50/30 shadow-xs ring-1 ring-blue-500/20"
+                            : "border-slate-200 bg-white hover:bg-slate-50/80"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {/* Typographic Format Badge */}
+                            <span
+                              className={`px-2 py-1 rounded-lg font-mono text-[10px] font-black uppercase shrink-0 ${
                                 isPDF
                                   ? "bg-rose-100 text-rose-700 border border-rose-200"
                                   : isWord
@@ -477,96 +694,389 @@ export const MaterialUploadHub: React.FC = () => {
                                   : "bg-amber-100 text-amber-800 border border-amber-200"
                               }`}
                             >
-                              {doc.extension}
-                            </div>
+                              [{doc.extension}]
+                            </span>
 
-                            <div className="min-w-0 space-y-1">
+                            <div className="min-w-0 space-y-0.5">
                               <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">
                                 {doc.name}
                               </p>
-                              <div className="flex items-center gap-3 text-[11px] text-slate-500 flex-wrap">
+                              <div className="flex items-center gap-2.5 text-[11px] text-slate-500 flex-wrap">
                                 <span className="font-semibold text-slate-600">{sizeInMB} MB</span>
-                                <span className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3 text-slate-400" />
-                                  <span>{doc.uploadedAt}</span>
-                                </span>
-                                <span
-                                  className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                                    isSelected
-                                      ? "bg-emerald-100 text-emerald-800"
-                                      : "bg-slate-100 text-slate-600"
-                                  }`}
-                                >
-                                  {isSelected ? "Đang chọn trích xuất" : "Chờ xử lý"}
-                                </span>
+                                <span>•</span>
+                                <span>{doc.uploadedAt}</span>
+                                <span>•</span>
+                                {doc.isScanning ? (
+                                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px] animate-pulse">
+                                    [ AI Đang Đọc Lướt... ]
+                                  </span>
+                                ) : scan?.isMultiSubject ? (
+                                  <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-bold text-[10px]">
+                                    [ Đa Môn / Liên Ngành ]
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                                    [ Đơn Môn: {scan?.primarySubject.subjectName || "Đã Nhận Diện"} ]
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={(e) => handleRemoveDoc(e, doc.id)}
-                            className="p-2 rounded-xl text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer shrink-0"
-                            title="Xóa tệp khỏi danh sách"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span
+                              className={`px-2.5 py-1 rounded-xl text-[11px] font-black ${
+                                isSelected
+                                  ? "bg-blue-600 text-white shadow-2xs"
+                                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                              }`}
+                            >
+                              {isSelected ? "ĐANG CHỌN" : "CHỌN"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => handleRemoveDoc(e, doc.id)}
+                              className="px-2 py-1 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-[11px] font-bold transition-colors cursor-pointer"
+                              title="Xóa tệp khỏi danh sách"
+                            >
+                              [XÓA]
+                            </button>
+                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
 
-              {/* Trigger Extraction Button */}
+                        {/* GitHub-style mini distribution bar for this file */}
+                        {scan && scan.distributions && scan.distributions.length > 0 && (
+                          <div className="space-y-1 pt-1 border-t border-slate-100">
+                            {/* Segmented flex bar */}
+                            <div className="h-1.5 w-full bg-slate-100 rounded-full flex overflow-hidden">
+                              {scan.distributions.map((d, dIdx) => (
+                                <div
+                                  key={dIdx}
+                                  style={{
+                                    width: `${d.percentage}%`,
+                                    backgroundColor: d.color,
+                                  }}
+                                  title={`${d.subjectName}: ${d.percentage}%`}
+                                />
+                              ))}
+                            </div>
+
+                            {/* Legend labels */}
+                            <div className="flex items-center gap-3 text-[10px] text-slate-600 flex-wrap">
+                              {scan.distributions.map((d, dIdx) => (
+                                <span key={dIdx} className="inline-flex items-center gap-1">
+                                  <span
+                                    className="w-2 h-2 rounded-full inline-block"
+                                    style={{ backgroundColor: d.color }}
+                                  />
+                                  <strong className="text-slate-700">{d.subjectName}</strong>
+                                  <span className="text-slate-400">{d.percentage}%</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* CHẾ ĐỘ XEM 2: GOM NHÓM THEO BỘ CHUYÊN NGÀNH (Bundle Clustering) */
+                <div className="space-y-3.5 max-h-96 overflow-y-auto pr-1">
+                  {clusteredBundles.map((bundle, bIdx) => (
+                    <div
+                      key={bIdx}
+                      className="p-4 rounded-2xl bg-slate-50/90 border border-slate-200/90 space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-200/70">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full inline-block"
+                            style={{ backgroundColor: bundle.color }}
+                          />
+                          <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                            Bộ Môn: {bundle.subjectName}
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-400">
+                            ({bundle.domainName})
+                          </span>
+                        </div>
+                        <span className="px-2.5 py-0.5 rounded-full bg-white text-blue-700 border border-blue-200 text-[10px] font-black">
+                          {bundle.docs.length} Tài Liệu
+                        </span>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {bundle.docs.map((doc) => {
+                          const isSelected = activeDoc?.id === doc.id;
+                          return (
+                            <div
+                              key={doc.id}
+                              onClick={() => handleSelectActiveDoc(doc)}
+                              className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs transition-all cursor-pointer ${
+                                isSelected
+                                  ? "bg-white border-blue-500 shadow-2xs font-bold"
+                                  : "bg-white/80 border-slate-200 hover:bg-white"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-mono text-[10px] text-slate-500 font-bold shrink-0">
+                                  [{doc.extension}]
+                                </span>
+                                <span className="text-slate-800 truncate">{doc.name}</span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {doc.scanResult?.isMultiSubject && (
+                                  <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                                    Đa Môn
+                                  </span>
+                                )}
+                                <span
+                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${
+                                    isSelected
+                                      ? "bg-blue-600 text-white"
+                                      : "bg-slate-100 text-slate-600"
+                                  }`}
+                                >
+                                  {isSelected ? "ĐANG CHỌN" : "XEM"}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Main Action Button - Kích Hoạt Agent */}
               <button
+                type="button"
                 onClick={handleStartExtraction}
                 disabled={!activeDoc || isProcessing}
-                className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-black shadow-lg shadow-indigo-200 hover:shadow-xl transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-black shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isProcessing ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>AI Agent Đang Xử Lý &amp; Trích Xuất...</span>
-                  </>
+                  <span>[ AI AGENT ĐANG HỆ THỐNG HÓA BÀI HỌC... ]</span>
                 ) : (
-                  <>
-                    <Sparkles className="w-4 h-4 text-amber-300" />
-                    <span>Kích Hoạt Agent Trích Xuất &amp; Hệ Thống Hóa Tri Thức</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
+                  <span>
+                    [ KÍCH HOẠT AGENT TRÍCH XUẤT &amp; HỆ THỐNG HÓA TRI THỨC FEYNMAN → ]
+                  </span>
                 )}
               </button>
             </div>
           </div>
 
-          {/* CỘT PHẢI: Bảng thông tin học thuật (5 cols) */}
+          {/* CỘT PHẢI: Bảng thông tin học thuật, GitHub Language Bar & Semantic Chapter Splitter (5 cols) */}
           <div className="lg:col-span-5 space-y-5">
             <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-4">
+              {/* Header Box */}
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shadow-2xs">
-                    <Layers className="w-5 h-5" />
-                  </div>
-                  <div>
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[10px] font-black uppercase">
+                      ĐỐI SOÁT
+                    </span>
                     <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
                       Bảng Thông Tin Học Thuật
                     </h3>
-                    <p className="text-[11px] text-slate-500">
-                      Thuộc tính bài học và kết quả đối soát dữ liệu
-                    </p>
                   </div>
+                  <p className="text-[11px] text-slate-500">
+                    Ma trận nhãn đa ngành &amp; đối soát kho tri thức Supabase
+                  </p>
                 </div>
                 {aiClassification && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-200/70">
-                    <Sparkles className="w-3 h-3 text-emerald-600" />
-                    {aiClassification.confidenceScore}% Khớp
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-black border border-emerald-200">
+                    {aiClassification.confidenceScore}% Khớp Tri Thức
                   </span>
                 )}
               </div>
 
-              {/* Trường 1 & 2: Phân loại Ngành & Môn */}
-              <div className="space-y-3.5">
+              {/* PHƯƠNG ÁN A: GITHUB-STYLE MULTI-DOMAIN LANGUAGE BAR */}
+              {activeScanResult && activeScanResult.distributions.length > 0 ? (
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                      Ma Trận Phân Bổ Ngữ Nghĩa (Multi-Tag Distribution)
+                    </span>
+                    <span className="text-[10px] font-bold text-slate-400">
+                      Chuẩn GitHub Language Bar
+                    </span>
+                  </div>
+
+                  {/* Thanh tỷ lệ % phân bổ ngang đa màu */}
+                  <div className="h-3 w-full bg-slate-200 rounded-full flex overflow-hidden p-0.5 shadow-inner">
+                    {activeScanResult.distributions.map((dist, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          width: `${dist.percentage}%`,
+                          backgroundColor: dist.color,
+                        }}
+                        className="h-full rounded-sm transition-all duration-300"
+                        title={`${dist.subjectName}: ${dist.percentage}%`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Bảng chú giải các môn học và % tương ứng */}
+                  <div className="space-y-1.5 pt-1">
+                    {activeScanResult.distributions.map((dist, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between text-xs p-2 rounded-xl bg-white border border-slate-200/70"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+                            style={{ backgroundColor: dist.color }}
+                          />
+                          <span className="font-bold text-slate-800 truncate">
+                            {dist.subjectName}
+                          </span>
+                          <span className="text-[10px] font-semibold text-slate-400 shrink-0">
+                            [{dist.domainName}]
+                          </span>
+                        </div>
+                        <span className="font-mono text-xs font-black text-slate-800 shrink-0">
+                          {dist.percentage}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Từ khóa đối soát trong tài liệu */}
+                  {activeScanResult.primarySubject.matchedKeywords.length > 0 && (
+                    <div className="space-y-1 pt-1 border-t border-slate-200/60">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Từ khóa ngữ nghĩa nhận diện được:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {activeScanResult.primarySubject.matchedKeywords.map((kw, kIdx) => (
+                          <span
+                            key={kIdx}
+                            className="px-2 py-0.5 rounded-md bg-white text-slate-700 text-[10px] font-bold border border-slate-200"
+                          >
+                            {kw}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              {/* PHƯƠNG ÁN B: SEMANTIC CHAPTER SPLITTER (Khi phát hiện tài liệu đa học phần / liên ngành) */}
+              {activeScanResult?.isMultiSubject && (
+                <div className="p-4 rounded-2xl bg-purple-50/80 border-2 border-purple-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded bg-purple-700 text-white font-mono text-[10px] font-black uppercase">
+                        PHƯƠNG ÁN B
+                      </span>
+                      <span className="text-xs font-black text-purple-950 uppercase tracking-wider">
+                        Phát Hiện Tài Liệu Đa Môn / Liên Ngành
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-black uppercase bg-purple-200 text-purple-900 px-2 py-0.5 rounded">
+                      Semantic Splitter
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-purple-900 leading-relaxed">
+                    Tài liệu này chứa nội dung của <strong>2 môn học khác nhau</strong> (
+                    {activeScanResult.primarySubject.subjectName} và{" "}
+                    {activeScanResult.secondarySubject?.subjectName}). Hãy chọn phương án xử lý phù hợp:
+                  </p>
+
+                  {/* 2 Tùy chọn xử lý: Tích Hợp vs Tách Module */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleSplitMode("integrated")}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                        activeDoc?.selectedSplitMode === "integrated"
+                          ? "bg-white border-purple-600 shadow-sm ring-2 ring-purple-600/20"
+                          : "bg-white/70 border-purple-200 hover:bg-white"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-black text-purple-950">
+                          Tích Hợp Liên Ngành
+                        </span>
+                        {activeDoc?.selectedSplitMode === "integrated" && (
+                          <span className="text-[10px] font-black text-purple-700">[ĐANG CHỌN]</span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-snug">
+                        Giữ nguyên 1 bài học tổng hợp, liên kết chéo trên Cây Tri Thức toàn sàn.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleSplitMode("split")}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                        activeDoc?.selectedSplitMode === "split"
+                          ? "bg-white border-purple-600 shadow-sm ring-2 ring-purple-600/20"
+                          : "bg-white/70 border-purple-200 hover:bg-white"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-black text-purple-950">
+                          Tách Thành Các Module
+                        </span>
+                        {activeDoc?.selectedSplitMode === "split" && (
+                          <span className="text-[10px] font-black text-purple-700">[ĐANG CHỌN]</span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-snug">
+                        Tự động cắt theo ranh giới chương thành các bài học độc lập cho từng môn.
+                      </p>
+                    </button>
+                  </div>
+
+                  {/* Hiển thị chi tiết các phân đoạn chương mục được phát hiện khi chọn Tách Module */}
+                  {activeDoc?.selectedSplitMode === "split" &&
+                    activeScanResult.detectedModules &&
+                    activeScanResult.detectedModules.length > 0 && (
+                      <div className="space-y-2 pt-2 border-t border-purple-200">
+                        <span className="text-[11px] font-black text-purple-950 uppercase tracking-wider block">
+                          Các Module Bài Học Độc Lập Dự Kiến Tách:
+                        </span>
+                        <div className="space-y-2">
+                          {activeScanResult.detectedModules.map((mod) => (
+                            <div
+                              key={mod.id}
+                              className="p-2.5 rounded-xl bg-white border border-purple-200 text-xs space-y-1"
+                            >
+                              <div className="flex items-center justify-between font-bold text-slate-800">
+                                <span className="line-clamp-1">{mod.heading}</span>
+                                <span className="text-[10px] text-purple-700 font-mono font-bold shrink-0">
+                                  ~{mod.percentageInDoc}% tệp
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                                <span className="font-bold text-indigo-700">
+                                  Môn: {mod.dominantSubjectName}
+                                </span>
+                                <span>•</span>
+                                <span>{mod.wordCount} từ</span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 line-clamp-1 italic">
+                                "{mod.previewSnippet}"
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                </div>
+              )}
+
+              {/* Trường 1 & 2: Nhóm Ngành & Môn Học */}
+              <div className="space-y-3.5 pt-1">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
                     <span>Nhóm Ngành (Academic Domain)</span>
@@ -642,76 +1152,56 @@ export const MaterialUploadHub: React.FC = () => {
                 </div>
               </div>
 
-              {/* Trường 3: Thông tin chi tiết AI nhận diện */}
-              {aiClassification ? (
-                <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100/90 space-y-3">
+              {/* Chi tiết định danh học thuật */}
+              {aiClassification && (
+                <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100/90 space-y-2.5 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-indigo-950 flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>Đối Soát Kho Tri Thức Supabase</span>
+                    <span className="font-bold text-indigo-950 uppercase tracking-wider text-[11px]">
+                      Định Danh Bài Học Đề Xuất
                     </span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider bg-white px-2 py-0.5 rounded text-indigo-700 border border-indigo-200/70 shadow-2xs">
-                      Chuẩn Hóa
+                    <span className="text-[10px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200">
+                      Master Schema
                     </span>
                   </div>
 
-                  <div className="space-y-2 text-xs">
-                    <div className="bg-white/90 p-2.5 rounded-xl border border-indigo-100 shadow-2xs">
-                      <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">
-                        Tên Bài Học Đề Xuất
-                      </span>
-                      <span className="font-bold text-slate-800 line-clamp-1 mt-0.5">
-                        {aiClassification.suggestedTitle}
-                      </span>
-                    </div>
+                  <div className="bg-white p-2.5 rounded-xl border border-indigo-100 space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 block uppercase">
+                      Tiêu Đề Bài Giảng
+                    </span>
+                    <span className="font-bold text-slate-800 block line-clamp-1">
+                      {aiClassification.suggestedTitle}
+                    </span>
+                  </div>
 
-                    <div className="bg-white/90 p-2.5 rounded-xl border border-indigo-100 shadow-2xs">
-                      <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">
-                        URL Reference Link Chuẩn
+                  <div className="bg-white p-2.5 rounded-xl border border-indigo-100 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">
+                        URL Reference Chuẩn
                       </span>
-                      <a
-                        href={aiClassification.refLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-mono text-[11px] text-indigo-600 hover:underline truncate flex items-center gap-1 mt-0.5"
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(aiClassification.refLink);
+                          setIsCopied(true);
+                          toast.success("Đã sao chép liên kết!");
+                          setTimeout(() => setIsCopied(false), 2000);
+                        }}
+                        className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 cursor-pointer"
                       >
-                        <span className="truncate">{aiClassification.refLink}</span>
-                        <ExternalLink className="w-3 h-3 shrink-0" />
-                      </a>
+                        {isCopied ? "[ĐÃ SAO CHÉP]" : "[SAO CHÉP LINK]"}
+                      </button>
                     </div>
+                    <span className="font-mono text-[11px] text-indigo-600 block truncate">
+                      {aiClassification.refLink}
+                    </span>
                   </div>
-
-                  {aiClassification.matchedKeywords.length > 0 && (
-                    <div className="space-y-1.5 pt-1">
-                      <span className="text-[11px] font-bold text-slate-500 block">
-                        Từ khóa đối soát trong kho tri thức:
-                      </span>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {aiClassification.matchedKeywords.map((kw, i) => (
-                          <span
-                            key={i}
-                            className="px-2 py-0.5 rounded-md bg-white text-slate-700 text-[10px] font-semibold border border-indigo-100 shadow-2xs"
-                          >
-                            {kw}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-center space-y-1">
-                  <p className="text-xs font-bold text-slate-600">Chờ nạp tài liệu</p>
-                  <p className="text-[11px] text-slate-400">
-                    Khi chọn một tài liệu ở bên trái, AI sẽ tự động phân tích và đối soát các nhãn học thuật tại đây.
-                  </p>
                 </div>
               )}
 
-              {/* Trường 4: Thông tin chỉ tiêu trích xuất */}
-              <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200/80 space-y-2 text-xs">
+              {/* Chỉ tiêu trích xuất */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
                 <span className="font-bold text-slate-700 block text-[11px] uppercase tracking-wider">
-                  Chỉ Tiêu Trích Xuất Feynman
+                  Chỉ Tiêu Trích Xuất Chuẩn Feynman
                 </span>
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   <div className="bg-white p-2.5 rounded-xl border border-slate-200/70">
@@ -729,26 +1219,26 @@ export const MaterialUploadHub: React.FC = () => {
         </div>
       ) : null}
 
-      {/* Live AI Agent Processing Stepper */}
+      {/* Live AI Agent Processing Stepper - Không Dùng Icon */}
       {isProcessing && (
         <div className="bg-white rounded-3xl p-8 border border-blue-200 shadow-xl space-y-6">
           <div className="text-center space-y-2">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-inner">
-              <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
-            </div>
+            <span className="px-3.5 py-1.5 rounded-full bg-blue-100 text-blue-800 font-mono text-xs font-black uppercase inline-block animate-pulse">
+              [ AI AGENT ĐANG XỬ LÝ DỮ LIỆU ]
+            </span>
             <h3 className="text-lg font-black text-slate-800">
-              AI Agent Đang Hệ Thống Hóa Tri Thức
+              Hệ Thống Hóa Tri Thức Học Thuật
             </h3>
-            <p className="text-xs text-slate-500">{stageMessage}</p>
+            <p className="text-xs text-slate-500 font-mono">{stageMessage}</p>
           </div>
 
           {/* Stepper Progress */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             {[
-              { num: 1, title: "Tiếp Nhận & Vai Trò", desc: "Quét nhị phân & nhận diện loại hình sư phạm" },
-              { num: 2, title: "Semantic Chunking", desc: "Băm ý niệm & tiền đề Anthropic Context" },
+              { num: 1, title: "Tiếp Nhận & Quét Cấu Trúc", desc: "Bóc tách văn bản & ma trận ngữ nghĩa" },
+              { num: 2, title: "Semantic Chunking", desc: "Băm ý niệm & gán tiền đề Contextual Retrieval" },
               { num: 3, title: "Chiếu Xạ Master Graph", desc: "Định vị tiên quyết & độ khó trên Supabase" },
-              { num: 4, title: "Schema Feynman", desc: "Đóng gói bài học & lưu trữ Supabase" },
+              { num: 4, title: "Schema Feynman", desc: "Đóng gói bài học & chuẩn bị đưa sang Bàn Thẩm Định" },
             ].map((st) => (
               <div
                 key={st.num}
@@ -762,15 +1252,15 @@ export const MaterialUploadHub: React.FC = () => {
               >
                 <div className="flex items-center gap-2 mb-1">
                   <span
-                    className={`w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center ${
+                    className={`w-6 h-6 rounded-full text-xs font-black flex items-center justify-center font-mono ${
                       currentStage > st.num
-                        ? "bg-emerald-500 text-white"
+                        ? "bg-emerald-600 text-white"
                         : currentStage === st.num
                         ? "bg-blue-600 text-white animate-pulse"
                         : "bg-slate-300 text-slate-700"
                     }`}
                   >
-                    {currentStage > st.num ? "✓" : st.num}
+                    {currentStage > st.num ? "OK" : st.num}
                   </span>
                   <span className="text-xs font-bold text-slate-800">{st.title}</span>
                 </div>
@@ -781,7 +1271,7 @@ export const MaterialUploadHub: React.FC = () => {
         </div>
       )}
 
-      {/* Extracted Lesson Output Card */}
+      {/* Extracted Lesson Output Card - Không Dùng Icon */}
       {extractedDraft && (
         <div className="bg-white rounded-3xl p-6 sm:p-8 border-2 border-indigo-200 shadow-xl space-y-6 animate-fade-in">
           {/* Header */}
@@ -789,7 +1279,7 @@ export const MaterialUploadHub: React.FC = () => {
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300">
-                  CHỜ KIỂM ĐỊNH (PENDING)
+                  [ TRẠNG THÁI: CHỜ KIỂM ĐỊNH ]
                 </span>
                 <span className="text-xs text-slate-400 font-medium">
                   Trích xuất từ: {extractedDraft.fileName}
@@ -805,10 +1295,9 @@ export const MaterialUploadHub: React.FC = () => {
                     href={extractedDraft.refLink}
                     target="_blank"
                     rel="noreferrer"
-                    className="font-mono text-indigo-600 hover:underline hover:text-indigo-800 transition-colors flex items-center gap-1"
+                    className="font-mono text-indigo-600 hover:underline hover:text-indigo-800 transition-colors"
                   >
-                    <span>{extractedDraft.refLink}</span>
-                    <ExternalLink className="w-3 h-3" />
+                    {extractedDraft.refLink}
                   </a>
                   <button
                     type="button"
@@ -818,10 +1307,9 @@ export const MaterialUploadHub: React.FC = () => {
                       toast.success("Đã sao chép liên kết tham chiếu!");
                       setTimeout(() => setIsCopied(false), 2000);
                     }}
-                    className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-                    title="Sao chép URL"
+                    className="text-[11px] font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
                   >
-                    {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    {isCopied ? "[ĐÃ SAO CHÉP]" : "[SAO CHÉP]"}
                   </button>
                 </div>
               )}
@@ -829,59 +1317,37 @@ export const MaterialUploadHub: React.FC = () => {
 
             <div className="flex items-center gap-2 shrink-0 flex-wrap">
               {extractedDraft.pedagogicalRoleLabel && (
-                <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 text-xs font-bold border border-purple-200 shadow-2xs">
-                  <FileText className="w-3.5 h-3.5 text-purple-600" />
+                <span className="px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 text-xs font-bold border border-purple-200 shadow-2xs">
                   {extractedDraft.pedagogicalRoleLabel}
                 </span>
               )}
-              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">
-                <Clock className="w-3.5 h-3.5 text-slate-500" />
+              <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">
                 {extractedDraft.estimatedReadingMinutes} phút đọc
               </span>
-              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold">
-                <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
+              <span className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold">
                 Độ khó {extractedDraft.difficultyLevel}/5
               </span>
             </div>
           </div>
 
-          {/* Master Ontology Projection & Roadmap Positioning */}
+          {/* Master Ontology Projection */}
           {extractedDraft.suggestedRoadmapPosition && (
-            <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 space-y-2.5">
+            <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 space-y-2">
               <div className="flex items-center justify-between">
-                <div className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
-                  <Layers className="w-4 h-4 text-indigo-600" />
-                  <span>Định Vị Trong Cây Tri Thức Chuẩn (Master Ontology Projection)</span>
-                </div>
+                <span className="text-xs font-bold text-indigo-950 uppercase tracking-wider">
+                  Định Vị Trong Cây Tri Thức Chuẩn (Master Ontology Projection)
+                </span>
                 <span className="text-[10px] font-bold text-indigo-600 bg-white px-2 py-0.5 rounded border border-indigo-200">
                   Supabase Knowledge Graph
                 </span>
               </div>
               <p className="text-xs font-semibold text-slate-700">
-                📌 {extractedDraft.suggestedRoadmapPosition}
+                {extractedDraft.suggestedRoadmapPosition}
               </p>
-              {extractedDraft.prerequisiteTopics && extractedDraft.prerequisiteTopics.length > 0 && (
-                <div className="pt-1 border-t border-indigo-100/60">
-                  <span className="text-[11px] font-bold text-slate-500 block mb-1">
-                    Kiến thức tiên quyết cần nắm vững trước bài này:
-                  </span>
-                  <div className="flex flex-wrap gap-2">
-                    {extractedDraft.prerequisiteTopics.map((pt, i) => (
-                      <span
-                        key={i}
-                        className="text-[11px] bg-white text-indigo-900 px-2.5 py-1 rounded-lg border border-indigo-200 font-medium shadow-2xs"
-                        title={pt.reason}
-                      >
-                        🔹 {pt.title}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
-          {/* Summary / Ground Truth */}
+          {/* Summary */}
           <div className="space-y-2">
             <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">
               Tóm Tắt Khái Quát Bài Học (Feynman Ground Truth)
@@ -891,12 +1357,10 @@ export const MaterialUploadHub: React.FC = () => {
             </p>
           </div>
 
-          {/* 2-Col Concepts & Jargons */}
+          {/* 2 Cột Concepts & Jargons */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Required Concepts */}
             <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200/80 space-y-2.5">
-              <h4 className="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <h4 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
                 Khái Niệm Cốt Lõi Bắt Buộc ({extractedDraft.requiredConcepts.length})
               </h4>
               <div className="flex flex-wrap gap-1.5">
@@ -911,10 +1375,8 @@ export const MaterialUploadHub: React.FC = () => {
               </div>
             </div>
 
-            {/* Jargon Traps */}
             <div className="p-4 rounded-2xl bg-rose-50/50 border border-rose-200/80 space-y-2.5">
-              <h4 className="text-xs font-bold text-rose-800 uppercase tracking-wider flex items-center gap-1.5">
-                <AlertCircle className="w-4 h-4 text-rose-600" />
+              <h4 className="text-xs font-bold text-rose-800 uppercase tracking-wider">
                 Bẫy Thuật Ngữ Cần Lưu Ý ({extractedDraft.jargonTraps.length})
               </h4>
               <div className="flex flex-wrap gap-1.5">
@@ -930,60 +1392,22 @@ export const MaterialUploadHub: React.FC = () => {
             </div>
           </div>
 
-          {/* Semantic Chunks / Atomic Knowledge Units Preview */}
-          {extractedDraft.semanticChunks && extractedDraft.semanticChunks.length > 0 && (
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                  <Layers className="w-4 h-4 text-blue-600" />
-                  Hạt Nhân Tri Thức Đã Bóc Tách ({extractedDraft.semanticChunks.length} Khối)
-                </h4>
-                <span className="text-[10px] text-slate-400 font-medium">
-                  Đã gắn tiền đề Contextual Retrieval
-                </span>
-              </div>
-              <div className="space-y-2">
-                {extractedDraft.semanticChunks.slice(0, 3).map((chunk) => (
-                  <div
-                    key={chunk.chunkId}
-                    className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 text-xs space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between text-slate-700 font-bold">
-                      <span className="line-clamp-1">📌 {chunk.heading}</span>
-                      <span className="text-[10px] text-slate-400 shrink-0">
-                        ~{chunk.estimatedReadingSeconds}s đọc
-                      </span>
-                    </div>
-                    <div className="text-[11px] font-mono text-indigo-700 bg-white p-1.5 rounded border border-indigo-100">
-                      {chunk.contextualContent.split("\n")[0]}
-                    </div>
-                    <p className="text-slate-600 text-xs line-clamp-2 leading-relaxed">
-                      {chunk.rawContent}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Actions */}
           <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
             <button
               onClick={handleReset}
               className="w-full sm:w-auto py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
             >
-              Tải Lên Tài Liệu Khác
+              [ Tải Lên Tài Liệu Khác ]
             </button>
 
             <div className="flex items-center gap-2 w-full sm:w-auto">
               {isCuratorOrAdmin ? (
                 <button
                   onClick={() => navigate("/curator/validation")}
-                  className="w-full sm:w-auto py-2.5 px-5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white text-xs font-black shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full sm:w-auto py-2.5 px-5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white text-xs font-black shadow-md hover:shadow-lg transition-all cursor-pointer"
                 >
-                  <FileCheck className="w-4 h-4" />
-                  <span>Đi Đến Bàn Thẩm Định Để Phê Duyệt Ngay</span>
-                  <ArrowRight className="w-4 h-4" />
+                  [ Đi Đến Bàn Thẩm Định Để Phê Duyệt Ngay → ]
                 </button>
               ) : (
                 <button
@@ -991,10 +1415,9 @@ export const MaterialUploadHub: React.FC = () => {
                     toast.success("Bài học đã được gửi tới Hội đồng Thẩm định viên thành công!");
                     navigate("/topics");
                   }}
-                  className="w-full sm:w-auto py-2.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full sm:w-auto py-2.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-md hover:shadow-lg transition-all cursor-pointer"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Xác Nhận & Gửi Vào Hàng Đợi Thẩm Định</span>
+                  [ Xác Nhận &amp; Gửi Vào Hàng Đợi Thẩm Định ]
                 </button>
               )}
             </div>
