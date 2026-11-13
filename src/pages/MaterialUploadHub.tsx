@@ -1,13 +1,14 @@
 /**
  * File: src/pages/MaterialUploadHub.tsx
  * Mục đích: Trung tâm tải lên tài liệu học tập & Kích hoạt AI Agent Hệ thống hóa Tri thức.
- * Tính năng nâng cao:
- *   1. Quét siêu tốc văn bản (.docx, .pdf) qua FastDocumentScanner & tính toán ma trận % phân bổ (GitHub-style language bar).
- *   2. Tự động gom nhóm các tệp tải lên theo Bộ Chuyên Ngành (Bundle Clustering).
- *   3. Xử lý tài liệu liên ngành đa môn:
- *      - Phương án A: Phân bổ % ngữ nghĩa (GitHub-style multi-domain bar).
- *      - Phương án B: Tự động phát hiện ranh giới chương/học phần (Semantic Chapter Splitter) với tùy chọn tách module độc lập.
- *   4. Quy chuẩn UI: TUYỆT ĐỐI KHÔNG DÙNG ICON (No Lucide, no SVG, typographic badges, progress bars & status dots only).
+ * Trải nghiệm người dùng:
+ *   - Layout 2 cột cố định xuyên suốt (Cột trái: Tải lên & Danh sách tệp; Cột phải: Bảng thông tin học thuật).
+ *   - Dữ liệu Agent đọc lướt (Fast Scan) và trích xuất sâu (Deep Feynman Extraction) CẬP NHẬT TRỰC TIẾP lên bảng thông tin bên phải.
+ *   - Tuyệt đối không chuyển sang trang mới hoặc layout mới toàn màn hình.
+ *   - Hỗ trợ xem từng tệp hoặc gom nhóm theo bộ chuyên ngành.
+ *   - Phương án A: Ma trận phân bổ % ngữ nghĩa (GitHub-style language bar).
+ *   - Phương án B: Tự động phát hiện ranh giới chương/học phần (Semantic Chapter Splitter).
+ *   - Quy chuẩn UI: TUYỆT ĐỐI KHÔNG DÙNG ICON (No Lucide, no SVG, typographic badges, progress bars & status dots only).
  */
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
@@ -23,8 +24,6 @@ import { TaxonomyClassifier } from "@/lib/services/taxonomy-classifier";
 import {
   FastDocumentScanner,
   FastScanResult,
-  SubjectDistribution,
-  DetectedChapterModule,
 } from "@/lib/services/fast-document-scanner";
 import { DomainCategory, AcademicSubject, TaxonomyClassificationResult } from "@/types/catalog.types";
 import { PageHeroBanner } from "@/components/shared/PageHeroBanner";
@@ -38,9 +37,12 @@ export interface UploadedDocRecord {
   size: number;
   extension: string;
   uploadedAt: string;
+  suggestedTitle: string;
   classification: TaxonomyClassificationResult | null;
   scanResult: FastScanResult | null;
+  extractedDraft: ExtractedLessonDraft | null;
   isScanning: boolean;
+  isExtracting: boolean;
   selectedSplitMode: "integrated" | "split";
   status: "ready" | "processing" | "extracted";
 }
@@ -69,15 +71,14 @@ export const MaterialUploadHub: React.FC = () => {
   const uploadedFile = activeDoc ? activeDoc.file : null;
   const aiClassification = activeDoc ? activeDoc.classification : null;
   const activeScanResult = activeDoc ? activeDoc.scanResult : null;
+  const activeExtractedDraft = activeDoc ? activeDoc.extractedDraft : null;
 
   const [fileError, setFileError] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState<boolean>(false);
 
-  // Agent State
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  // Agent State (tiến trình trích xuất chi tiết)
   const [currentStage, setCurrentStage] = useState<number>(0);
   const [stageMessage, setStageMessage] = useState<string>("");
-  const [extractedDraft, setExtractedDraft] = useState<ExtractedLessonDraft | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -176,6 +177,7 @@ export const MaterialUploadHub: React.FC = () => {
           if (doc.id !== recordId) return doc;
           return {
             ...doc,
+            suggestedTitle: scanRes.suggestedTitle,
             scanResult: scanRes,
             isScanning: false,
             selectedSplitMode: scanRes.splitMode,
@@ -198,7 +200,7 @@ export const MaterialUploadHub: React.FC = () => {
         })
       );
 
-      // Nếu đây là tài liệu đang được chọn, đồng bộ nhóm ngành và môn học lên bảng thông tin
+      // Nếu đây là tài liệu đang chọn hoặc tệp đầu tiên, cập nhật ngay lên bảng thông tin bên phải
       if (activeDocId === recordId || (!activeDocId && uploadedDocs[0]?.id === recordId)) {
         setSelectedDomainId(scanRes.primarySubject.domainId);
         setTimeout(() => {
@@ -207,11 +209,11 @@ export const MaterialUploadHub: React.FC = () => {
 
         if (scanRes.isMultiSubject) {
           toast.success(
-            `Phát hiện tài liệu liên ngành: ${scanRes.primarySubject.subjectName} (${scanRes.primarySubject.percentage}%) và ${scanRes.secondarySubject?.subjectName} (${scanRes.secondarySubject?.percentage}%)`
+            `Đã cập nhật bảng thông tin: Tài liệu đa môn [${scanRes.primarySubject.subjectName} ${scanRes.primarySubject.percentage}% & ${scanRes.secondarySubject?.subjectName} ${scanRes.secondarySubject?.percentage}%]`
           );
         } else {
           toast.success(
-            `AI đã quét xong: ${scanRes.primarySubject.subjectName} (${scanRes.primarySubject.percentage}% khớp)`
+            `Đã cập nhật bảng thông tin: ${scanRes.primarySubject.subjectName} (${scanRes.primarySubject.percentage}% khớp)`
           );
         }
       }
@@ -265,9 +267,12 @@ export const MaterialUploadHub: React.FC = () => {
         size: file.size,
         extension: ext,
         uploadedAt: nowStr,
+        suggestedTitle: fallbackClassification?.suggestedTitle || file.name.replace(/\.[^/.]+$/, ""),
         classification: fallbackClassification,
         scanResult: null,
+        extractedDraft: null,
         isScanning: true,
+        isExtracting: false,
         selectedSplitMode: "integrated",
         status: "ready",
       });
@@ -342,6 +347,25 @@ export const MaterialUploadHub: React.FC = () => {
     }
   };
 
+  const handleUpdateActiveTitle = (newTitle: string) => {
+    if (!activeDoc) return;
+    setUploadedDocs((prev) =>
+      prev.map((d) => {
+        if (d.id !== activeDoc.id) return d;
+        return {
+          ...d,
+          suggestedTitle: newTitle,
+          classification: d.classification
+            ? { ...d.classification, suggestedTitle: newTitle }
+            : null,
+          scanResult: d.scanResult
+            ? { ...d.scanResult, suggestedTitle: newTitle }
+            : null,
+        };
+      })
+    );
+  };
+
   // Nạp nhanh tệp mẫu thử nghiệm
   const handleLoadSampleDoc = async (fileName: string) => {
     try {
@@ -358,8 +382,9 @@ export const MaterialUploadHub: React.FC = () => {
     }
   };
 
+  // Kích hoạt Agent trích xuất sâu chuẩn Feynman cho tệp đang chọn
   const handleStartExtraction = async () => {
-    if (!uploadedFile) {
+    if (!activeDoc || !uploadedFile) {
       toast.error("Vui lòng chọn hoặc kéo thả một tệp tài liệu");
       return;
     }
@@ -369,9 +394,14 @@ export const MaterialUploadHub: React.FC = () => {
       return;
     }
 
-    setIsProcessing(true);
+    const currentDocId = activeDoc.id;
+
+    // Đánh dấu doc đang trích xuất
+    setUploadedDocs((prev) =>
+      prev.map((d) => (d.id === currentDocId ? { ...d, isExtracting: true, status: "processing" } : d))
+    );
     setCurrentStage(1);
-    setExtractedDraft(null);
+    setStageMessage("Quét cấu trúc ngữ nghĩa & nhận diện sư phạm...");
 
     try {
       const draft = await DocumentExtractionAgent.extractCurriculumFromFile({
@@ -393,31 +423,38 @@ export const MaterialUploadHub: React.FC = () => {
         },
       });
 
-      // Bổ sung thông tin phân bổ nếu có
+      // Nếu tài liệu liên ngành và chọn tích hợp
       if (activeScanResult?.isMultiSubject && activeDoc?.selectedSplitMode === "integrated") {
-        draft.suggestedRoadmapPosition = `[Bài Học Liên Ngành] ${draft.suggestedRoadmapPosition} • Kết nối chuyên môn: ${activeScanResult.secondarySubject?.subjectName}`;
+        draft.suggestedRoadmapPosition = `[Bài Học Liên Ngành] ${draft.suggestedRoadmapPosition} • Chuyên môn kết nối: ${activeScanResult.secondarySubject?.subjectName}`;
       }
 
-      setExtractedDraft(draft);
-      toast.success("AI Agent đã hoàn tất hệ thống hóa bài học thành công!");
+      // Cập nhật kết quả trích xuất trực tiếp vào bản ghi của tệp đang chọn
+      setUploadedDocs((prev) =>
+        prev.map((d) =>
+          d.id === currentDocId
+            ? {
+                ...d,
+                extractedDraft: draft,
+                isExtracting: false,
+                status: "extracted",
+                suggestedTitle: draft.title || d.suggestedTitle,
+              }
+            : d
+        )
+      );
+
+      toast.success("AI Agent đã trích xuất & cập nhật dữ liệu thành công vào bảng thông tin bên phải!");
     } catch (err: any) {
       console.error("Lỗi trích xuất:", err);
       toast.error("Có lỗi xảy ra trong quá trình xử lý bài học: " + err.message);
-    } finally {
-      setIsProcessing(false);
+      setUploadedDocs((prev) =>
+        prev.map((d) => (d.id === currentDocId ? { ...d, isExtracting: false, status: "ready" } : d))
+      );
     }
   };
 
-  const handleReset = () => {
-    setUploadedDocs([]);
-    setActiveDocId(null);
-    setFileError(null);
-    setExtractedDraft(null);
-    setCurrentStage(0);
-    setStageMessage("");
-  };
-
   const isCuratorOrAdmin = user?.role === "curator" || user?.role === "admin";
+  const isCurrentlyExtracting = activeDoc?.isExtracting || false;
 
   return (
     <div className="w-full space-y-6 pb-12">
@@ -459,971 +496,929 @@ export const MaterialUploadHub: React.FC = () => {
         }
       />
 
-      {!extractedDraft ? (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* CỘT TRÁI: Khu vực tải tài liệu lên & Quản lý tệp/bộ chuyên ngành (7 cols) */}
-          <div className="lg:col-span-7 space-y-5">
-            <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-5">
-              {/* Header Box - Không Dùng Icon */}
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[10px] font-black tracking-wider uppercase">
-                      TẢI LÊN
-                    </span>
-                    <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-                      Khu Vực Tải Lên Tài Liệu
-                    </h2>
-                  </div>
-                  <p className="text-[11px] text-slate-500">
-                    AI đọc lướt cấu trúc siêu tốc, phân tích nhãn đa ngành &amp; gom nhóm tự động
-                  </p>
-                </div>
+      {/* CẤU TRÚC 2 CỘT CỐ ĐỊNH XUYÊN SUỐT - DỮ LIỆU ĐƯỢC CẬP NHẬT TRỰC TIẾP LÊN BẢNG BÊN PHẢI */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* ============================================================== */}
+        {/* CỘT TRÁI: Khu vực tải tài liệu lên & Danh sách tệp (6 cols)     */}
+        {/* ============================================================== */}
+        <div className="lg:col-span-6 space-y-5">
+          <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-5">
+            {/* Header Box */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
-                  <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200/60 shadow-2xs">
-                    {uploadedDocs.length} tệp
+                  <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[10px] font-black tracking-wider uppercase">
+                    TẢI LÊN
+                  </span>
+                  <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+                    Khu Vực Tải Lên Tài Liệu
+                  </h2>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  AI đọc lướt cấu trúc siêu tốc, phân tích nhãn đa ngành &amp; gom nhóm tự động
+                </p>
+              </div>
+              <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200/60 shadow-2xs">
+                {uploadedDocs.length} tệp
+              </span>
+            </div>
+
+            {/* Dropzone Tải Lên - Hoàn toàn không dùng icon */}
+            <div
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleFileDrop}
+              onClick={() => !isCurrentlyExtracting && fileInputRef.current?.click()}
+              className="border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/70 hover:bg-blue-50/30 rounded-2xl p-6 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group"
+            >
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={(e) => e.target.files && handleAddFiles(e.target.files)}
+                accept=".pdf,.pdfa,.doc,.docx,.pptx"
+                multiple
+                className="hidden"
+              />
+
+              <span className="px-3.5 py-1.5 rounded-full bg-blue-600 text-white font-mono text-[11px] font-black tracking-wider uppercase shadow-xs group-hover:scale-105 transition-transform">
+                [ KÉO THẢ TỆP VÀO ĐÂY HOẶC NHẤP ĐỂ TẢI ]
+              </span>
+
+              <div className="space-y-0.5">
+                <p className="text-xs sm:text-sm font-bold text-slate-700">
+                  Định dạng: .DOCX, .DOC, .PDF, .PDFA, .PPTX • Tối đa 25MB
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Khi tải lên, AI sẽ tự động đọc lướt và điền thẳng thông tin sang bảng bên phải
+                </p>
+              </div>
+            </div>
+
+            {/* Error Notice */}
+            {fileError && (
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold">
+                [LỖI] {fileError}
+              </div>
+            )}
+
+            {/* Quick Sample Files Strip (Tệp mẫu chuẩn và liên ngành đa môn) */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/80 via-indigo-50/70 to-purple-50/60 border border-indigo-100/90 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded bg-indigo-600 text-white font-mono text-[10px] font-black uppercase">
+                    MẪU TEST
+                  </span>
+                  <span className="text-xs font-bold text-indigo-950">
+                    Tệp Mẫu Ngành CNTT Có Sẵn (Bấm nạp để AI đọc lướt):
                   </span>
                 </div>
+                <span className="text-[10px] font-black uppercase tracking-wider bg-white px-2 py-0.5 rounded text-indigo-700 border border-indigo-200/70 shadow-2xs">
+                  7 Tệp
+                </span>
               </div>
 
-              {/* Dropzone Tải Lên - Hoàn toàn không dùng icon */}
-              <div
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={handleFileDrop}
-                onClick={() => !isProcessing && fileInputRef.current?.click()}
-                className="border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/70 hover:bg-blue-50/30 rounded-2xl p-7 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-2 group"
-              >
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={(e) => e.target.files && handleAddFiles(e.target.files)}
-                  accept=".pdf,.pdfa,.doc,.docx,.pptx"
-                  multiple
-                  className="hidden"
-                />
-
-                <span className="px-3.5 py-1.5 rounded-full bg-blue-600 text-white font-mono text-[11px] font-black tracking-wider uppercase shadow-xs group-hover:scale-105 transition-transform">
-                  [ KÉO THẢ TỆP VÀO ĐÂY HOẶC NHẤP ĐỂ TẢI ]
-                </span>
-
+              <div className="space-y-2">
+                {/* Hàng 1: Tài liệu Liên ngành (2 môn trong 1 tệp) */}
                 <div className="space-y-1">
-                  <p className="text-xs sm:text-sm font-bold text-slate-700">
-                    Hỗ trợ định dạng: .DOCX, .DOC, .PDF, .PDFA, .PPTX
-                  </p>
-                  <p className="text-[11px] text-slate-400">
-                    Dung lượng tối đa 25MB • AI sẽ quét nội dung và xác định tỷ lệ kiến thức trong giây lát
-                  </p>
-                </div>
-              </div>
-
-              {/* Error Notice */}
-              {fileError && (
-                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs font-bold">
-                  [LỖI] {fileError}
-                </div>
-              )}
-
-              {/* Quick Sample Files Strip (Tệp mẫu chuẩn và liên ngành đa môn) */}
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/80 via-indigo-50/70 to-purple-50/60 border border-indigo-100/90 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded bg-indigo-600 text-white font-mono text-[10px] font-black uppercase">
-                      MẪU TEST
-                    </span>
-                    <span className="text-xs font-bold text-indigo-950">
-                      Tệp Mẫu Ngành CNTT Có Sẵn (Bấm để nạp test luồng AI):
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-black uppercase tracking-wider bg-white px-2 py-0.5 rounded text-indigo-700 border border-indigo-200/70 shadow-2xs">
-                    7 Tệp Mẫu
+                  <span className="text-[10px] font-black text-purple-700 uppercase tracking-wider block">
+                    Tài Liệu Đa Môn / Liên Ngành (Test Phương Án A &amp; B):
                   </span>
-                </div>
-
-                <div className="space-y-2">
-                  {/* Hàng 1: Tài liệu Liên ngành (2 môn trong 1 tệp) */}
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black text-purple-700 uppercase tracking-wider block">
-                      Tài Liệu Liên Ngành Đa Môn (Test Phương Án A &amp; B):
-                    </span>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleLoadSampleDoc("Do-An-Web-Dashboard-Va-Thi-Giac-May-Tinh-AI-Camera.docx")
-                        }
-                        disabled={isProcessing}
-                        className="px-2.5 py-1.5 rounded-xl bg-purple-100/80 hover:bg-purple-600 text-purple-900 hover:text-white text-[11px] font-bold transition-all border border-purple-300 shadow-2xs cursor-pointer"
-                      >
-                        [DOCX] Đồ Án Web + AI Camera (2 Môn)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleLoadSampleDoc("Giao-Trinh-Tich-Hop-Co-So-Du-Lieu-Va-Mang-May-Tinh.docx")
-                        }
-                        disabled={isProcessing}
-                        className="px-2.5 py-1.5 rounded-xl bg-purple-100/80 hover:bg-purple-600 text-purple-900 hover:text-white text-[11px] font-bold transition-all border border-purple-300 shadow-2xs cursor-pointer"
-                      >
-                        [DOCX] Giáo Trình CSDL + Mạng Máy Tính (2 Môn)
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Hàng 2: Tài liệu Đơn môn */}
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
-                      Tài Liệu Đơn Môn Chuẩn:
-                    </span>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        {
-                          file: "Giao-Trinh-Phat-Trien-Ung-Dung-Web-RESTful-API.docx",
-                          label: "[DOCX] Phát Triển Web REST API",
-                        },
-                        {
-                          file: "Giao-Trinh-Co-So-Du-Lieu-SQL-Chuan-Hoa-ACID.docx",
-                          label: "[DOCX] Cơ Sở Dữ Liệu SQL",
-                        },
-                        {
-                          file: "Giao-Trinh-Mang-May-Tinh-Mo-Hinh-OSI-TCP-IP.docx",
-                          label: "[DOCX] Mạng Máy Tính (OSI/TCP)",
-                        },
-                        {
-                          file: "Giao-Trinh-Dien-Toan-Dam-May-Cloud-Container-Docker.docx",
-                          label: "[DOCX] Điện Toán Đám Mây",
-                        },
-                        {
-                          file: "Giao-Trinh-An-Toan-Thong-Tin-Ma-Hoa-Cong-Khai-Cybersecurity.docx",
-                          label: "[DOCX] An Toàn Thông Tin",
-                        },
-                      ].map((s, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => handleLoadSampleDoc(s.file)}
-                          disabled={isProcessing}
-                          className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-indigo-600 text-slate-700 hover:text-white text-[11px] font-bold transition-all border border-indigo-100/90 shadow-2xs cursor-pointer"
-                        >
-                          {s.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* TÙY CHỌN CHẾ ĐỘ XEM: TỪNG TỆP vs GOM THEO BỘ CHUYÊN NGÀNH */}
-              <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Chế Độ Xem:
-                  </span>
-                  <div className="inline-flex rounded-xl bg-slate-100 p-0.5 text-[11px] font-bold">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => setViewMode("list")}
-                      className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                        viewMode === "list"
-                          ? "bg-white text-blue-700 shadow-2xs font-black"
-                          : "text-slate-500 hover:text-slate-800"
-                      }`}
+                      onClick={() =>
+                        handleLoadSampleDoc("Do-An-Web-Dashboard-Va-Thi-Giac-May-Tinh-AI-Camera.docx")
+                      }
+                      disabled={isCurrentlyExtracting}
+                      className="px-2.5 py-1.5 rounded-xl bg-purple-100/80 hover:bg-purple-600 text-purple-900 hover:text-white text-[11px] font-bold transition-all border border-purple-300 shadow-2xs cursor-pointer"
                     >
-                      Danh Sách Từng Tệp ({uploadedDocs.length})
+                      [DOCX] Đồ Án Web + AI Camera (2 Môn)
                     </button>
                     <button
                       type="button"
-                      onClick={() => setViewMode("bundles")}
-                      className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
-                        viewMode === "bundles"
-                          ? "bg-white text-blue-700 shadow-2xs font-black"
-                          : "text-slate-500 hover:text-slate-800"
-                      }`}
+                      onClick={() =>
+                        handleLoadSampleDoc("Giao-Trinh-Tich-Hop-Co-So-Du-Lieu-Va-Mang-May-Tinh.docx")
+                      }
+                      disabled={isCurrentlyExtracting}
+                      className="px-2.5 py-1.5 rounded-xl bg-purple-100/80 hover:bg-purple-600 text-purple-900 hover:text-white text-[11px] font-bold transition-all border border-purple-300 shadow-2xs cursor-pointer"
                     >
-                      Gom Nhóm Bộ Chuyên Ngành ({clusteredBundles.length} Bộ)
+                      [DOCX] CSDL SQL + Mạng Máy Tính (2 Môn)
                     </button>
                   </div>
                 </div>
 
-                <span className="text-[11px] text-slate-400">
-                  {viewMode === "list"
-                    ? "Nhấp vào từng tệp để kiểm tra nhãn"
-                    : "AI tự động phân loại tệp vào các bộ môn"}
+                {/* Hàng 2: Tài liệu Đơn môn */}
+                <div className="space-y-1">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                    Tài Liệu Đơn Môn:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      {
+                        file: "Giao-Trinh-Phat-Trien-Ung-Dung-Web-RESTful-API.docx",
+                        label: "[DOCX] Phát Triển Web REST API",
+                      },
+                      {
+                        file: "Giao-Trinh-Co-So-Du-Lieu-SQL-Chuan-Hoa-ACID.docx",
+                        label: "[DOCX] Cơ Sở Dữ Liệu SQL",
+                      },
+                      {
+                        file: "Giao-Trinh-Mang-May-Tinh-Mo-Hinh-OSI-TCP-IP.docx",
+                        label: "[DOCX] Mạng Máy Tính (TCP/IP)",
+                      },
+                      {
+                        file: "Giao-Trinh-Dien-Toan-Dam-May-Cloud-Container-Docker.docx",
+                        label: "[DOCX] Điện Toán Đám Mây",
+                      },
+                      {
+                        file: "Giao-Trinh-An-Toan-Thong-Tin-Ma-Hoa-Cong-Khai-Cybersecurity.docx",
+                        label: "[DOCX] An Toàn Thông Tin",
+                      },
+                    ].map((s, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleLoadSampleDoc(s.file)}
+                        disabled={isCurrentlyExtracting}
+                        className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-indigo-600 text-slate-700 hover:text-white text-[11px] font-bold transition-all border border-indigo-100/90 shadow-2xs cursor-pointer"
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* TÙY CHỌN CHẾ ĐỘ XEM: TỪNG TỆP vs GOM THEO BỘ CHUYÊN NGÀNH */}
+            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Chế Độ Xem:
                 </span>
+                <div className="inline-flex rounded-xl bg-slate-100 p-0.5 text-[11px] font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("list")}
+                    className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                      viewMode === "list"
+                        ? "bg-white text-blue-700 shadow-2xs font-black"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    Từng Tệp ({uploadedDocs.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("bundles")}
+                    className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                      viewMode === "bundles"
+                        ? "bg-white text-blue-700 shadow-2xs font-black"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    Gom Theo Bộ ({clusteredBundles.length} Bộ)
+                  </button>
+                </div>
               </div>
 
-              {/* DANH SÁCH TÀI LIỆU HOẶC GOM NHÓM THEO BỘ */}
-              {uploadedDocs.length === 0 ? (
-                <div className="p-8 rounded-2xl bg-slate-50/80 border border-dashed border-slate-200 text-center space-y-2">
-                  <span className="px-3 py-1 rounded-md bg-slate-200 text-slate-600 font-mono text-[11px] font-black uppercase inline-block">
-                    DANH SÁCH TRỐNG
-                  </span>
-                  <p className="text-xs font-bold text-slate-600">Chưa có tài liệu nào được nạp</p>
-                  <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
-                    Hãy bấm chọn tệp mẫu phía trên hoặc kéo thả tệp giáo trình từ máy tính để AI tiến hành phân loại và đối soát.
-                  </p>
-                </div>
-              ) : viewMode === "list" ? (
-                /* CHẾ ĐỘ XEM 1: DANH SÁCH TỪNG TỆP */
-                <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
-                  {uploadedDocs.map((doc) => {
-                    const isSelected = activeDoc?.id === doc.id;
-                    const sizeInMB = (doc.size / (1024 * 1024)).toFixed(2);
-                    const isPDF = doc.extension === "PDF" || doc.extension === "PDFA";
-                    const isWord = doc.extension === "DOC" || doc.extension === "DOCX";
-                    const scan = doc.scanResult;
+              <span className="text-[11px] text-slate-400">
+                {viewMode === "list" ? "Bấm tệp để đối soát bên phải" : "Tự động gom theo chuyên ngành"}
+              </span>
+            </div>
 
-                    return (
-                      <div
-                        key={doc.id}
-                        onClick={() => handleSelectActiveDoc(doc)}
-                        className={`p-3.5 rounded-2xl border transition-all cursor-pointer space-y-2 ${
-                          isSelected
-                            ? "border-blue-500 bg-blue-50/30 shadow-xs ring-1 ring-blue-500/20"
-                            : "border-slate-200 bg-white hover:bg-slate-50/80"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            {/* Typographic Format Badge */}
-                            <span
-                              className={`px-2 py-1 rounded-lg font-mono text-[10px] font-black uppercase shrink-0 ${
-                                isPDF
-                                  ? "bg-rose-100 text-rose-700 border border-rose-200"
-                                  : isWord
-                                  ? "bg-blue-100 text-blue-700 border border-blue-200"
-                                  : "bg-amber-100 text-amber-800 border border-amber-200"
-                              }`}
-                            >
-                              [{doc.extension}]
-                            </span>
+            {/* DANH SÁCH TÀI LIỆU HOẶC GOM NHÓM THEO BỘ */}
+            {uploadedDocs.length === 0 ? (
+              <div className="p-8 rounded-2xl bg-slate-50/80 border border-dashed border-slate-200 text-center space-y-2">
+                <span className="px-3 py-1 rounded-md bg-slate-200 text-slate-600 font-mono text-[11px] font-black uppercase inline-block">
+                  DANH SÁCH TRỐNG
+                </span>
+                <p className="text-xs font-bold text-slate-600">Chưa có tài liệu nào được nạp</p>
+                <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                  Hãy bấm chọn tệp mẫu phía trên hoặc kéo thả tệp giáo trình từ máy tính để AI tiến hành phân loại và đối soát.
+                </p>
+              </div>
+            ) : viewMode === "list" ? (
+              /* CHẾ ĐỘ XEM 1: DANH SÁCH TỪNG TỆP */
+              <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
+                {uploadedDocs.map((doc) => {
+                  const isSelected = activeDoc?.id === doc.id;
+                  const sizeInMB = (doc.size / (1024 * 1024)).toFixed(2);
+                  const isPDF = doc.extension === "PDF" || doc.extension === "PDFA";
+                  const isWord = doc.extension === "DOC" || doc.extension === "DOCX";
+                  const scan = doc.scanResult;
 
-                            <div className="min-w-0 space-y-0.5">
-                              <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">
-                                {doc.name}
-                              </p>
-                              <div className="flex items-center gap-2.5 text-[11px] text-slate-500 flex-wrap">
-                                <span className="font-semibold text-slate-600">{sizeInMB} MB</span>
-                                <span>•</span>
-                                <span>{doc.uploadedAt}</span>
-                                <span>•</span>
-                                {doc.isScanning ? (
-                                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px] animate-pulse">
-                                    [ AI Đang Đọc Lướt... ]
-                                  </span>
-                                ) : scan?.isMultiSubject ? (
-                                  <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-bold text-[10px]">
-                                    [ Đa Môn / Liên Ngành ]
-                                  </span>
-                                ) : (
-                                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">
-                                    [ Đơn Môn: {scan?.primarySubject.subjectName || "Đã Nhận Diện"} ]
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span
-                              className={`px-2.5 py-1 rounded-xl text-[11px] font-black ${
-                                isSelected
-                                  ? "bg-blue-600 text-white shadow-2xs"
-                                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                              }`}
-                            >
-                              {isSelected ? "ĐANG CHỌN" : "CHỌN"}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={(e) => handleRemoveDoc(e, doc.id)}
-                              className="px-2 py-1 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-[11px] font-bold transition-colors cursor-pointer"
-                              title="Xóa tệp khỏi danh sách"
-                            >
-                              [XÓA]
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* GitHub-style mini distribution bar for this file */}
-                        {scan && scan.distributions && scan.distributions.length > 0 && (
-                          <div className="space-y-1 pt-1 border-t border-slate-100">
-                            {/* Segmented flex bar */}
-                            <div className="h-1.5 w-full bg-slate-100 rounded-full flex overflow-hidden">
-                              {scan.distributions.map((d, dIdx) => (
-                                <div
-                                  key={dIdx}
-                                  style={{
-                                    width: `${d.percentage}%`,
-                                    backgroundColor: d.color,
-                                  }}
-                                  title={`${d.subjectName}: ${d.percentage}%`}
-                                />
-                              ))}
-                            </div>
-
-                            {/* Legend labels */}
-                            <div className="flex items-center gap-3 text-[10px] text-slate-600 flex-wrap">
-                              {scan.distributions.map((d, dIdx) => (
-                                <span key={dIdx} className="inline-flex items-center gap-1">
-                                  <span
-                                    className="w-2 h-2 rounded-full inline-block"
-                                    style={{ backgroundColor: d.color }}
-                                  />
-                                  <strong className="text-slate-700">{d.subjectName}</strong>
-                                  <span className="text-slate-400">{d.percentage}%</span>
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                /* CHẾ ĐỘ XEM 2: GOM NHÓM THEO BỘ CHUYÊN NGÀNH (Bundle Clustering) */
-                <div className="space-y-3.5 max-h-96 overflow-y-auto pr-1">
-                  {clusteredBundles.map((bundle, bIdx) => (
+                  return (
                     <div
-                      key={bIdx}
-                      className="p-4 rounded-2xl bg-slate-50/90 border border-slate-200/90 space-y-2.5"
+                      key={doc.id}
+                      onClick={() => handleSelectActiveDoc(doc)}
+                      className={`p-3.5 rounded-2xl border transition-all cursor-pointer space-y-2 ${
+                        isSelected
+                          ? "border-blue-500 bg-blue-50/40 shadow-xs ring-1 ring-blue-500/20"
+                          : "border-slate-200 bg-white hover:bg-slate-50/80"
+                      }`}
                     >
-                      <div className="flex items-center justify-between pb-2 border-b border-slate-200/70">
-                        <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {/* Format Badge */}
                           <span
-                            className="w-2.5 h-2.5 rounded-full inline-block"
-                            style={{ backgroundColor: bundle.color }}
-                          />
-                          <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                            Bộ Môn: {bundle.subjectName}
+                            className={`px-2 py-1 rounded-lg font-mono text-[10px] font-black uppercase shrink-0 ${
+                              isPDF
+                                ? "bg-rose-100 text-rose-700 border border-rose-200"
+                                : isWord
+                                ? "bg-blue-100 text-blue-700 border border-blue-200"
+                                : "bg-amber-100 text-amber-800 border border-amber-200"
+                            }`}
+                          >
+                            [{doc.extension}]
                           </span>
-                          <span className="text-[10px] font-bold text-slate-400">
-                            ({bundle.domainName})
-                          </span>
+
+                          <div className="min-w-0 space-y-0.5">
+                            <p className="text-xs sm:text-sm font-bold text-slate-800 truncate">
+                              {doc.name}
+                            </p>
+                            <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
+                              <span className="font-semibold text-slate-600">{sizeInMB} MB</span>
+                              <span>•</span>
+                              <span>{doc.uploadedAt}</span>
+                              <span>•</span>
+                              {doc.isScanning ? (
+                                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px] animate-pulse">
+                                  [ AI Đang Đọc Lướt... ]
+                                </span>
+                              ) : doc.extractedDraft ? (
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                                  [ Đã Trích Xuất Feynman ]
+                                </span>
+                              ) : scan?.isMultiSubject ? (
+                                <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-bold text-[10px]">
+                                  [ Đa Môn / Liên Ngành ]
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold text-[10px]">
+                                  [ {scan?.primarySubject.subjectName || "Đã Phân Loại"} ]
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <span className="px-2.5 py-0.5 rounded-full bg-white text-blue-700 border border-blue-200 text-[10px] font-black">
-                          {bundle.docs.length} Tài Liệu
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span
+                            className={`px-2.5 py-1 rounded-xl text-[11px] font-black ${
+                              isSelected
+                                ? "bg-blue-600 text-white shadow-2xs"
+                                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                            }`}
+                          >
+                            {isSelected ? "ĐANG CHỌN" : "CHỌN"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => handleRemoveDoc(e, doc.id)}
+                            className="px-2 py-1 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 text-[11px] font-bold transition-colors cursor-pointer"
+                            title="Xóa tệp khỏi danh sách"
+                          >
+                            [XÓA]
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* GitHub-style mini distribution bar for this file */}
+                      {scan && scan.distributions && scan.distributions.length > 0 && (
+                        <div className="space-y-1 pt-1 border-t border-slate-100">
+                          <div className="h-1.5 w-full bg-slate-100 rounded-full flex overflow-hidden">
+                            {scan.distributions.map((d, dIdx) => (
+                              <div
+                                key={dIdx}
+                                style={{
+                                  width: `${d.percentage}%`,
+                                  backgroundColor: d.color,
+                                }}
+                                title={`${d.subjectName}: ${d.percentage}%`}
+                              />
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-3 text-[10px] text-slate-600 flex-wrap">
+                            {scan.distributions.map((d, dIdx) => (
+                              <span key={dIdx} className="inline-flex items-center gap-1">
+                                <span
+                                  className="w-2 h-2 rounded-full inline-block"
+                                  style={{ backgroundColor: d.color }}
+                                />
+                                <strong className="text-slate-700">{d.subjectName}</strong>
+                                <span className="text-slate-400">{d.percentage}%</span>
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* CHẾ ĐỘ XEM 2: GOM NHÓM THEO BỘ CHUYÊN NGÀNH (Bundle Clustering) */
+              <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
+                {clusteredBundles.map((bundle, bIdx) => (
+                  <div
+                    key={bIdx}
+                    className="p-4 rounded-2xl bg-slate-50/90 border border-slate-200/90 space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200/70">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full inline-block"
+                          style={{ backgroundColor: bundle.color }}
+                        />
+                        <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                          Bộ Môn: {bundle.subjectName}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400">
+                          ({bundle.domainName})
                         </span>
                       </div>
-
-                      <div className="space-y-1.5">
-                        {bundle.docs.map((doc) => {
-                          const isSelected = activeDoc?.id === doc.id;
-                          return (
-                            <div
-                              key={doc.id}
-                              onClick={() => handleSelectActiveDoc(doc)}
-                              className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs transition-all cursor-pointer ${
-                                isSelected
-                                  ? "bg-white border-blue-500 shadow-2xs font-bold"
-                                  : "bg-white/80 border-slate-200 hover:bg-white"
-                              }`}
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="font-mono text-[10px] text-slate-500 font-bold shrink-0">
-                                  [{doc.extension}]
-                                </span>
-                                <span className="text-slate-800 truncate">{doc.name}</span>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                {doc.scanResult?.isMultiSubject && (
-                                  <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
-                                    Đa Môn
-                                  </span>
-                                )}
-                                <span
-                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${
-                                    isSelected
-                                      ? "bg-blue-600 text-white"
-                                      : "bg-slate-100 text-slate-600"
-                                  }`}
-                                >
-                                  {isSelected ? "ĐANG CHỌN" : "XEM"}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                      <span className="px-2.5 py-0.5 rounded-full bg-white text-blue-700 border border-blue-200 text-[10px] font-black">
+                        {bundle.docs.length} Tài Liệu
+                      </span>
                     </div>
-                  ))}
-                </div>
-              )}
 
-              {/* Main Action Button - Kích Hoạt Agent */}
+                    <div className="space-y-1.5">
+                      {bundle.docs.map((doc) => {
+                        const isSelected = activeDoc?.id === doc.id;
+                        return (
+                          <div
+                            key={doc.id}
+                            onClick={() => handleSelectActiveDoc(doc)}
+                            className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs transition-all cursor-pointer ${
+                              isSelected
+                                ? "bg-white border-blue-500 shadow-2xs font-bold"
+                                : "bg-white/80 border-slate-200 hover:bg-white"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-mono text-[10px] text-slate-500 font-bold shrink-0">
+                                [{doc.extension}]
+                              </span>
+                              <span className="text-slate-800 truncate">{doc.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {doc.extractedDraft && (
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                  Feynman Đã Trích
+                                </span>
+                              )}
+                              <span
+                                className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${
+                                  isSelected
+                                    ? "bg-blue-600 text-white"
+                                    : "bg-slate-100 text-slate-600"
+                                }`}
+                              >
+                                {isSelected ? "ĐANG CHỌN" : "XEM"}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Quick Trigger Button at left bottom */}
+            {activeDoc && (
               <button
                 type="button"
                 onClick={handleStartExtraction}
-                disabled={!activeDoc || isProcessing}
-                className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-black shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isCurrentlyExtracting}
+                className="w-full py-3 px-5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-black shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isProcessing ? (
-                  <span>[ AI AGENT ĐANG HỆ THỐNG HÓA BÀI HỌC... ]</span>
+                {isCurrentlyExtracting ? (
+                  <span>[ AI AGENT ĐANG TRÍCH XUẤT CHO TỆP NÀY... ]</span>
                 ) : (
                   <span>
-                    [ KÍCH HOẠT AGENT TRÍCH XUẤT &amp; HỆ THỐNG HÓA TRI THỨC FEYNMAN → ]
+                    [ KÍCH HOẠT AGENT TRÍCH XUẤT TRI THỨC FEYNMAN CHO TỆP ĐANG CHỌN → ]
                   </span>
                 )}
               </button>
-            </div>
+            )}
           </div>
+        </div>
 
-          {/* CỘT PHẢI: Bảng thông tin học thuật, GitHub Language Bar & Semantic Chapter Splitter (5 cols) */}
-          <div className="lg:col-span-5 space-y-5">
-            <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-4">
-              {/* Header Box */}
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[10px] font-black uppercase">
-                      ĐỐI SOÁT
-                    </span>
-                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-                      Bảng Thông Tin Học Thuật
-                    </h3>
-                  </div>
-                  <p className="text-[11px] text-slate-500">
-                    Ma trận nhãn đa ngành &amp; đối soát kho tri thức Supabase
-                  </p>
-                </div>
-                {aiClassification && (
-                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-black border border-emerald-200">
-                    {aiClassification.confidenceScore}% Khớp Tri Thức
+        {/* ============================================================== */}
+        {/* CỘT PHẢI: Bảng thông tin học thuật cập nhật dữ liệu trực tiếp  */}
+        {/* ============================================================== */}
+        <div className="lg:col-span-6 space-y-5">
+          <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-4">
+            {/* Header Box */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[10px] font-black uppercase">
+                    ĐỐI SOÁT
                   </span>
-                )}
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+                    Bảng Thông Tin Học Thuật
+                  </h3>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  {activeDoc
+                    ? `Đang hiển thị dữ liệu của tệp: ${activeDoc.name}`
+                    : "Chưa chọn tệp nào từ danh sách bên trái"}
+                </p>
               </div>
 
-              {/* PHƯƠNG ÁN A: GITHUB-STYLE MULTI-DOMAIN LANGUAGE BAR */}
-              {activeScanResult && activeScanResult.distributions.length > 0 ? (
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                      Ma Trận Phân Bổ Ngữ Nghĩa (Multi-Tag Distribution)
+              {activeDoc && (
+                <div className="flex items-center gap-2">
+                  {activeExtractedDraft ? (
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-black border border-emerald-300">
+                      [ ĐÃ TRÍCH XUẤT FEYNMAN ]
                     </span>
-                    <span className="text-[10px] font-bold text-slate-400">
-                      Chuẩn GitHub Language Bar
+                  ) : activeDoc.isScanning ? (
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-black border border-amber-300 animate-pulse">
+                      [ ĐANG QUÉT AI... ]
                     </span>
-                  </div>
+                  ) : aiClassification ? (
+                    <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 text-[11px] font-black border border-blue-200">
+                      {aiClassification.confidenceScore}% Khớp Tri Thức
+                    </span>
+                  ) : null}
+                </div>
+              )}
+            </div>
 
-                  {/* Thanh tỷ lệ % phân bổ ngang đa màu */}
-                  <div className="h-3 w-full bg-slate-200 rounded-full flex overflow-hidden p-0.5 shadow-inner">
-                    {activeScanResult.distributions.map((dist, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          width: `${dist.percentage}%`,
-                          backgroundColor: dist.color,
+            {/* THÔNG BÁO TIẾN TRÌNH TRÍCH XUẤT NGAY TẠI BẢNG NẾU ĐANG CHẠY */}
+            {isCurrentlyExtracting && (
+              <div className="p-4 rounded-2xl bg-blue-50/90 border border-blue-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-blue-900 uppercase tracking-wider animate-pulse">
+                    [ AI AGENT ĐANG HỆ THỐNG HÓA BÀI HỌC ]
+                  </span>
+                  <span className="text-xs font-mono font-black text-blue-700 bg-white px-2 py-0.5 rounded border border-blue-200">
+                    Bước {currentStage} / 4
+                  </span>
+                </div>
+                <div className="h-2 w-full bg-blue-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-600 transition-all duration-300"
+                    style={{ width: `${(currentStage / 4) * 100}%` }}
+                  />
+                </div>
+                <p className="text-[11px] font-mono text-blue-800 leading-snug">{stageMessage}</p>
+              </div>
+            )}
+
+            {activeDoc ? (
+              <div className="space-y-4">
+                {/* 1. KHỐI PHÂN LOẠI & ĐỊNH DANH HỌC THUẬT */}
+                <div className="space-y-3 p-4 rounded-2xl bg-slate-50/70 border border-slate-200/90">
+                  <span className="text-[11px] font-black text-slate-700 uppercase tracking-wider block">
+                    Định Danh &amp; Phân Vùng Cây Tri Thức (Supabase Master Graph)
+                  </span>
+
+                  {/* Nhóm Ngành & Môn Học */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                        <span>Nhóm Ngành (Cấp 1)</span>
+                      </label>
+                      <select
+                        value={selectedDomainId}
+                        onChange={(e) => {
+                          const newDomainId = e.target.value;
+                          setSelectedDomainId(newDomainId);
+                          const meta = TaxonomyClassifier.generateMetadataForSelection(
+                            activeDoc.name,
+                            newDomainId,
+                            selectedSubjectId
+                          );
+                          activeDoc.classification = {
+                            domainId: newDomainId,
+                            subjectId: selectedSubjectId,
+                            confidenceScore: activeDoc.classification?.confidenceScore || 92,
+                            matchedKeywords: activeDoc.classification?.matchedKeywords || [],
+                            ...meta,
+                          };
+                          setUploadedDocs([...uploadedDocs]);
                         }}
-                        className="h-full rounded-sm transition-all duration-300"
-                        title={`${dist.subjectName}: ${dist.percentage}%`}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Bảng chú giải các môn học và % tương ứng */}
-                  <div className="space-y-1.5 pt-1">
-                    {activeScanResult.distributions.map((dist, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between text-xs p-2 rounded-xl bg-white border border-slate-200/70"
+                        disabled={isCurrentlyExtracting}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer disabled:opacity-50"
                       >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span
-                            className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
-                            style={{ backgroundColor: dist.color }}
-                          />
-                          <span className="font-bold text-slate-800 truncate">
-                            {dist.subjectName}
-                          </span>
-                          <span className="text-[10px] font-semibold text-slate-400 shrink-0">
-                            [{dist.domainName}]
-                          </span>
-                        </div>
-                        <span className="font-mono text-xs font-black text-slate-800 shrink-0">
-                          {dist.percentage}%
-                        </span>
-                      </div>
-                    ))}
+                        {domains.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                        <span>Môn Học Trực Thuộc (Cấp 2)</span>
+                      </label>
+                      <select
+                        value={selectedSubjectId}
+                        onChange={(e) => {
+                          const newSubId = e.target.value;
+                          setSelectedSubjectId(newSubId);
+                          const meta = TaxonomyClassifier.generateMetadataForSelection(
+                            activeDoc.name,
+                            selectedDomainId,
+                            newSubId
+                          );
+                          activeDoc.classification = {
+                            domainId: selectedDomainId,
+                            subjectId: newSubId,
+                            confidenceScore: activeDoc.classification?.confidenceScore || 92,
+                            matchedKeywords: activeDoc.classification?.matchedKeywords || [],
+                            ...meta,
+                          };
+                          setUploadedDocs([...uploadedDocs]);
+                        }}
+                        disabled={isCurrentlyExtracting || availableSubjects.length === 0}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer disabled:opacity-50"
+                      >
+                        {availableSubjects.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
-                  {/* Từ khóa đối soát trong tài liệu */}
-                  {activeScanResult.primarySubject.matchedKeywords.length > 0 && (
-                    <div className="space-y-1 pt-1 border-t border-slate-200/60">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                        Từ khóa ngữ nghĩa nhận diện được:
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {activeScanResult.primarySubject.matchedKeywords.map((kw, kIdx) => (
-                          <span
-                            key={kIdx}
-                            className="px-2 py-0.5 rounded-md bg-white text-slate-700 text-[10px] font-bold border border-slate-200"
-                          >
-                            {kw}
-                          </span>
-                        ))}
+                  {/* Tiêu đề bài giảng đề xuất (Cho phép chỉnh sửa trực tiếp) */}
+                  <div className="space-y-1 pt-1">
+                    <label className="text-[11px] font-bold text-slate-700 block">
+                      Tiêu Đề Bài Giảng Đề Xuất (AI gợi ý)
+                    </label>
+                    <input
+                      type="text"
+                      value={activeDoc.suggestedTitle}
+                      onChange={(e) => handleUpdateActiveTitle(e.target.value)}
+                      disabled={isCurrentlyExtracting}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 disabled:opacity-50"
+                    />
+                  </div>
+
+                  {/* URL Reference Link chuẩn */}
+                  {aiClassification?.refLink && (
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 space-y-1 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">
+                          URL Reference Link Chuẩn
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(aiClassification.refLink);
+                            setIsCopied(true);
+                            toast.success("Đã sao chép liên kết!");
+                            setTimeout(() => setIsCopied(false), 2000);
+                          }}
+                          className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                        >
+                          {isCopied ? "[ĐÃ SAO CHÉP]" : "[SAO CHÉP LINK]"}
+                        </button>
                       </div>
+                      <span className="font-mono text-[11px] text-indigo-600 block truncate">
+                        {aiClassification.refLink}
+                      </span>
                     </div>
                   )}
                 </div>
-              ) : null}
 
-              {/* PHƯƠNG ÁN B: SEMANTIC CHAPTER SPLITTER (Khi phát hiện tài liệu đa học phần / liên ngành) */}
-              {activeScanResult?.isMultiSubject && (
-                <div className="p-4 rounded-2xl bg-purple-50/80 border-2 border-purple-200 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded bg-purple-700 text-white font-mono text-[10px] font-black uppercase">
-                        PHƯƠNG ÁN B
+                {/* 2. PHƯƠNG ÁN A: GITHUB-STYLE MULTI-DOMAIN LANGUAGE BAR */}
+                {activeScanResult && activeScanResult.distributions.length > 0 ? (
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                        Ma Trận Phân Bổ Ngữ Nghĩa (GitHub-Style Multi-Tag)
                       </span>
-                      <span className="text-xs font-black text-purple-950 uppercase tracking-wider">
-                        Phát Hiện Tài Liệu Đa Môn / Liên Ngành
+                      <span className="text-[10px] font-bold text-slate-400">
+                        {activeScanResult.isMultiSubject ? "Tài Liệu Đa Môn" : "Tài Liệu Đơn Môn"}
                       </span>
                     </div>
-                    <span className="text-[10px] font-black uppercase bg-purple-200 text-purple-900 px-2 py-0.5 rounded">
-                      Semantic Splitter
-                    </span>
-                  </div>
 
-                  <p className="text-xs text-purple-900 leading-relaxed">
-                    Tài liệu này chứa nội dung của <strong>2 môn học khác nhau</strong> (
-                    {activeScanResult.primarySubject.subjectName} và{" "}
-                    {activeScanResult.secondarySubject?.subjectName}). Hãy chọn phương án xử lý phù hợp:
-                  </p>
+                    {/* Thanh tỷ lệ % phân bổ ngang đa màu */}
+                    <div className="h-3 w-full bg-slate-200 rounded-full flex overflow-hidden p-0.5 shadow-inner">
+                      {activeScanResult.distributions.map((dist, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            width: `${dist.percentage}%`,
+                            backgroundColor: dist.color,
+                          }}
+                          className="h-full rounded-sm transition-all duration-300"
+                          title={`${dist.subjectName}: ${dist.percentage}%`}
+                        />
+                      ))}
+                    </div>
 
-                  {/* 2 Tùy chọn xử lý: Tích Hợp vs Tách Module */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleSplitMode("integrated")}
-                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                        activeDoc?.selectedSplitMode === "integrated"
-                          ? "bg-white border-purple-600 shadow-sm ring-2 ring-purple-600/20"
-                          : "bg-white/70 border-purple-200 hover:bg-white"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-black text-purple-950">
-                          Tích Hợp Liên Ngành
+                    {/* Bảng chú giải các môn học và % tương ứng */}
+                    <div className="space-y-1 pt-1">
+                      {activeScanResult.distributions.map((dist, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between text-xs p-2 rounded-xl bg-white border border-slate-200/70"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+                              style={{ backgroundColor: dist.color }}
+                            />
+                            <span className="font-bold text-slate-800 truncate">
+                              {dist.subjectName}
+                            </span>
+                            <span className="text-[10px] font-semibold text-slate-400 shrink-0">
+                              [{dist.domainName}]
+                            </span>
+                          </div>
+                          <span className="font-mono text-xs font-black text-slate-800 shrink-0">
+                            {dist.percentage}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Từ khóa đối soát trong tài liệu */}
+                    {activeScanResult.primarySubject.matchedKeywords.length > 0 && (
+                      <div className="space-y-1 pt-1 border-t border-slate-200/60">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                          Từ khóa ngữ nghĩa nhận diện được:
                         </span>
-                        {activeDoc?.selectedSplitMode === "integrated" && (
-                          <span className="text-[10px] font-black text-purple-700">[ĐANG CHỌN]</span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-600 leading-snug">
-                        Giữ nguyên 1 bài học tổng hợp, liên kết chéo trên Cây Tri Thức toàn sàn.
-                      </p>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleToggleSplitMode("split")}
-                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                        activeDoc?.selectedSplitMode === "split"
-                          ? "bg-white border-purple-600 shadow-sm ring-2 ring-purple-600/20"
-                          : "bg-white/70 border-purple-200 hover:bg-white"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-black text-purple-950">
-                          Tách Thành Các Module
-                        </span>
-                        {activeDoc?.selectedSplitMode === "split" && (
-                          <span className="text-[10px] font-black text-purple-700">[ĐANG CHỌN]</span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-600 leading-snug">
-                        Tự động cắt theo ranh giới chương thành các bài học độc lập cho từng môn.
-                      </p>
-                    </button>
-                  </div>
-
-                  {/* Hiển thị chi tiết các phân đoạn chương mục được phát hiện khi chọn Tách Module */}
-                  {activeDoc?.selectedSplitMode === "split" &&
-                    activeScanResult.detectedModules &&
-                    activeScanResult.detectedModules.length > 0 && (
-                      <div className="space-y-2 pt-2 border-t border-purple-200">
-                        <span className="text-[11px] font-black text-purple-950 uppercase tracking-wider block">
-                          Các Module Bài Học Độc Lập Dự Kiến Tách:
-                        </span>
-                        <div className="space-y-2">
-                          {activeScanResult.detectedModules.map((mod) => (
-                            <div
-                              key={mod.id}
-                              className="p-2.5 rounded-xl bg-white border border-purple-200 text-xs space-y-1"
+                        <div className="flex flex-wrap gap-1.5">
+                          {activeScanResult.primarySubject.matchedKeywords.map((kw, kIdx) => (
+                            <span
+                              key={kIdx}
+                              className="px-2 py-0.5 rounded-md bg-white text-slate-700 text-[10px] font-bold border border-slate-200"
                             >
-                              <div className="flex items-center justify-between font-bold text-slate-800">
-                                <span className="line-clamp-1">{mod.heading}</span>
-                                <span className="text-[10px] text-purple-700 font-mono font-bold shrink-0">
-                                  ~{mod.percentageInDoc}% tệp
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 text-[10px] text-slate-500">
-                                <span className="font-bold text-indigo-700">
-                                  Môn: {mod.dominantSubjectName}
-                                </span>
-                                <span>•</span>
-                                <span>{mod.wordCount} từ</span>
-                              </div>
-                              <p className="text-[11px] text-slate-500 line-clamp-1 italic">
-                                "{mod.previewSnippet}"
-                              </p>
-                            </div>
+                              {kw}
+                            </span>
                           ))}
                         </div>
                       </div>
                     )}
-                </div>
-              )}
-
-              {/* Trường 1 & 2: Nhóm Ngành & Môn Học */}
-              <div className="space-y-3.5 pt-1">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                    <span>Nhóm Ngành (Academic Domain)</span>
-                    <span className="text-[11px] text-slate-400 font-normal">Cấp 1</span>
-                  </label>
-                  <select
-                    value={selectedDomainId}
-                    onChange={(e) => {
-                      const newDomainId = e.target.value;
-                      setSelectedDomainId(newDomainId);
-                      if (activeDoc) {
-                        const meta = TaxonomyClassifier.generateMetadataForSelection(
-                          activeDoc.name,
-                          newDomainId,
-                          selectedSubjectId
-                        );
-                        activeDoc.classification = {
-                          domainId: newDomainId,
-                          subjectId: selectedSubjectId,
-                          confidenceScore: activeDoc.classification?.confidenceScore || 92,
-                          matchedKeywords: activeDoc.classification?.matchedKeywords || [],
-                          ...meta,
-                        };
-                        setUploadedDocs([...uploadedDocs]);
-                      }
-                    }}
-                    disabled={isProcessing}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer disabled:opacity-50"
-                  >
-                    {domains.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
-                    <span>Môn Học Trực Thuộc (Academic Subject)</span>
-                    <span className="text-[11px] text-slate-400 font-normal">Cấp 2</span>
-                  </label>
-                  <select
-                    value={selectedSubjectId}
-                    onChange={(e) => {
-                      const newSubId = e.target.value;
-                      setSelectedSubjectId(newSubId);
-                      if (activeDoc) {
-                        const meta = TaxonomyClassifier.generateMetadataForSelection(
-                          activeDoc.name,
-                          selectedDomainId,
-                          newSubId
-                        );
-                        activeDoc.classification = {
-                          domainId: selectedDomainId,
-                          subjectId: newSubId,
-                          confidenceScore: activeDoc.classification?.confidenceScore || 92,
-                          matchedKeywords: activeDoc.classification?.matchedKeywords || [],
-                          ...meta,
-                        };
-                        setUploadedDocs([...uploadedDocs]);
-                      }
-                    }}
-                    disabled={isProcessing || availableSubjects.length === 0}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer disabled:opacity-50"
-                  >
-                    {availableSubjects.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Chi tiết định danh học thuật */}
-              {aiClassification && (
-                <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100/90 space-y-2.5 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-indigo-950 uppercase tracking-wider text-[11px]">
-                      Định Danh Bài Học Đề Xuất
-                    </span>
-                    <span className="text-[10px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200">
-                      Master Schema
-                    </span>
                   </div>
+                ) : null}
 
-                  <div className="bg-white p-2.5 rounded-xl border border-indigo-100 space-y-1">
-                    <span className="text-[10px] font-bold text-slate-400 block uppercase">
-                      Tiêu Đề Bài Giảng
-                    </span>
-                    <span className="font-bold text-slate-800 block line-clamp-1">
-                      {aiClassification.suggestedTitle}
-                    </span>
-                  </div>
-
-                  <div className="bg-white p-2.5 rounded-xl border border-indigo-100 space-y-1">
+                {/* 3. PHƯƠNG ÁN B: SEMANTIC CHAPTER SPLITTER (Khi phát hiện tài liệu đa học phần / liên ngành) */}
+                {activeScanResult?.isMultiSubject && (
+                  <div className="p-4 rounded-2xl bg-purple-50/80 border-2 border-purple-200 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase">
-                        URL Reference Chuẩn
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-purple-700 text-white font-mono text-[10px] font-black uppercase">
+                          PHƯƠNG ÁN B
+                        </span>
+                        <span className="text-xs font-black text-purple-950 uppercase tracking-wider">
+                          Phân Đoạn Ranh Giới Chương Mục
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-black uppercase bg-purple-200 text-purple-900 px-2 py-0.5 rounded">
+                        Semantic Splitter
                       </span>
+                    </div>
+
+                    <p className="text-xs text-purple-900 leading-relaxed">
+                      Tài liệu này chứa nội dung của <strong>2 môn học khác nhau</strong> (
+                      {activeScanResult.primarySubject.subjectName} và{" "}
+                      {activeScanResult.secondarySubject?.subjectName}). Chọn phương án xử lý:
+                    </p>
+
+                    {/* 2 Tùy chọn xử lý: Tích Hợp vs Tách Module */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(aiClassification.refLink);
-                          setIsCopied(true);
-                          toast.success("Đã sao chép liên kết!");
-                          setTimeout(() => setIsCopied(false), 2000);
-                        }}
-                        className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                        onClick={() => handleToggleSplitMode("integrated")}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          activeDoc.selectedSplitMode === "integrated"
+                            ? "bg-white border-purple-600 shadow-sm ring-2 ring-purple-600/20"
+                            : "bg-white/70 border-purple-200 hover:bg-white"
+                        }`}
                       >
-                        {isCopied ? "[ĐÃ SAO CHÉP]" : "[SAO CHÉP LINK]"}
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-black text-purple-950">
+                            Tích Hợp Liên Ngành
+                          </span>
+                          {activeDoc.selectedSplitMode === "integrated" && (
+                            <span className="text-[10px] font-black text-purple-700">[ĐANG CHỌN]</span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-600 leading-tight">
+                          Giữ nguyên 1 bài học tổng hợp, liên kết chéo trên Cây Tri Thức.
+                        </p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSplitMode("split")}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          activeDoc.selectedSplitMode === "split"
+                            ? "bg-white border-purple-600 shadow-sm ring-2 ring-purple-600/20"
+                            : "bg-white/70 border-purple-200 hover:bg-white"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-black text-purple-950">
+                            Tách Thành Các Module
+                          </span>
+                          {activeDoc.selectedSplitMode === "split" && (
+                            <span className="text-[10px] font-black text-purple-700">[ĐANG CHỌN]</span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-600 leading-tight">
+                          Tự động bóc tách theo chương thành các bài học độc lập cho từng môn.
+                        </p>
                       </button>
                     </div>
-                    <span className="font-mono text-[11px] text-indigo-600 block truncate">
-                      {aiClassification.refLink}
-                    </span>
-                  </div>
-                </div>
-              )}
 
-              {/* Chỉ tiêu trích xuất */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
-                <span className="font-bold text-slate-700 block text-[11px] uppercase tracking-wider">
-                  Chỉ Tiêu Trích Xuất Chuẩn Feynman
-                </span>
-                <div className="grid grid-cols-2 gap-2 text-[11px]">
-                  <div className="bg-white p-2.5 rounded-xl border border-slate-200/70">
-                    <span className="text-slate-400 block">Khái niệm cốt lõi:</span>
-                    <strong className="text-slate-800">4 - 6 khái niệm</strong>
+                    {/* Hiển thị chi tiết các phân đoạn chương mục khi chọn Tách Module */}
+                    {activeDoc.selectedSplitMode === "split" &&
+                      activeScanResult.detectedModules &&
+                      activeScanResult.detectedModules.length > 0 && (
+                        <div className="space-y-2 pt-2 border-t border-purple-200">
+                          <span className="text-[11px] font-black text-purple-950 uppercase tracking-wider block">
+                            Các Module Bài Học Độc Lập Dự Kiến Tách:
+                          </span>
+                          <div className="space-y-1.5">
+                            {activeScanResult.detectedModules.map((mod) => (
+                              <div
+                                key={mod.id}
+                                className="p-2 rounded-xl bg-white border border-purple-200 text-xs space-y-1"
+                              >
+                                <div className="flex items-center justify-between font-bold text-slate-800">
+                                  <span className="line-clamp-1">{mod.heading}</span>
+                                  <span className="text-[10px] text-purple-700 font-mono font-bold shrink-0">
+                                    ~{mod.percentageInDoc}% tệp
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                                  <span className="font-bold text-indigo-700">
+                                    Môn: {mod.dominantSubjectName}
+                                  </span>
+                                  <span>•</span>
+                                  <span>{mod.wordCount} từ</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                   </div>
-                  <div className="bg-white p-2.5 rounded-xl border border-slate-200/70">
-                    <span className="text-slate-400 block">Bẫy thuật ngữ:</span>
-                    <strong className="text-slate-800">Tự động phát hiện</strong>
+                )}
+
+                {/* 4. KHỐI TRÍCH XUẤT FEYNMAN (KHI ĐÃ TRÍCH XUẤT HOẶC CHƯA) */}
+                {activeExtractedDraft ? (
+                  <div className="p-4 rounded-2xl bg-indigo-50/80 border-2 border-indigo-200 space-y-3 text-xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-emerald-600 text-white font-mono text-[10px] font-black uppercase">
+                          KẾT QUẢ FEYNMAN
+                        </span>
+                        <span className="font-black text-indigo-950 uppercase tracking-wider">
+                          Đã Trích Xuất &amp; Đóng Gói
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200">
+                        {activeExtractedDraft.estimatedReadingMinutes} phút đọc • Độ khó {activeExtractedDraft.difficultyLevel}/5
+                      </span>
+                    </div>
+
+                    {/* Master Roadmap Positioning */}
+                    {activeExtractedDraft.suggestedRoadmapPosition && (
+                      <div className="bg-white p-2.5 rounded-xl border border-indigo-100 space-y-1">
+                        <span className="text-[10px] font-bold text-slate-400 block uppercase">
+                          Định Vị Trong Cây Tri Thức
+                        </span>
+                        <p className="font-semibold text-slate-800 leading-snug">
+                          {activeExtractedDraft.suggestedRoadmapPosition}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Summary */}
+                    <div className="bg-white p-2.5 rounded-xl border border-indigo-100 space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 block uppercase">
+                        Tóm Tắt Khái Quát (Feynman Ground Truth)
+                      </span>
+                      <p className="text-slate-700 leading-relaxed">
+                        {activeExtractedDraft.summary}
+                      </p>
+                    </div>
+
+                    {/* Concepts & Jargons */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div className="bg-white p-2.5 rounded-xl border border-emerald-200 space-y-1.5">
+                        <span className="text-[10px] font-bold text-emerald-800 block uppercase">
+                          Khái Niệm Cốt Lõi ({activeExtractedDraft.requiredConcepts.length})
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {activeExtractedDraft.requiredConcepts.map((c, i) => (
+                            <span
+                              key={i}
+                              className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-900 font-bold text-[10px] border border-emerald-200"
+                            >
+                              {c}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-2.5 rounded-xl border border-rose-200 space-y-1.5">
+                        <span className="text-[10px] font-bold text-rose-800 block uppercase">
+                          Bẫy Thuật Ngữ ({activeExtractedDraft.jargonTraps.length})
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {activeExtractedDraft.jargonTraps.map((j, i) => (
+                            <span
+                              key={i}
+                              className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-900 font-bold text-[10px] border border-rose-200"
+                            >
+                              {j}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Nút hành động chuyển giao sang Bàn Thẩm Định */}
+                    <div className="pt-2 border-t border-indigo-100 flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold text-slate-500">
+                        Trạng thái: Chờ Kiểm Định Viên phê duyệt
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {isCuratorOrAdmin ? (
+                          <button
+                            type="button"
+                            onClick={() => navigate("/curator/validation")}
+                            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs transition-all shadow-xs cursor-pointer"
+                          >
+                            [ Sang Bàn Thẩm Định Ngay → ]
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              toast.success("Bài học đã được gửi tới Hàng đợi Bàn Thẩm Định thành công!");
+                              navigate("/topics");
+                            }}
+                            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs transition-all shadow-xs cursor-pointer"
+                          >
+                            [ Xác Nhận &amp; Gửi Vào Hàng Đợi Thẩm Định ]
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  /* Khi chưa trích xuất: Hiển thị chỉ tiêu & Nút kích hoạt trích xuất sâu */
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-3 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-700 block text-[11px] uppercase tracking-wider">
+                        Chỉ Tiêu Trích Xuất Feynman (AI Sẵn Sàng)
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-400">
+                        {activeScanResult?.totalWords || 0} từ trong tài liệu
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-200/70">
+                        <span className="text-slate-400 block">Khái niệm cốt lõi:</span>
+                        <strong className="text-slate-800">4 - 6 khái niệm</strong>
+                      </div>
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-200/70">
+                        <span className="text-slate-400 block">Bẫy thuật ngữ:</span>
+                        <strong className="text-slate-800">Tự động phát hiện</strong>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleStartExtraction}
+                      disabled={isCurrentlyExtracting}
+                      className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                    >
+                      [ KÍCH HOẠT TRÍCH XUẤT FEYNMAN CHO TỆP NÀY → ]
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
+            ) : (
+              <div className="p-10 rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-center space-y-2">
+                <span className="px-3 py-1 rounded-md bg-slate-200 text-slate-600 font-mono text-[11px] font-black uppercase inline-block">
+                  CHƯA CÓ DỮ LIỆU
+                </span>
+                <p className="text-xs font-bold text-slate-600">Chờ nạp tài liệu học thuật</p>
+                <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                  Hãy bấm chọn tệp mẫu hoặc kéo thả tệp ở khung bên trái để AI quét cấu trúc và hiển thị ma trận nhãn học thuật tại đây.
+                </p>
+              </div>
+            )}
           </div>
         </div>
-      ) : null}
-
-      {/* Live AI Agent Processing Stepper - Không Dùng Icon */}
-      {isProcessing && (
-        <div className="bg-white rounded-3xl p-8 border border-blue-200 shadow-xl space-y-6">
-          <div className="text-center space-y-2">
-            <span className="px-3.5 py-1.5 rounded-full bg-blue-100 text-blue-800 font-mono text-xs font-black uppercase inline-block animate-pulse">
-              [ AI AGENT ĐANG XỬ LÝ DỮ LIỆU ]
-            </span>
-            <h3 className="text-lg font-black text-slate-800">
-              Hệ Thống Hóa Tri Thức Học Thuật
-            </h3>
-            <p className="text-xs text-slate-500 font-mono">{stageMessage}</p>
-          </div>
-
-          {/* Stepper Progress */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            {[
-              { num: 1, title: "Tiếp Nhận & Quét Cấu Trúc", desc: "Bóc tách văn bản & ma trận ngữ nghĩa" },
-              { num: 2, title: "Semantic Chunking", desc: "Băm ý niệm & gán tiền đề Contextual Retrieval" },
-              { num: 3, title: "Chiếu Xạ Master Graph", desc: "Định vị tiên quyết & độ khó trên Supabase" },
-              { num: 4, title: "Schema Feynman", desc: "Đóng gói bài học & chuẩn bị đưa sang Bàn Thẩm Định" },
-            ].map((st) => (
-              <div
-                key={st.num}
-                className={`p-3.5 rounded-2xl border transition-all ${
-                  currentStage === st.num
-                    ? "bg-blue-50 border-blue-400 shadow-sm"
-                    : currentStage > st.num
-                    ? "bg-emerald-50 border-emerald-300"
-                    : "bg-slate-50 border-slate-200 opacity-60"
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span
-                    className={`w-6 h-6 rounded-full text-xs font-black flex items-center justify-center font-mono ${
-                      currentStage > st.num
-                        ? "bg-emerald-600 text-white"
-                        : currentStage === st.num
-                        ? "bg-blue-600 text-white animate-pulse"
-                        : "bg-slate-300 text-slate-700"
-                    }`}
-                  >
-                    {currentStage > st.num ? "OK" : st.num}
-                  </span>
-                  <span className="text-xs font-bold text-slate-800">{st.title}</span>
-                </div>
-                <p className="text-[10px] text-slate-500 leading-tight">{st.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Extracted Lesson Output Card - Không Dùng Icon */}
-      {extractedDraft && (
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border-2 border-indigo-200 shadow-xl space-y-6 animate-fade-in">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300">
-                  [ TRẠNG THÁI: CHỜ KIỂM ĐỊNH ]
-                </span>
-                <span className="text-xs text-slate-400 font-medium">
-                  Trích xuất từ: {extractedDraft.fileName}
-                </span>
-              </div>
-              <h2 className="text-xl sm:text-2xl font-black text-slate-800">
-                {extractedDraft.title}
-              </h2>
-              {extractedDraft.refLink && (
-                <div className="flex items-center gap-2 text-xs pt-1 flex-wrap">
-                  <span className="font-semibold text-slate-500">URL Tham Chiếu Chuẩn:</span>
-                  <a
-                    href={extractedDraft.refLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-mono text-indigo-600 hover:underline hover:text-indigo-800 transition-colors"
-                  >
-                    {extractedDraft.refLink}
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(extractedDraft.refLink || "");
-                      setIsCopied(true);
-                      toast.success("Đã sao chép liên kết tham chiếu!");
-                      setTimeout(() => setIsCopied(false), 2000);
-                    }}
-                    className="text-[11px] font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
-                  >
-                    {isCopied ? "[ĐÃ SAO CHÉP]" : "[SAO CHÉP]"}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0 flex-wrap">
-              {extractedDraft.pedagogicalRoleLabel && (
-                <span className="px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 text-xs font-bold border border-purple-200 shadow-2xs">
-                  {extractedDraft.pedagogicalRoleLabel}
-                </span>
-              )}
-              <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">
-                {extractedDraft.estimatedReadingMinutes} phút đọc
-              </span>
-              <span className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold">
-                Độ khó {extractedDraft.difficultyLevel}/5
-              </span>
-            </div>
-          </div>
-
-          {/* Master Ontology Projection */}
-          {extractedDraft.suggestedRoadmapPosition && (
-            <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-indigo-950 uppercase tracking-wider">
-                  Định Vị Trong Cây Tri Thức Chuẩn (Master Ontology Projection)
-                </span>
-                <span className="text-[10px] font-bold text-indigo-600 bg-white px-2 py-0.5 rounded border border-indigo-200">
-                  Supabase Knowledge Graph
-                </span>
-              </div>
-              <p className="text-xs font-semibold text-slate-700">
-                {extractedDraft.suggestedRoadmapPosition}
-              </p>
-            </div>
-          )}
-
-          {/* Summary */}
-          <div className="space-y-2">
-            <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">
-              Tóm Tắt Khái Quát Bài Học (Feynman Ground Truth)
-            </h4>
-            <p className="text-xs sm:text-sm text-slate-700 leading-relaxed bg-slate-50/80 p-4 rounded-2xl border border-slate-200/80">
-              {extractedDraft.summary}
-            </p>
-          </div>
-
-          {/* 2 Cột Concepts & Jargons */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200/80 space-y-2.5">
-              <h4 className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
-                Khái Niệm Cốt Lõi Bắt Buộc ({extractedDraft.requiredConcepts.length})
-              </h4>
-              <div className="flex flex-wrap gap-1.5">
-                {extractedDraft.requiredConcepts.map((c, i) => (
-                  <span
-                    key={i}
-                    className="text-xs font-semibold bg-white text-emerald-900 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs"
-                  >
-                    {c}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-rose-50/50 border border-rose-200/80 space-y-2.5">
-              <h4 className="text-xs font-bold text-rose-800 uppercase tracking-wider">
-                Bẫy Thuật Ngữ Cần Lưu Ý ({extractedDraft.jargonTraps.length})
-              </h4>
-              <div className="flex flex-wrap gap-1.5">
-                {extractedDraft.jargonTraps.map((j, i) => (
-                  <span
-                    key={i}
-                    className="text-xs font-semibold bg-white text-rose-900 px-2.5 py-1 rounded-lg border border-rose-200 shadow-2xs"
-                  >
-                    {j}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <button
-              onClick={handleReset}
-              className="w-full sm:w-auto py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
-            >
-              [ Tải Lên Tài Liệu Khác ]
-            </button>
-
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              {isCuratorOrAdmin ? (
-                <button
-                  onClick={() => navigate("/curator/validation")}
-                  className="w-full sm:w-auto py-2.5 px-5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white text-xs font-black shadow-md hover:shadow-lg transition-all cursor-pointer"
-                >
-                  [ Đi Đến Bàn Thẩm Định Để Phê Duyệt Ngay → ]
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    toast.success("Bài học đã được gửi tới Hội đồng Thẩm định viên thành công!");
-                    navigate("/topics");
-                  }}
-                  className="w-full sm:w-auto py-2.5 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-md hover:shadow-lg transition-all cursor-pointer"
-                >
-                  [ Xác Nhận &amp; Gửi Vào Hàng Đợi Thẩm Định ]
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 };
