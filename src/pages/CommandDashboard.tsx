@@ -13,6 +13,8 @@ import { MasteryCardPreview } from "@/components/shared/MasteryCardPreview";
 import { useModalStore } from "@/hooks/useModalStore";
 import { useGamificationStore } from "@/hooks/useGamificationStore";
 import { useNotificationStore } from "@/hooks/useNotificationStore";
+import { useAuthStore } from "@/hooks/useAuthStore";
+import { supabase } from "@/lib/supabase";
 import { getPersonaById } from "@/config/personas.config";
 import { SupabaseService } from "@/lib/services/supabase-service";
 import type { FeynmanSession, VaultRecord } from "@/types/session.types";
@@ -41,6 +43,26 @@ export const CommandDashboard: React.FC = () => {
       ]);
       setSessions(fetchedSessions);
       setVaultItems(fetchedVault);
+
+      // Đồng bộ profile & streak từ Supabase nếu có id hợp lệ
+      const currentUser = useAuthStore.getState().user;
+      if (currentUser?.id) {
+        try {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("streak_count, total_xp")
+            .eq("id", currentUser.id)
+            .maybeSingle();
+
+          if (profile) {
+            useGamificationStore
+              .getState()
+              .resetForUser(profile.streak_count ?? 0, profile.total_xp ?? 0);
+          }
+        } catch {
+          // ignore error if offline or network fail
+        }
+      }
 
       // Kiểm tra và đẩy thông báo tự động (Scheduled/On-load Notification)
       // 1. Thẻ đến hạn ôn tập SM-2

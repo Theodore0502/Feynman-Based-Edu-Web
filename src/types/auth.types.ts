@@ -21,6 +21,7 @@ export interface UserProfile {
   assignedDomains?: string[]; // IDs của các Nhóm Ngành phụ trách (Dành riêng cho Curator)
   masteryPoints?: number;
   clarityAverage?: number;
+  streakCount?: number;
   createdAt: string;
 }
 

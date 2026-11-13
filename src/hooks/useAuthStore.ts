@@ -14,6 +14,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { supabase } from "@/lib/supabase";
 import { UserProfile, UserRole } from "../types/auth.types";
+import { useGamificationStore } from "./useGamificationStore";
 
 export interface AuthResponse {
   success: boolean;
@@ -73,6 +74,7 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
       fieldOfStudy: "Công Nghệ Thông Tin & Toán",
       masteryPoints: 480,
       clarityAverage: 82,
+      streakCount: 14,
       createdAt: "2026-11-01T08:00:00Z",
     },
   },
@@ -89,6 +91,7 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
       assignedDomains: ["dom-it", "dom-cs", "dom-se"],
       masteryPoints: 1600,
       clarityAverage: 94,
+      streakCount: 28,
       createdAt: "2026-11-05T08:00:00Z",
     },
   },
@@ -114,6 +117,7 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
       ],
       masteryPoints: 2500,
       clarityAverage: 98,
+      streakCount: 45,
       createdAt: "2026-10-15T00:00:00Z",
     },
   },
@@ -131,6 +135,7 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
       fieldOfStudy: "Khoa Học Máy Tính & Lập Trình Web",
       masteryPoints: 0,
       clarityAverage: 0,
+      streakCount: 0,
       createdAt: "2026-11-13T00:00:00Z",
     },
   },
@@ -146,6 +151,7 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
       fieldOfStudy: "Thương Mại Điện Tử & Marketing Số",
       masteryPoints: 0,
       clarityAverage: 0,
+      streakCount: 0,
       createdAt: "2026-11-13T00:00:00Z",
     },
   },
@@ -161,6 +167,7 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
       fieldOfStudy: "Y Khoa & Dược Học Cơ Bản",
       masteryPoints: 0,
       clarityAverage: 0,
+      streakCount: 0,
       createdAt: "2026-11-13T00:00:00Z",
     },
   },
@@ -177,6 +184,7 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
       assignedDomains: ["dom-it", "dom-cs", "dom-se", "dom-ecom", "dom-med"],
       masteryPoints: 0,
       clarityAverage: 0,
+      streakCount: 0,
       createdAt: "2026-11-13T00:00:00Z",
     },
   },
@@ -203,6 +211,7 @@ export const PRECONFIGURED_USERS: Record<string, { password: string; profile: Us
       ],
       masteryPoints: 0,
       clarityAverage: 0,
+      streakCount: 0,
       createdAt: "2026-11-13T00:00:00Z",
     },
   },
@@ -257,6 +266,10 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             loginError: null,
           });
+          useGamificationStore.getState().resetForUser(
+            targetEntry.profile.streakCount ?? 0,
+            targetEntry.profile.masteryPoints ?? 0
+          );
           return { success: true };
         }
 
@@ -308,6 +321,22 @@ export const useAuthStore = create<AuthState>()(
           }
 
           if (data.user) {
+            let streakCount = 0;
+            let totalXp = 0;
+            try {
+              const { data: dbProfile } = await supabase
+                .from("profiles")
+                .select("streak_count, total_xp")
+                .eq("id", data.user.id)
+                .maybeSingle();
+              if (dbProfile) {
+                streakCount = dbProfile.streak_count ?? 0;
+                totalXp = dbProfile.total_xp ?? 0;
+              }
+            } catch (e) {
+              // ignore
+            }
+
             const userMeta = data.user.user_metadata || {};
             const profile: UserProfile = {
               id: data.user.id,
@@ -317,8 +346,9 @@ export const useAuthStore = create<AuthState>()(
               displayName: userMeta.full_name || data.user.email?.split("@")[0] || "Học viên Elis",
               role: (userMeta.role as UserRole) || "learner",
               fieldOfStudy: userMeta.field_of_study || "Phương pháp Feynman",
-              masteryPoints: 0,
+              masteryPoints: totalXp,
               clarityAverage: 0,
+              streakCount: streakCount,
               createdAt: data.user.created_at,
             };
 
@@ -328,6 +358,7 @@ export const useAuthStore = create<AuthState>()(
               isLoading: false,
               loginError: null,
             });
+            useGamificationStore.getState().resetForUser(streakCount, totalXp);
             return { success: true };
           }
 
@@ -591,27 +622,34 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: false,
           loginError: null,
         });
+        useGamificationStore.getState().resetForUser(0, 0);
       },
 
       switchRole: (newRole: UserRole) => {
         if (newRole === "admin") {
+          const p = PRECONFIGURED_USERS.admin123.profile;
           set({
-            user: PRECONFIGURED_USERS.admin123.profile,
+            user: p,
             isAuthenticated: true,
             loginError: null,
           });
+          useGamificationStore.getState().resetForUser(p.streakCount ?? 0, p.masteryPoints ?? 0);
         } else if (newRole === "curator") {
+          const p = PRECONFIGURED_USERS.curator123.profile;
           set({
-            user: PRECONFIGURED_USERS.curator123.profile,
+            user: p,
             isAuthenticated: true,
             loginError: null,
           });
+          useGamificationStore.getState().resetForUser(p.streakCount ?? 0, p.masteryPoints ?? 0);
         } else {
+          const p = PRECONFIGURED_USERS.learn123.profile;
           set({
-            user: PRECONFIGURED_USERS.learn123.profile,
+            user: p,
             isAuthenticated: true,
             loginError: null,
           });
+          useGamificationStore.getState().resetForUser(p.streakCount ?? 0, p.masteryPoints ?? 0);
         }
       },
 

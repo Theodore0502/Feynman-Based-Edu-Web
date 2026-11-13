@@ -20,20 +20,36 @@ interface GamificationStore extends GamificationState {
   recordCustomCardCreate: () => { xpGained: number };
   syncStreak: () => void;
   getLevelDetails: () => ReturnType<typeof calculateLevelFromXp>;
+  resetForUser: (streakCount?: number, totalXp?: number) => void;
 }
 
 export const useGamificationStore = create<GamificationStore>()(
   persist(
     (set, get) => ({
-      streakCount: 14,
-      lastActiveDate: getTodayDateString(),
-      totalXp: 850,
-      currentLevel: 3,
-      levelTitle: "Người Hướng Dẫn",
-      nextLevelXp: 1500,
-      sessionsCompleted: 12,
-      flashcardsReviewed: 28,
-      badgesUnlocked: ["first_lecture", "jargon_slayer", "streak_7"],
+      streakCount: 0,
+      lastActiveDate: null,
+      totalXp: 0,
+      currentLevel: 1,
+      levelTitle: "Tập Sự Feynman",
+      nextLevelXp: 250,
+      sessionsCompleted: 0,
+      flashcardsReviewed: 0,
+      badgesUnlocked: [],
+
+      resetForUser: (streakCount = 0, totalXp = 0) => {
+        const levelInfo = calculateLevelFromXp(totalXp);
+        set({
+          streakCount,
+          lastActiveDate: null,
+          totalXp,
+          currentLevel: levelInfo.level,
+          levelTitle: levelInfo.title,
+          nextLevelXp: levelInfo.nextLevelXp,
+          sessionsCompleted: 0,
+          flashcardsReviewed: 0,
+          badgesUnlocked: [],
+        });
+      },
 
       syncStreak: () => {
         const { streakCount, lastActiveDate } = get();
