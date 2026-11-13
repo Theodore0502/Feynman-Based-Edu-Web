@@ -134,14 +134,10 @@ export const MaterialUploadHub: React.FC = () => {
     return subjects.filter((s) => allowed.has(s.id) || s.domainId === selectedDomainId);
   }, [selectedDomainId, subjects, domainSubjects]);
 
-  // Update default subject when domain changes
+  // Update default subject when domain changes (chỉ gán nếu chưa có môn nào được chọn)
   useEffect(() => {
-    if (availableSubjects.length > 0) {
-      if (!availableSubjects.some((s) => s.id === selectedSubjectId)) {
-        setSelectedSubjectId(availableSubjects[0].id);
-      }
-    } else {
-      setSelectedSubjectId("");
+    if (!selectedSubjectId && availableSubjects.length > 0) {
+      setSelectedSubjectId(availableSubjects[0].id);
     }
   }, [selectedDomainId, availableSubjects, selectedSubjectId]);
 
@@ -210,6 +206,10 @@ export const MaterialUploadHub: React.FC = () => {
     try {
       const scanRes = await FastDocumentScanner.scanDocument(file);
 
+      const primarySubId = scanRes.primarySubject.subjectId;
+      const primSub = subjects.find((s) => s.id === primarySubId);
+      const primDomId = primSub?.domainId || scanRes.primarySubject.domainId;
+
       setUploadedDocs((prev) =>
         prev.map((doc) => {
           if (doc.id !== recordId) return doc;
@@ -220,10 +220,10 @@ export const MaterialUploadHub: React.FC = () => {
             isScanning: false,
             selectedSplitMode: scanRes.splitMode,
             classification: {
-              domainId: scanRes.primarySubject.domainId,
+              domainId: primDomId,
               domainSlug: scanRes.primarySubject.domainSlug,
               domainName: scanRes.primarySubject.domainName,
-              subjectId: scanRes.primarySubject.subjectId,
+              subjectId: primarySubId,
               subjectSlug: scanRes.primarySubject.subjectId.replace(/^sub-/, ""),
               subjectName: scanRes.primarySubject.subjectName,
               confidenceScore: Math.min(99, Math.max(75, scanRes.primarySubject.percentage)),
@@ -240,10 +240,8 @@ export const MaterialUploadHub: React.FC = () => {
 
       // Nếu đây là tài liệu đang chọn hoặc chưa có tài liệu nào khác được chọn chủ động
       if (activeDocIdRef.current === recordId || !activeDocIdRef.current) {
-        setSelectedDomainId(scanRes.primarySubject.domainId);
-        setTimeout(() => {
-          setSelectedSubjectId(scanRes.primarySubject.subjectId);
-        }, 50);
+        setSelectedDomainId(primDomId);
+        setSelectedSubjectId(primarySubId);
 
         if (scanRes.isMultiSubject && scanRes.secondarySubject) {
           toast.success(
@@ -1126,80 +1124,186 @@ export const MaterialUploadHub: React.FC = () => {
                     </div>
                   )}
 
-                {/* 1. KHỐI PHÂN LOẠI & ĐỊNH DANH HỌC THUẬT */}
-                <div className="space-y-3 p-4 rounded-2xl bg-slate-50/70 border border-slate-200/90">
+                {/* 1. KHỐI PHÂN LOẠI & ĐỊNH DANH HỌC THUẬT ĐA NHÃN (MULTI-LABEL TAXONOMY) */}
+                <div className="space-y-4 p-4 rounded-2xl bg-slate-50/70 border border-slate-200/90">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">
-                      Phân Loại Học Thuật
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-black text-slate-800 uppercase tracking-wider block">
+                        Định Danh &amp; Đa Nhãn Học Thuật
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[10px] font-black uppercase">
+                        Đa Nhãn AI
+                      </span>
+                    </div>
                     <span className="text-[10px] font-bold text-slate-400">
                       Cây Tri Thức Supabase
                     </span>
                   </div>
 
-                  {/* Nhóm Ngành & Môn Học */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
-                        <span>Nhóm Ngành (Cấp 1)</span>
+                  {/* A. CÁC NHÓM NGÀNH LIÊN QUAN (MULTI-DOMAIN TAGS VỚI %) */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-700 block">
+                        Nhóm Ngành Liên Quan (Cấp 1):
                       </label>
-                      <select
-                        value={selectedDomainId}
-                        onChange={(e) => {
-                          const newDomainId = e.target.value;
-                          setSelectedDomainId(newDomainId);
-                          const meta = TaxonomyClassifier.generateMetadataForSelection(
-                            activeDoc.name,
-                            newDomainId,
-                            selectedSubjectId
-                          );
-                          activeDoc.classification = {
-                            domainId: newDomainId,
-                            subjectId: selectedSubjectId,
-                            confidenceScore: activeDoc.classification?.confidenceScore || 92,
-                            matchedKeywords: activeDoc.classification?.matchedKeywords || [],
-                            ...meta,
-                          };
-                          setUploadedDocs([...uploadedDocs]);
-                        }}
-                        disabled={isCurrentlyExtracting}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer disabled:opacity-50"
-                      >
-                        {domains.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name}
-                          </option>
-                        ))}
-                      </select>
+                      <span className="text-[10px] text-slate-400 font-normal">
+                        Bấm nhãn để chọn ngành chính
+                      </span>
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
-                        <span>Môn Học Trực Thuộc (Cấp 2)</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {activeScanResult?.relatedDomains && activeScanResult.relatedDomains.length > 0 ? (
+                        activeScanResult.relatedDomains.map((domTag) => {
+                          const isSelected = selectedDomainId === domTag.domainId;
+                          return (
+                            <button
+                              key={domTag.domainId}
+                              type="button"
+                              onClick={() => {
+                                setSelectedDomainId(domTag.domainId);
+                                if (activeDoc) {
+                                  const meta = TaxonomyClassifier.generateMetadataForSelection(
+                                    activeDoc.name,
+                                    domTag.domainId,
+                                    selectedSubjectId
+                                  );
+                                  activeDoc.classification = {
+                                    domainId: domTag.domainId,
+                                    subjectId: selectedSubjectId,
+                                    confidenceScore: activeDoc.classification?.confidenceScore || 95,
+                                    matchedKeywords: activeDoc.classification?.matchedKeywords || [],
+                                    ...meta,
+                                  };
+                                  setUploadedDocs([...uploadedDocs]);
+                                }
+                              }}
+                              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                                isSelected
+                                  ? "bg-blue-600 text-white border-blue-700 shadow-xs ring-2 ring-blue-500/20"
+                                  : "bg-white text-slate-700 border-slate-200 hover:border-blue-300"
+                              }`}
+                            >
+                              <span>{domTag.domainName}</span>
+                              <span
+                                className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-black ${
+                                  isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                                }`}
+                              >
+                                {domTag.percentage}%
+                              </span>
+                              {domTag.isPrimary && (
+                                <span className={`text-[9px] uppercase font-black tracking-wider ${isSelected ? "text-amber-200" : "text-amber-600"}`}>
+                                  [CHÍNH]
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="text-xs text-slate-400">Đang cập nhật danh mục ngành...</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* B. CÁC MÔN HỌC TRỰC THUỘC & LIÊN QUAN (MULTI-SUBJECT TAGS VỚI %) */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-700 block">
+                        Môn Học Trực Thuộc &amp; Liên Quan (Cấp 2):
                       </label>
+                      <span className="text-[10px] text-slate-400 font-normal">
+                        Bấm nhãn để chọn môn trích xuất chính
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {activeScanResult?.relatedSubjects && activeScanResult.relatedSubjects.length > 0 ? (
+                        activeScanResult.relatedSubjects.map((subTag) => {
+                          const isSelected = selectedSubjectId === subTag.subjectId;
+                          return (
+                            <button
+                              key={subTag.subjectId}
+                              type="button"
+                              onClick={() => {
+                                setSelectedSubjectId(subTag.subjectId);
+                                const sub = subjects.find((s) => s.id === subTag.subjectId);
+                                const targetDomId = sub?.domainId || subTag.domainId || selectedDomainId;
+                                setSelectedDomainId(targetDomId);
+                                if (activeDoc) {
+                                  const meta = TaxonomyClassifier.generateMetadataForSelection(
+                                    activeDoc.name,
+                                    targetDomId,
+                                    subTag.subjectId
+                                  );
+                                  activeDoc.classification = {
+                                    domainId: targetDomId,
+                                    subjectId: subTag.subjectId,
+                                    confidenceScore: 95,
+                                    matchedKeywords: [subTag.subjectName],
+                                    ...meta,
+                                  };
+                                  setUploadedDocs([...uploadedDocs]);
+                                }
+                              }}
+                              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+                                isSelected
+                                  ? "bg-indigo-600 text-white border-indigo-700 shadow-xs ring-2 ring-indigo-500/20"
+                                  : "bg-white text-slate-700 border-slate-200 hover:border-indigo-300"
+                              }`}
+                            >
+                              <span>{subTag.subjectName}</span>
+                              <span
+                                className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-black ${
+                                  isSelected ? "bg-white/20 text-white" : "bg-indigo-50 text-indigo-700"
+                                }`}
+                              >
+                                {subTag.percentage}%
+                              </span>
+                              {subTag.isPrimary && (
+                                <span className={`text-[9px] uppercase font-black tracking-wider ${isSelected ? "text-amber-200" : "text-amber-600"}`}>
+                                  [MÔN CHÍNH]
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="text-xs text-slate-400">Đang cập nhật danh mục môn học...</div>
+                      )}
+                    </div>
+
+                    {/* Dropdown bổ sung môn học từ CSDL nếu muốn đổi sang môn khác */}
+                    <div className="pt-1 flex items-center gap-2">
+                      <span className="text-[10px] text-slate-500 font-bold shrink-0">Hoặc chọn môn khác từ CSDL:</span>
                       <select
                         value={selectedSubjectId}
                         onChange={(e) => {
                           const newSubId = e.target.value;
                           setSelectedSubjectId(newSubId);
-                          const meta = TaxonomyClassifier.generateMetadataForSelection(
-                            activeDoc.name,
-                            selectedDomainId,
-                            newSubId
-                          );
-                          activeDoc.classification = {
-                            domainId: selectedDomainId,
-                            subjectId: newSubId,
-                            confidenceScore: activeDoc.classification?.confidenceScore || 92,
-                            matchedKeywords: activeDoc.classification?.matchedKeywords || [],
-                            ...meta,
-                          };
-                          setUploadedDocs([...uploadedDocs]);
+                          const sub = subjects.find((s) => s.id === newSubId);
+                          if (sub?.domainId) {
+                            setSelectedDomainId(sub.domainId);
+                          }
+                          if (activeDoc) {
+                            const meta = TaxonomyClassifier.generateMetadataForSelection(
+                              activeDoc.name,
+                              sub?.domainId || selectedDomainId,
+                              newSubId
+                            );
+                            activeDoc.classification = {
+                              domainId: sub?.domainId || selectedDomainId,
+                              subjectId: newSubId,
+                              confidenceScore: 92,
+                              matchedKeywords: [sub?.name || ""],
+                              ...meta,
+                            };
+                            setUploadedDocs([...uploadedDocs]);
+                          }
                         }}
                         disabled={isCurrentlyExtracting || availableSubjects.length === 0}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer disabled:opacity-50"
+                        className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
                       >
-                        {availableSubjects.map((s) => (
+                        {subjects.map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.name}
                           </option>
@@ -1268,7 +1372,6 @@ export const MaterialUploadHub: React.FC = () => {
                         </p>
 
                         <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                          {/* Gợi ý 1: Thêm số phiên bản 2, 3, 4 */}
                           <button
                             type="button"
                             onClick={() => handleApplyVersionedTitle(titleConflictAdvice.versionedTitle)}
@@ -1278,7 +1381,6 @@ export const MaterialUploadHub: React.FC = () => {
                             [ Thêm Số: (Phiên Bản {titleConflictAdvice.nextVersionNumber}) ]
                           </button>
 
-                          {/* Gợi ý 2: Thêm số phần 2, 3, 4 */}
                           <button
                             type="button"
                             onClick={() => handleApplyVersionedTitle(titleConflictAdvice.partTitle)}
@@ -1288,7 +1390,6 @@ export const MaterialUploadHub: React.FC = () => {
                             [ Thêm Số: (Phần {titleConflictAdvice.nextVersionNumber}) ]
                           </button>
 
-                          {/* Gợi ý 3: Gộp vào bài giảng hiện có */}
                           <button
                             type="button"
                             onClick={() =>
@@ -1305,131 +1406,26 @@ export const MaterialUploadHub: React.FC = () => {
                       </div>
                     )}
                   </div>
-
-                  {/* URL Reference Link chuẩn */}
-                  {aiClassification?.refLink && (
-                    <div className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-slate-100/90 text-xs">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="font-mono text-[10px] font-bold text-slate-400 uppercase shrink-0">
-                          Link:
-                        </span>
-                        <span className="font-mono text-[11px] text-indigo-600 truncate">
-                          {aiClassification.refLink}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(aiClassification.refLink);
-                          setIsCopied(true);
-                          toast.success("Đã sao chép liên kết!");
-                          setTimeout(() => setIsCopied(false), 2000);
-                        }}
-                        className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 shrink-0 cursor-pointer"
-                      >
-                        {isCopied ? "[ĐÃ SAO CHÉP]" : "[SAO CHÉP LINK]"}
-                      </button>
-                    </div>
-                  )}
                 </div>
 
-                {/* 2. PHƯƠNG ÁN A: GITHUB-STYLE MULTI-DOMAIN LANGUAGE BAR */}
-                {activeScanResult && activeScanResult.distributions.length > 0 ? (
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                        Phân Bổ Ngữ Nghĩa Môn Học
-                      </span>
-                      <span className="text-[10px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
-                        {activeScanResult.isMultiSubject ? "Tài Liệu Đa Môn" : "Tài Liệu Đơn Môn"}
-                      </span>
-                    </div>
-
-                    {/* Thanh tỷ lệ % phân bổ ngang đa màu */}
-                    <div className="h-2.5 w-full bg-slate-200 rounded-full flex overflow-hidden p-0.5 shadow-inner">
-                      {activeScanResult.distributions.map((dist, idx) => (
-                        <div
-                          key={idx}
-                          style={{
-                            width: `${dist.percentage}%`,
-                            backgroundColor: dist.color,
-                          }}
-                          className="h-full rounded-sm transition-all duration-300"
-                          title={`${dist.subjectName}: ${dist.percentage}%`}
-                        />
-                      ))}
-                    </div>
-
-                    {/* Bảng chú giải các môn học dạng lưới 2 cột gọn gàng */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-0.5">
-                      {activeScanResult.distributions.map((dist, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-white border border-slate-200/80"
-                        >
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span
-                              className="w-2 h-2 rounded-full inline-block shrink-0"
-                              style={{ backgroundColor: dist.color }}
-                            />
-                            <span className="font-semibold text-slate-700 truncate text-[11px]">
-                              {dist.subjectName}
-                            </span>
-                          </div>
-                          <span className="font-mono text-xs font-bold text-slate-800 shrink-0 ml-1.5">
-                            {dist.percentage}%
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Khái niệm ngữ nghĩa nhận diện được */}
-                    {activeScanResult.primarySubject.matchedKeywords.filter(
-                      (k) => k.length > 2 && !/^[a-z]+$/.test(k)
-                    ).length > 0 && (
-                      <div className="space-y-1 pt-1.5 border-t border-slate-200/60">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                          Khái niệm nhận diện:
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {activeScanResult.primarySubject.matchedKeywords
-                            .filter((k) => k.length > 2 && !/^[a-z]+$/.test(k))
-                            .slice(0, 4)
-                            .map((kw, kIdx) => (
-                              <span
-                                key={kIdx}
-                                className="px-2 py-0.5 rounded-md bg-white text-slate-700 text-[10px] font-medium border border-slate-200"
-                              >
-                                {kw}
-                              </span>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : null}
-
-                {/* 3. PHƯƠNG ÁN B: SEMANTIC CHAPTER SPLITTER (Khi phát hiện tài liệu đa học phần / liên ngành) */}
+                {/* 2. PHÂN ĐOẠN RANH GIỚI CHƯƠNG MỤC (SEMANTIC SPLITTER) */}
                 {activeScanResult?.isMultiSubject && (
                   <div className="p-4 rounded-2xl bg-purple-50/80 border-2 border-purple-200 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="px-2 py-0.5 rounded bg-purple-700 text-white font-mono text-[10px] font-black uppercase">
-                          PHƯƠNG ÁN B
+                          ĐA HỌC PHẦN
                         </span>
                         <span className="text-xs font-black text-purple-950 uppercase tracking-wider">
-                          Phân Đoạn Ranh Giới Chương Mục
+                          Phân Đoạn Ranh Giới Chương Mục (Semantic Splitter)
                         </span>
                       </div>
-                      <span className="text-[10px] font-black uppercase bg-purple-200 text-purple-900 px-2 py-0.5 rounded">
-                        Semantic Splitter
-                      </span>
                     </div>
 
                     <p className="text-xs text-purple-900 leading-relaxed">
-                      Tài liệu này chứa nội dung của <strong>2 môn học khác nhau</strong> (
-                      {activeScanResult.primarySubject.subjectName} và{" "}
-                      {activeScanResult.secondarySubject?.subjectName}). Chọn phương án xử lý:
+                      Tài liệu liên ngành chứa kiến thức của nhiều môn học (
+                      {activeScanResult.relatedSubjects?.map((s) => `${s.subjectName} ${s.percentage}%`).join(", ") || activeScanResult.primarySubject.subjectName}
+                      ). Bạn có thể chọn cách thức tổ chức bài học:
                     </p>
 
                     {/* 2 Tùy chọn xử lý: Tích Hợp vs Tách Module */}
