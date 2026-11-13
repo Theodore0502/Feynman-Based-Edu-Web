@@ -455,7 +455,8 @@ export const MaterialUploadHub: React.FC = () => {
       });
       handleAddFiles([file]);
     } catch (err: any) {
-      toast.error(`Lỗi nạp tệp mẫu: ${err.message}`);
+      console.error("[ELIS AUDIT] Lỗi nạp tệp mẫu:", err);
+      toast.error("Không thể nạp tệp mẫu. Vui lòng kiểm tra lại cấu trúc tệp.");
     }
   };
 
@@ -537,8 +538,8 @@ export const MaterialUploadHub: React.FC = () => {
           : "AI Agent đã trích xuất & cập nhật dữ liệu thành công vào bảng thông tin bên phải!"
       );
     } catch (err: any) {
-      console.error("Lỗi trích xuất:", err);
-      toast.error("Có lỗi xảy ra trong quá trình xử lý bài học: " + err.message);
+      console.error("[ELIS AUDIT] Lỗi trích xuất:", err);
+      toast.error("Có lỗi xảy ra trong quá trình xử lý bài học.");
       setUploadedDocs((prev) =>
         prev.map((d) => (d.id === currentDocId ? { ...d, isExtracting: false, status: "ready" } : d))
       );

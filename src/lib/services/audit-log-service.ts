@@ -130,68 +130,88 @@ export const AuditLogService = {
   },
 
   /**
-   * Định dạng và in log trực tiếp lên Browser DevTools Console
+   * Định dạng và in log trực tiếp lên Browser DevTools Console (Không dùng groupCollapsed để luôn nhìn thấy ngay)
    */
   printToConsole(entry: AuditLogData, gmt7: FormattedGMT7Time) {
     if (typeof console === "undefined") return;
 
     const brandStyle =
-      "background: #1e1b4b; color: #818cf8; font-weight: 900; font-size: 10px; padding: 2px 6px; border-radius: 3px; border: 1px solid #4338ca;";
+      "background: #1e1b4b; color: #818cf8; font-weight: 900; font-size: 10px; padding: 2px 6px; border-radius: 3px;";
     
     // Màu badge theo vai trò người dùng (Learner, Curator, Admin, Guest)
-    let roleStyle = "background: #0284c7; color: #ffffff; font-weight: 800; font-size: 10px; padding: 2px 6px; border-radius: 3px;";
+    let roleStyle = "background: #0284c7; color: #ffffff; font-weight: 800; font-size: 10px; padding: 2px 5px; border-radius: 3px;";
     const roleUpper = (entry.userRole || "GUEST").toUpperCase();
     if (roleUpper === "ADMIN") {
-      roleStyle = "background: #7c3aed; color: #ffffff; font-weight: 900; font-size: 10px; padding: 2px 6px; border-radius: 3px;";
+      roleStyle = "background: #7c3aed; color: #ffffff; font-weight: 900; font-size: 10px; padding: 2px 5px; border-radius: 3px;";
     } else if (roleUpper === "CURATOR") {
-      roleStyle = "background: #d97706; color: #ffffff; font-weight: 800; font-size: 10px; padding: 2px 6px; border-radius: 3px;";
+      roleStyle = "background: #d97706; color: #ffffff; font-weight: 800; font-size: 10px; padding: 2px 5px; border-radius: 3px;";
     } else if (roleUpper === "GUEST" || roleUpper === "ANONYMOUS") {
-      roleStyle = "background: #475569; color: #e2e8f0; font-weight: 700; font-size: 10px; padding: 2px 6px; border-radius: 3px;";
+      roleStyle = "background: #475569; color: #e2e8f0; font-weight: 700; font-size: 10px; padding: 2px 5px; border-radius: 3px;";
     }
 
     const timeStyle =
-      "background: #064e3b; color: #34d399; font-weight: 700; font-size: 10px; padding: 2px 6px; border-radius: 3px;";
+      "color: #059669; font-weight: 800; font-size: 10px;";
 
     const catStyle =
-      "color: #6366f1; font-weight: 700; font-size: 11px;";
+      "color: #4f46e5; font-weight: 700; font-size: 11px;";
 
     const actionStyle =
-      "color: #0f172a; font-weight: 800; font-size: 11px;";
+      "color: #0f172a; font-weight: 900; font-size: 11px;";
 
-    const pathStyle =
-      "color: #64748b; font-size: 10px;";
+    const userLabel = entry.userName
+      ? `${entry.userName} (${entry.userRole || "guest"})`
+      : entry.userEmail || "anonymous";
 
-    const header = `%cELIS AUDIT%c %c${roleUpper}%c %c${gmt7.timeOnly}%c %c[${entry.category}]%c %c${entry.action}%c %c${entry.path || ""}`;
-
-    const userLabel = `${entry.userName || "Khách"} (${entry.userEmail || "anonymous"})`;
     const payloadHasData = Boolean(entry.details && Object.keys(entry.details).length > 0);
 
-    console.groupCollapsed(
-      header,
-      brandStyle,
-      "",
-      roleStyle,
-      "",
-      timeStyle,
-      "",
-      catStyle,
-      "",
-      actionStyle,
-      "",
-      pathStyle
-    );
+    const logMessage = `%c[ELIS AUDIT]%c %c${gmt7.formatted}%c %c[${roleUpper}]%c %c[${entry.category}]%c %c${entry.action}%c ${entry.path || "/"}`;
 
-    console.log("%c👤 Người thực hiện:", "color: #3b82f6; font-weight: bold;", userLabel);
-    console.log("%c🕒 Thời gian GMT+7:", "color: #10b981; font-weight: bold;", gmt7.formatted);
-    console.log("%c📍 Vị trí màn hình:", "color: #8b5cf6; font-weight: bold;", entry.path || window?.location?.pathname);
-    if (entry.component) {
-      console.log("%c🧩 Thành phần UI:", "color: #ec4899; font-weight: bold;", entry.component);
+    if (entry.status === "FAILED") {
+      console.error(
+        logMessage,
+        brandStyle,
+        "",
+        timeStyle,
+        "",
+        roleStyle,
+        "",
+        catStyle,
+        "",
+        "color: #dc2626; font-weight: 900;",
+        "",
+        payloadHasData ? entry.details : ""
+      );
+    } else if (entry.status === "WARNING") {
+      console.warn(
+        logMessage,
+        brandStyle,
+        "",
+        timeStyle,
+        "",
+        roleStyle,
+        "",
+        catStyle,
+        "",
+        "color: #d97706; font-weight: 900;",
+        "",
+        payloadHasData ? entry.details : ""
+      );
+    } else {
+      console.log(
+        logMessage,
+        brandStyle,
+        "",
+        timeStyle,
+        "",
+        roleStyle,
+        "",
+        catStyle,
+        "",
+        actionStyle,
+        "",
+        payloadHasData ? entry.details : ""
+      );
     }
-    if (payloadHasData) {
-      console.log("%c📦 Chi tiết hành động (Payload):", "color: #d97706; font-weight: bold;", entry.details);
-    }
-    console.log("%c🌐 Trình duyệt:", "color: #64748b;", navigator?.userAgent || "browser");
-    console.groupEnd();
   },
 
   /**
@@ -412,6 +432,14 @@ if (typeof window !== "undefined") {
       console.log("👉 %c__ELIS_AUDIT__.clear()%c : Xóa bộ nhớ log cục bộ", "color: #ef4444; font-weight: bold;", "");
     },
   };
+  // Thông báo trực tiếp lên Console ngay khi script khởi động
+  console.log(
+    "%c[ELIS AUDIT SYSTEM - GMT+7 KÍCH HOẠT]%c Mọi hành động trên web (Navigation, Click nút, Tải file, Thẩm định) của bất kỳ user nào đều được ghi nhận vào Supabase và Console này. Gõ %c__ELIS_AUDIT__.printTable()%c để xem bảng.",
+    "background: #1e1b4b; color: #34d399; font-weight: 800; font-size: 11px; padding: 3px 8px; border-radius: 4px;",
+    "color: #1e293b; font-weight: 600; font-size: 11px; margin-left: 6px;",
+    "color: #3b82f6; font-weight: bold; text-decoration: underline;",
+    "color: #1e293b;"
+  );
 }
 
 export default AuditLogService;

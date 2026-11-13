@@ -155,7 +155,6 @@ export const SystemLogger = {
             : "SYSTEM",
         component: fullEntry.source,
         status: fullEntry.status === "FAILURE" ? "FAILED" : "SUCCESS",
-        skipConsole: true, // SystemLogger đã tự in bảng màu chuyên dụng lên Console
         details: {
           message: fullEntry.message,
           payload: fullEntry.payload,
