@@ -30,6 +30,7 @@ import {
 
 export const CommandDashboard: React.FC = () => {
   const { openModal } = useModalStore();
+  const { user } = useAuthStore();
   const { streakCount, currentLevel, levelTitle, totalXp } = useGamificationStore();
   const [sessions, setSessions] = useState<FeynmanSession[]>([]);
   const [vaultItems, setVaultItems] = useState<VaultRecord[]>([]);
@@ -37,15 +38,15 @@ export const CommandDashboard: React.FC = () => {
   useEffect(() => {
     // Tải dữ liệu từ Supabase Cloud
     async function loadData() {
+      const currentUser = useAuthStore.getState().user;
       const [fetchedSessions, fetchedVault] = await Promise.all([
-        SupabaseService.getSessions(10),
+        SupabaseService.getSessions(10, currentUser?.id),
         SupabaseService.getVaultItems(),
       ]);
       setSessions(fetchedSessions);
       setVaultItems(fetchedVault);
 
       // Đồng bộ profile & streak từ Supabase nếu có id hợp lệ
-      const currentUser = useAuthStore.getState().user;
       if (currentUser?.id) {
         try {
           const { data: profile } = await supabase
@@ -81,21 +82,27 @@ export const CommandDashboard: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
     if (window.confirm("Bạn có chắc chắn muốn xóa bản ghi phiên học này không?")) {
-      await SupabaseService.deleteSession(id);
+      await SupabaseService.deleteSession(id, user?.id);
       setSessions((prev) => prev.filter((s) => s.id !== id));
     }
   };
 
-  const sampleReport = {
-    id: "rep-sample",
-    sessionId: "ses-sample",
-    clarityScore: 84,
-    logicCompleteness: 88,
-    bestAnalogy: "Docker giống như căn hộ chung cư xây sẵn, còn máy ảo giống mua cả khu đất tự xây móng.",
-    knowledgeGaps: ["Cơ chế cách ly Namespace", "Cgroup kiểm soát tài nguyên"],
-    summaryFeedback: "Giải thích rất hóm hỉnh và bình dân hóa chuẩn xác. Đã vượt qua kiểm tra của Bé Bo!",
-    createdAt: new Date().toISOString(),
-  };
+  // Tính độ thấu suốt trung bình từ các phiên đã hoàn thành thực tế
+  const completedSessions = sessions.filter(
+    (s) => s.status === "COMPLETED" && s.clarityScore > 0
+  );
+  const averageClarity =
+    completedSessions.length > 0
+      ? Math.round(
+          completedSessions.reduce((acc, s) => acc + s.clarityScore, 0) /
+            completedSessions.length
+        )
+      : user?.clarityAverage || 0;
+
+  // Lấy báo cáo gần nhất thực tế của người dùng
+  const latestSessionWithReport = sessions.find((s) => s.report);
+  const latestReport = latestSessionWithReport?.report || null;
+  const latestTopic = latestSessionWithReport?.topic || "";
 
   return (
     <div className="space-y-6">
@@ -157,7 +164,7 @@ export const CommandDashboard: React.FC = () => {
 
           {/* Khối 3 (Phải): Thẻ đo độ thấu suốt (Clarity Gauge) */}
           <div className="shrink-0 bg-white/80 backdrop-blur-md p-5 rounded-3xl border border-white/80 shadow-xs flex flex-col items-center self-center lg:self-auto">
-            <ClarityMeter score={82} variant="circle" />
+            <ClarityMeter score={averageClarity} variant="circle" />
             <span className="text-[11px] text-slate-500 font-semibold mt-2">Độ Thấu Suốt Tuần Này</span>
           </div>
         </div>
@@ -286,11 +293,39 @@ export const CommandDashboard: React.FC = () => {
 
         {/* Right: Featured Feynman Mastery Card Preview */}
         <div className="space-y-4">
-          <MasteryCardPreview
-            topic="Cơ chế Docker Container"
-            report={sampleReport}
-            onShare={() => openModal("SHARE_MASTERY", { topic: "Docker Container", score: 84 })}
-          />
+          {latestReport ? (
+            <MasteryCardPreview
+              topic={latestTopic || "Bài Giảng Gần Nhất"}
+              report={latestReport}
+              onShare={() =>
+                openModal("SHARE_MASTERY", {
+                  topic: latestTopic,
+                  score: latestReport.clarityScore,
+                })
+              }
+            />
+          ) : (
+            <div className="p-6 rounded-3xl bg-white border border-[#E8EEF8] shadow-subtle flex flex-col items-center text-center space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-[#EEF2FC] text-[#5066A1] flex items-center justify-center">
+                <Sparkles className="w-8 h-8 text-[#7286D3]" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-base font-bold text-slate-800">
+                  Chưa Có Thẻ Vinh Danh
+                </h4>
+                <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
+                  Hoàn thành bài giảng đầu tiên với phản xạ bình dân hóa để AI cấp Thẻ Feynman Mastery Card chứng nhận thấu suốt!
+                </p>
+              </div>
+              <Link
+                to="/stage"
+                className="px-5 py-2.5 rounded-2xl bg-[#7286D3] hover:bg-[#5066A1] text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+              >
+                <Mic className="w-4 h-4" />
+                <span>Bắt Đầu Giảng Ngay</span>
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

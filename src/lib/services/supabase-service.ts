@@ -16,20 +16,25 @@ import type { AnalyticalResult } from "@/types/agent.types";
 
 const LOCAL_SESSIONS_STORAGE_KEY = "theodore_persistent_sessions";
 
-function getLocalSessions(): FeynmanSession[] {
+function getLocalSessions(userId?: string): FeynmanSession[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(LOCAL_SESSIONS_STORAGE_KEY);
+    // Dọn dẹp key dùng chung cũ nếu còn sót lại từ phiên bản trước
+    if (localStorage.getItem(LOCAL_SESSIONS_STORAGE_KEY)) {
+      localStorage.removeItem(LOCAL_SESSIONS_STORAGE_KEY);
+    }
+    if (!userId) return [];
+    const raw = localStorage.getItem(`elis_sessions_${userId}`);
     return raw ? JSON.parse(raw) : [];
   } catch (e) {
     return [];
   }
 }
 
-function saveLocalSession(session: FeynmanSession) {
-  if (typeof window === "undefined") return;
+function saveLocalSession(session: FeynmanSession, userId?: string) {
+  if (typeof window === "undefined" || !userId) return;
   try {
-    const current = getLocalSessions();
+    const current = getLocalSessions(userId);
     const idx = current.findIndex((s) => s.id === session.id);
     let updated: FeynmanSession[];
     if (idx >= 0) {
@@ -38,7 +43,7 @@ function saveLocalSession(session: FeynmanSession) {
     } else {
       updated = [session, ...current];
     }
-    localStorage.setItem(LOCAL_SESSIONS_STORAGE_KEY, JSON.stringify(updated));
+    localStorage.setItem(`elis_sessions_${userId}`, JSON.stringify(updated));
   } catch (e) {
     console.error("Lỗi lưu session local:", e);
   }
@@ -89,14 +94,14 @@ export const SupabaseService = {
     }
 
     // Luôn lưu session vào bộ nhớ bền vững phía client
-    saveLocalSession(newSession);
+    saveLocalSession(newSession, (typeof window !== "undefined" ? JSON.parse(localStorage.getItem("theodore_auth_session") || "{}")?.state?.user?.id : undefined));
     return newSession;
   },
 
   /**
-   * Lấy danh sách các phiên giảng gần nhất
+   * Lấy danh sách các phiên giảng gần nhất của người dùng
    */
-  async getSessions(limit: number = 20): Promise<FeynmanSession[]> {
+  async getSessions(limit: number = 20, userId?: string): Promise<FeynmanSession[]> {
     let cloudSessions: FeynmanSession[] = [];
     try {
       const { data, error } = await supabase
@@ -129,11 +134,12 @@ export const SupabaseService = {
         }));
       }
     } catch (err) {
-      console.warn("Supabase getSessions fallback:", err);
+      console.warn("Supabase getSessions error:", err);
     }
 
-    // Kết hợp dữ liệu từ Cloud và LocalStorage (chống mất session khi offline/chưa chạy migration)
-    const local = getLocalSessions();
+    // Kết hợp dữ liệu từ Cloud và LocalStorage theo userId
+    const effectiveUserId = userId || (typeof window !== "undefined" ? JSON.parse(localStorage.getItem("theodore_auth_session") || "{}")?.state?.user?.id : undefined);
+    const local = getLocalSessions(effectiveUserId);
     const mergedMap = new Map<string, FeynmanSession>();
 
     cloudSessions.forEach((s) => mergedMap.set(s.id, s));
@@ -147,45 +153,7 @@ export const SupabaseService = {
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
 
-    if (result.length > 0) {
-      return result.slice(0, limit);
-    }
-
-    // Các phiên học ban đầu nếu người dùng mới tinh chưa giảng bài nào
-    const initialSamples: FeynmanSession[] = [
-      {
-        id: "ses-sample-1",
-        topic: "Thuật Toán Hạ Độ Dốc (Gradient Descent)",
-        personaId: "child_10yo",
-        difficulty: "MEDIUM",
-        status: "COMPLETED",
-        clarityScore: 88,
-        createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-      },
-      {
-        id: "ses-sample-2",
-        topic: "Công Nghệ Đóng Gói Docker Container",
-        personaId: "non_tech",
-        difficulty: "MEDIUM",
-        status: "COMPLETED",
-        clarityScore: 84,
-        createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-      },
-      {
-        id: "ses-sample-3",
-        topic: "Lý Thuyết Đồ Thị & Thuật Toán Dijkstra",
-        personaId: "farmer",
-        difficulty: "HARD",
-        status: "ACTIVE",
-        clarityScore: 65,
-        createdAt: new Date().toISOString(),
-      },
-    ];
-
-    if (typeof window !== "undefined") {
-      localStorage.setItem(LOCAL_SESSIONS_STORAGE_KEY, JSON.stringify(initialSamples));
-    }
-    return initialSamples;
+    return result.slice(0, limit);
   },
 
   /**
@@ -226,14 +194,15 @@ export const SupabaseService = {
       console.warn("Supabase getSessionById fallback:", err);
     }
 
-    const local = getLocalSessions();
+    const activeUserId = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("theodore_auth_session") || "{}")?.state?.user?.id : undefined;
+    const local = getLocalSessions(activeUserId);
     return local.find((s) => s.id === id) || null;
   },
 
   /**
    * Xóa 1 phiên giảng
    */
-  async deleteSession(id: string): Promise<boolean> {
+  async deleteSession(id: string, userId?: string): Promise<boolean> {
     try {
       await supabase.from("sessions").delete().eq("id", id);
     } catch (err) {
@@ -241,8 +210,11 @@ export const SupabaseService = {
     }
 
     if (typeof window !== "undefined") {
-      const local = getLocalSessions().filter((s) => s.id !== id);
-      localStorage.setItem(LOCAL_SESSIONS_STORAGE_KEY, JSON.stringify(local));
+      const activeUserId = userId || JSON.parse(localStorage.getItem("theodore_auth_session") || "{}")?.state?.user?.id;
+      if (activeUserId) {
+        const local = getLocalSessions(activeUserId).filter((s) => s.id !== id);
+        localStorage.setItem(`elis_sessions_${activeUserId}`, JSON.stringify(local));
+      }
     }
     return true;
   },
@@ -360,13 +332,14 @@ export const SupabaseService = {
 
     // Luôn cập nhật trạng thái session local thành COMPLETED
     if (typeof window !== "undefined") {
-      const local = getLocalSessions();
+      const activeUserId = JSON.parse(localStorage.getItem("theodore_auth_session") || "{}")?.state?.user?.id;
+      const local = getLocalSessions(activeUserId);
       const target = local.find((s) => s.id === sessionId);
       if (target) {
         target.status = "COMPLETED";
         target.clarityScore = clarityScore;
         target.report = reportData;
-        saveLocalSession(target);
+        saveLocalSession(target, activeUserId);
       }
     }
 
@@ -374,7 +347,7 @@ export const SupabaseService = {
   },
 
   /**
-   * Lấy danh sách từ vựng trong Vault
+   * Lấy danh sách từ vựng trong Vault (trả về danh sách thật từ database, không chèn thẻ giả lập)
    */
   async getVaultItems(): Promise<VaultRecord[]> {
     try {
@@ -383,7 +356,8 @@ export const SupabaseService = {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (error || !data || data.length === 0) throw error;
+      if (error) throw error;
+      if (!data || data.length === 0) return [];
 
       return data.map((item: any) => ({
         id: item.id,
@@ -394,25 +368,8 @@ export const SupabaseService = {
         createdAt: item.created_at,
       }));
     } catch (err) {
-      console.warn("Supabase getVaultItems fallback:", err);
-      return [
-        {
-          id: "v-1",
-          term: "Container (Docker)",
-          plainExplanation: "Một chiếc hộp chứa đầy đủ ứng dụng và mọi đồ đạc cần thiết để chạy ở bất kỳ máy tính nào mà không bị lỗi thiếu file.",
-          analogyUsed: "Căn hộ chung cư xây sẵn đầy đủ tiện nghi, chỉ việc xách vali vào ở.",
-          topic: "Cơ chế Docker",
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: "v-2",
-          term: "Lạm phát (Inflation)",
-          plainExplanation: "Hiện tượng đồng tiền bị giảm sức mua, khiến cùng một số tiền nhưng mua được ít hàng hóa hơn trước.",
-          analogyUsed: "Cuộc đấu giá chỉ có 5 ổ bánh mì nhưng ai tham gia cũng được phát thêm gấp đôi tiền xu.",
-          topic: "Lạm phát",
-          createdAt: new Date().toISOString(),
-        },
-      ];
+      console.warn("Supabase getVaultItems error:", err);
+      return [];
     }
   },
 

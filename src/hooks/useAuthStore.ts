@@ -260,6 +260,14 @@ export const useAuthStore = create<AuthState>()(
             };
           }
 
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("theodore_persistent_sessions");
+            if (targetEntry.profile.streakCount === 0) {
+              localStorage.removeItem(`elis_sessions_${targetEntry.profile.id}`);
+              localStorage.removeItem(`feynman_sm2_vault_${targetEntry.profile.id}`);
+            }
+          }
+
           set({
             user: targetEntry.profile,
             isAuthenticated: true,
@@ -616,6 +624,9 @@ export const useAuthStore = create<AuthState>()(
           await supabase.auth.signOut();
         } catch (e) {
           // Ignore
+        }
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("theodore_persistent_sessions");
         }
         set({
           user: null,

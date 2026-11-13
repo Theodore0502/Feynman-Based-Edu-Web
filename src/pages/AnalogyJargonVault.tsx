@@ -11,6 +11,7 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { SupabaseService } from "@/lib/services/supabase-service";
+import { useAuthStore } from "@/hooks/useAuthStore";
 import type { VaultRecord } from "@/types/session.types";
 import { QuickDrillFlashcard } from "@/components/vault/QuickDrillFlashcard";
 import {
@@ -168,9 +169,22 @@ export const AnalogyJargonVault: React.FC = () => {
   const [newAnalogy, setNewAnalogy] = useState("");
   const [newTopic, setNewTopic] = useState("");
 
+  const { user } = useAuthStore();
+  const isFreshAccount = Boolean(
+    user?.id &&
+      [
+        "126b06d4-d9b6-4832-adf5-23183fc36b48", // minhanh_it
+        "babb1001-d5a0-4cb1-b0c5-5032f3c974d7", // hoangnam_ecom
+        "9977e224-7beb-4db4-b49b-64f7b63afb7c", // thuha_med
+        "fa9bae41-b01a-417b-ae15-a46629f62a52", // quocbao_curator
+        "1eac20a1-477d-4a44-a2c9-3173dd5dc721", // phuonglinh_admin
+      ].includes(user.id)
+  );
+
   // Nạp dữ liệu từ LocalStorage hoặc Supabase
   useEffect(() => {
-    const saved = localStorage.getItem("feynman_sm2_vault");
+    const storageKey = user?.id ? `feynman_sm2_vault_${user.id}` : "feynman_sm2_vault";
+    const saved = localStorage.getItem(storageKey);
     if (saved) {
       try {
         setItems(JSON.parse(saved));
@@ -180,15 +194,23 @@ export const AnalogyJargonVault: React.FC = () => {
       }
     }
 
-    // Nếu chưa có local, nạp default
+    // Nếu là tài khoản mới tinh, bắt đầu từ danh sách rỗng 0 thẻ
+    if (isFreshAccount) {
+      setItems([]);
+      localStorage.setItem(storageKey, JSON.stringify([]));
+      return;
+    }
+
+    // Nếu là tài khoản mẫu thử nghiệm (learn123, curator123, admin123), nạp dữ liệu minh họa
     setItems(INITIAL_VAULT_CARDS);
-    localStorage.setItem("feynman_sm2_vault", JSON.stringify(INITIAL_VAULT_CARDS));
-  }, []);
+    localStorage.setItem(storageKey, JSON.stringify(INITIAL_VAULT_CARDS));
+  }, [user?.id, isFreshAccount]);
 
   // Lưu lại vào LocalStorage khi items thay đổi
   const saveItems = (updated: VaultRecord[]) => {
     setItems(updated);
-    localStorage.setItem("feynman_sm2_vault", JSON.stringify(updated));
+    const storageKey = user?.id ? `feynman_sm2_vault_${user.id}` : "feynman_sm2_vault";
+    localStorage.setItem(storageKey, JSON.stringify(updated));
   };
 
   // Tính số thẻ đến hạn hôm nay
