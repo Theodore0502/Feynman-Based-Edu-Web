@@ -23,6 +23,7 @@ export interface PageHeroBannerProps {
   mascotAlt?: string;
   mascotClassName?: string;
   className?: string;
+  compact?: boolean;
 }
 
 export const PageHeroBanner: React.FC<PageHeroBannerProps> = ({
@@ -35,10 +36,15 @@ export const PageHeroBanner: React.FC<PageHeroBannerProps> = ({
   mascotAlt = "Linh vật Elis",
   mascotClassName,
   className = "",
+  compact = false,
 }) => {
   return (
     <div
-      className={`relative overflow-hidden bg-gradient-to-r from-[#F0F4FC] via-[#F6F3FC] to-[#FCF4F7] border border-[#E2EAFD] rounded-3xl p-4 sm:p-6 shadow-xs ${className}`}
+      className={cn(
+        "relative overflow-hidden bg-gradient-to-r from-[#F0F4FC] via-[#F6F3FC] to-[#FCF4F7] border border-[#E2EAFD] rounded-3xl shadow-xs",
+        compact ? "p-3.5 sm:p-4 lg:p-5" : "p-4 sm:p-6",
+        className
+      )}
     >
       {/* Dreamy Hero Background Image (mờ nhẹ nhàng) */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
@@ -50,39 +56,58 @@ export const PageHeroBanner: React.FC<PageHeroBannerProps> = ({
         <div className="absolute inset-0 bg-gradient-to-r from-white/50 via-white/30 to-white/50 backdrop-blur-[0.5px]" />
       </div>
 
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+      <div
+        className={cn(
+          "flex flex-col lg:flex-row lg:items-center justify-between relative z-10",
+          compact ? "gap-4" : "gap-6"
+        )}
+      >
         {/* Khối 1 (Trái): Card nội dung chính & nút hành động */}
         <div
           className={cn(
-            "space-y-3 p-5 sm:p-6 rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs shrink-0",
+            "rounded-3xl bg-white/75 backdrop-blur-md border border-white/80 shadow-xs shrink-0",
+            compact ? "space-y-2 p-4 sm:p-5" : "space-y-3 p-5 sm:p-6",
             rightWidget
               ? "max-w-xl lg:max-w-lg xl:max-w-xl"
               : "max-w-xl lg:max-w-2xl xl:max-w-3xl"
           )}
         >
           {badge && <div>{badge}</div>}
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight leading-snug">
+          <h1
+            className={cn(
+              "font-black text-slate-800 tracking-tight leading-snug",
+              compact ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl"
+            )}
+          >
             {title}
           </h1>
-          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+          <p
+            className={cn(
+              "text-slate-600 leading-relaxed",
+              compact ? "text-xs sm:text-[13px]" : "text-xs sm:text-sm"
+            )}
+          >
             {description}
           </p>
           {actions && (
-            <div className="flex flex-wrap items-center gap-3 pt-1">
+            <div className="flex flex-wrap items-center gap-2.5 pt-1">
               {actions}
             </div>
           )}
         </div>
 
         {/* Khối 2 (Giữa): Linh vật Cú Theodore bay nổi sinh động ở không gian trung tâm */}
-        <div className="flex items-center justify-center flex-1 my-1 lg:my-0 relative">
+        <div className="flex items-center justify-center flex-1 my-0 relative">
           <div className="relative group transition-transform duration-300 hover:scale-105">
             <img
               src={mascotSrc}
               alt={mascotAlt}
               className={cn(
-                "object-contain filter drop-shadow-[0_16px_32px_rgba(114,134,211,0.32)] animate-float select-none pointer-events-none",
-                mascotClassName || "w-36 h-36 sm:w-48 sm:h-48 lg:w-56 lg:h-56 xl:w-60 xl:h-60"
+                "object-contain filter drop-shadow-[0_12px_24px_rgba(114,134,211,0.28)] animate-float select-none pointer-events-none",
+                mascotClassName ||
+                  (compact
+                    ? "w-28 h-28 sm:w-36 sm:h-36 lg:w-44 lg:h-44 max-h-44"
+                    : "w-36 h-36 sm:w-48 sm:h-48 lg:w-56 lg:h-56 xl:w-60 xl:h-60")
               )}
             />
           </div>
@@ -90,7 +115,12 @@ export const PageHeroBanner: React.FC<PageHeroBannerProps> = ({
 
         {/* Khối 3 (Phải): Thẻ widget hoặc chỉ số nổi bật */}
         {rightWidget && (
-          <div className="shrink-0 bg-white/80 backdrop-blur-md p-5 rounded-3xl border border-white/80 shadow-xs flex flex-col items-center justify-center self-center lg:self-auto min-w-[190px]">
+          <div
+            className={cn(
+              "shrink-0 bg-white/80 backdrop-blur-md rounded-3xl border border-white/80 shadow-xs flex flex-col items-center justify-center self-center lg:self-auto min-w-[190px]",
+              compact ? "p-4" : "p-5"
+            )}
+          >
             {rightWidget}
           </div>
         )}

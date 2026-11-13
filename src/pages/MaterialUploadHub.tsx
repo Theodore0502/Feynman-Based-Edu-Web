@@ -213,24 +213,25 @@ export const MaterialUploadHub: React.FC = () => {
 
   return (
     <div className="w-full space-y-6 pb-12">
-      {/* Top Banner Header Đồng Bộ Chuẩn Dashboard */}
+      {/* Top Banner Header Đồng Bộ Chuẩn Dashboard (Bản thu gọn Compact) */}
       <PageHeroBanner
+        compact={true}
         mascotSrc="/images/theodore-upload-owl.png"
         mascotAlt="Linh vật Tải tài liệu Elis"
-        mascotClassName="w-52 h-52 sm:w-64 sm:h-64 lg:w-80 lg:h-80 xl:w-96 xl:h-96"
+        mascotClassName="w-24 h-24 sm:w-32 sm:h-32 lg:w-36 lg:h-36 max-h-36"
         title={
           <>
             Tải Lên Tài Liệu &amp; Tự Động Hóa{" "}
             <span className="whitespace-nowrap">Bài Học Chuẩn Feynman</span>
           </>
         }
-        description="Tác nhân AI đọc sâu tài liệu học thuật (.pdf, .doc, .pptx), bóc tách cấu trúc ngữ nghĩa, tự động định danh các khái niệm cốt lõi (Required Concepts) và phát hiện bẫy thuật ngữ (Jargon Traps)."
+        description="Tác nhân AI đọc sâu tài liệu học thuật (.pdf, .doc, .pptx), bóc tách cấu trúc ngữ nghĩa, tự động định danh khái niệm cốt lõi và phát hiện bẫy thuật ngữ."
         actions={
           <>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="px-5 py-2.5 rounded-2xl bg-[#7286D3] hover:bg-[#5066A1] text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-[#7286D3] hover:bg-[#5066A1] text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer"
             >
               <UploadCloud className="w-4 h-4" />
               <span>Chọn Tệp Tải Lên Ngay</span>
@@ -238,7 +239,7 @@ export const MaterialUploadHub: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate("/curator/validation")}
-              className="px-5 py-2.5 rounded-2xl bg-white/90 hover:bg-white text-slate-700 text-xs font-bold border border-slate-200/80 shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+              className="px-4 py-2 rounded-xl bg-white/90 hover:bg-white text-slate-700 text-xs font-bold border border-slate-200/80 shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
             >
               <FileCheck className="w-4 h-4 text-indigo-600" />
               <span>Sang Bàn Thẩm Định</span>
