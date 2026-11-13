@@ -11,11 +11,14 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
 import "./lib/services/system-logger";
+import "./lib/services/audit-log-service";
 import { ModalProvider } from "./components/modals/ModalProvider";
+import { GlobalActivityTracker } from "./components/shared/GlobalActivityTracker";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
+      <GlobalActivityTracker />
       <App />
       <ModalProvider />
     </BrowserRouter>

@@ -9,6 +9,8 @@
  *   5. Hỗ trợ ghi tệp nhật ký logs/system_events.log trong môi trường Node.js (nếu có).
  */
 
+import { AuditLogService } from "./audit-log-service";
+
 export type LogLevel = "DEBUG" | "INFO" | "WARN" | "ERROR";
 
 export type LogSource =
@@ -137,6 +139,32 @@ export const SystemLogger = {
       } catch {
         // Bỏ qua lỗi quota storage
       }
+    }
+
+    // 4. Tự động đồng bộ lên Supabase qua AuditLogService kèm múi giờ GMT+7
+    try {
+      AuditLogService.logAction({
+        action: fullEntry.action,
+        category:
+          fullEntry.source === "AGENT_EXTRACTION" || fullEntry.source === "CURATOR_HUB"
+            ? "CURATION"
+            : fullEntry.source === "FEYNMAN_STAGE" || fullEntry.source === "LIVE_TRIAL"
+            ? "LEARNING"
+            : fullEntry.level === "ERROR"
+            ? "ERROR"
+            : "SYSTEM",
+        component: fullEntry.source,
+        status: fullEntry.status === "FAILURE" ? "FAILED" : "SUCCESS",
+        skipConsole: true, // SystemLogger đã tự in bảng màu chuyên dụng lên Console
+        details: {
+          message: fullEntry.message,
+          payload: fullEntry.payload,
+          error: fullEntry.error,
+          durationMs: fullEntry.durationMs,
+        },
+      });
+    } catch {
+      // Đảm bảo không gián đoạn luồng
     }
 
     return fullEntry;
