@@ -109,6 +109,27 @@ function countOccurrences(haystack: string, needle: string): number {
   return count;
 }
 
+// Từ điển từ viết tắt chuyên ngành học thuật chuẩn xác
+const ACADEMIC_ACRONYMS: Record<string, string[]> = {
+  ai: ["sub-cs-ai-ml"],
+  "tri tue nhan tao": ["sub-cs-ai-ml"],
+  cnpm: ["sub-se-patterns", "sub-se-testing", "sub-se-devops"],
+  "cong nghe phan mem": ["sub-se-patterns", "sub-se-testing"],
+  cntt: ["sub-networks", "sub-it-security", "sub-it-cloud", "sub-it-web", "sub-db"],
+  "cong nghe thong tin": ["sub-networks", "sub-it-security", "sub-it-cloud", "sub-it-web", "sub-db"],
+  csdl: ["sub-db"],
+  sql: ["sub-db"],
+  api: ["sub-it-web"],
+  rest: ["sub-it-web"],
+  "tcp/ip": ["sub-networks"],
+  osi: ["sub-networks"],
+  docker: ["sub-it-cloud"],
+  cloud: ["sub-it-cloud"],
+  devops: ["sub-se-devops"],
+  fintech: ["sub-ecom-payments"],
+  seo: ["sub-ecom-digital-mkt"],
+};
+
 export const FastDocumentScanner = {
   /**
    * Đọc lướt văn bản và phân tích ma trận nhãn đa chiều hoàn toàn động từ CSDL
@@ -118,7 +139,7 @@ export const FastDocumentScanner = {
   ): Promise<FastScanResult> {
     const parsed = await DocumentParser.parseDocument(file);
     const fullText = parsed.extractedText || "";
-    const rawTokens = extractTokens(fullText);
+    const textLower = fullText.toLowerCase();
     const textUnaccented = removeVietnameseTones(fullText);
     const suggestedTitle = extractBestVietnameseTitle(fullText, file.name);
 
@@ -126,17 +147,18 @@ export const FastDocumentScanner = {
     const lines = fullText.split("\n").map((l) => l.trim()).filter(Boolean);
     const rawHeadings: { index: number; text: string; lineIndex: number }[] = [];
 
-    const headingRegex = /^(phần|chương|bài|mục|chương\s+\d+|phần\s+[ivx\d]+|\d+\.|\#+)/i;
+    const headingRegex = /^(phần\s+\d+|chương\s+\d+|bài\s+\d+|mục\s+\d+|\#+)/i;
     lines.forEach((line, idx) => {
       if (
-        (headingRegex.test(line) || (line.length <= 90 && line === line.toUpperCase() && line.length > 5)) &&
-        !line.endsWith(".")
+        (headingRegex.test(line) || (line.length <= 80 && line === line.toUpperCase() && line.length >= 8)) &&
+        !line.endsWith(".") &&
+        rawHeadings.length < 8
       ) {
         rawHeadings.push({ index: rawHeadings.length + 1, text: line, lineIndex: idx });
       }
     });
 
-    // 2. Chấm điểm từng Môn học trong CSDL Supabase (Hoàn toàn ĐỘNG, không hardcode)
+    // 2. Chấm điểm từng Môn học trong CSDL Supabase (Hoàn toàn ĐỘNG, đối soát từ ghép chuẩn)
     const subjects = THREE_TIER_SUBJECTS;
     const domains = THREE_TIER_DOMAINS;
     const lectures = THREE_TIER_LECTURES;
@@ -147,58 +169,86 @@ export const FastDocumentScanner = {
       let score = 0;
       const matchedKeywords: string[] = [];
 
-      // A. Kiểm tra khớp tên môn học trong tên file và thân bài
-      if (file.name.toLowerCase().includes(sNameLower) || removeVietnameseTones(file.name).includes(sNameUnaccented)) {
-        score += 45;
-        if (!matchedKeywords.includes(sub.name)) {
-          matchedKeywords.push(sub.name);
+      // A. Khớp chính xác hoặc không dấu nguyên tên môn học trong tên file và thân bài
+      if (file.name.toLowerCase().includes(sNameLower) || textLower.includes(sNameLower)) {
+        score += 55;
+        if (!matchedKeywords.includes(sub.name)) matchedKeywords.push(sub.name);
+      } else if (
+        removeVietnameseTones(file.name).includes(sNameUnaccented) ||
+        textUnaccented.includes(sNameUnaccented)
+      ) {
+        score += 40;
+        if (!matchedKeywords.includes(sub.name)) matchedKeywords.push(sub.name);
+      }
+
+      // B. Khớp các cụm từ ghép (từ 2 từ trở lên) trong tên môn (Tuyệt đối không khớp âm tiết đơn lẻ)
+      const subPhrases = sub.name
+        .split(/[&,–—\-\/]+/)
+        .map((p) => p.trim())
+        .filter((p) => p.split(/\s+/).length >= 2);
+
+      for (const phrase of subPhrases) {
+        const pLower = phrase.toLowerCase();
+        const pUn = removeVietnameseTones(phrase);
+        if (textLower.includes(pLower)) {
+          score += 35;
+          if (!matchedKeywords.includes(phrase)) matchedKeywords.push(phrase);
+        } else if (textUnaccented.includes(pUn)) {
+          score += 25;
+          if (!matchedKeywords.includes(phrase)) matchedKeywords.push(phrase);
         }
       }
 
-      const subTokens = extractTokens(sub.name);
-      for (const token of subTokens) {
-        if (token.length >= 3) {
-          const tokenUn = removeVietnameseTones(token);
-          const occurrences = countOccurrences(textUnaccented, tokenUn);
-          if (occurrences > 0) {
-            score += Math.min(occurrences * 4, 30);
+      // C. Khớp tên Domain của môn học (Ví dụ tài liệu chứa "Công nghệ thông tin")
+      const rel = THREE_TIER_DOMAIN_SUBJECTS.find((ds) => ds.subject_id === sub.id);
+      const domain = rel ? domains.find((d) => d.id === rel.domain_id) || domains[0] : domains[0];
+      if (domain) {
+        const dNameLower = domain.name.toLowerCase();
+        const dNameUn = removeVietnameseTones(domain.name);
+        if (textLower.includes(dNameLower)) {
+          score += 30;
+          if (!matchedKeywords.includes(domain.name)) matchedKeywords.push(domain.name);
+        } else if (textUnaccented.includes(dNameUn)) {
+          score += 20;
+          if (!matchedKeywords.includes(domain.name)) matchedKeywords.push(domain.name);
+        }
+      }
+
+      // D. Khớp từ viết tắt chuyên môn chuẩn (AI, CNPM, CNTT, SQL, API, REST...)
+      for (const [acronym, targetSubIds] of Object.entries(ACADEMIC_ACRONYMS)) {
+        if (targetSubIds.includes(sub.id)) {
+          const isShort = acronym.length <= 4;
+          const regex = new RegExp(`\\b${acronym}\\b`, isShort ? "" : "i");
+          if (regex.test(fullText) || (acronym.length > 3 && textUnaccented.includes(acronym))) {
+            score += 35;
+            const tag = acronym.toUpperCase();
+            if (!matchedKeywords.includes(tag)) matchedKeywords.push(tag);
           }
         }
       }
 
-      // B. Kiểm tra mô tả môn học trong CSDL
-      if (sub.description) {
-        const descTokens = extractTokens(sub.description);
-        for (const token of descTokens) {
-          if (token.length >= 4) {
-            const tokenUn = removeVietnameseTones(token);
-            const occurrences = countOccurrences(textUnaccented, tokenUn);
-            if (occurrences > 0) {
-              score += Math.min(occurrences * 2, 20);
-            }
-          }
-        }
-      }
-
-      // C. Khớp nối ĐỘNG toàn bộ các Bài học (Topics) & Khái niệm cốt lõi (Concepts) thuộc môn này trong Supabase
+      // E. Khớp nối toàn bộ Bài học (Topics) & Khái niệm cốt lõi (Concepts) từ CSDL
       const subjectTopics = lectures.filter((l) => l.subjectId === sub.id);
       for (const topic of subjectTopics) {
-        // So khớp tiêu đề bài học
-        const tTitleUn = removeVietnameseTones(topic.title);
-        if (removeVietnameseTones(file.name).includes(tTitleUn) || textUnaccented.includes(tTitleUn)) {
+        const tLower = topic.title.toLowerCase();
+        const tUn = removeVietnameseTones(topic.title);
+        if (textLower.includes(tLower) || textUnaccented.includes(tUn)) {
           score += 25;
           if (!matchedKeywords.includes(topic.title) && matchedKeywords.length < 5) {
             matchedKeywords.push(topic.title);
           }
         }
 
-        // So khớp các khái niệm cốt lõi của bài học
+        // Khớp khái niệm cốt lõi: Chỉ xét các cụm từ (2 từ trở lên) hoặc từ kỹ thuật tiếng Anh
         for (const concept of topic.requiredConcepts || []) {
-          if (concept.length >= 3) {
+          const isTechWord = /^[A-Z0-9\.\-\/]{2,}$/.test(concept.trim());
+          const wordCount = concept.trim().split(/\s+/).length;
+
+          if (wordCount >= 2 || isTechWord) {
+            const cLower = concept.toLowerCase();
             const cUn = removeVietnameseTones(concept);
-            const occurrences = countOccurrences(textUnaccented, cUn);
-            if (occurrences > 0) {
-              score += Math.min(occurrences * 5, 25);
+            if (textLower.includes(cLower) || textUnaccented.includes(cUn)) {
+              score += 20;
               if (!matchedKeywords.includes(concept) && matchedKeywords.length < 5) {
                 matchedKeywords.push(concept);
               }
@@ -206,10 +256,6 @@ export const FastDocumentScanner = {
           }
         }
       }
-
-      // Xác định nhóm ngành từ liên kết quan hệ N-N THREE_TIER_DOMAIN_SUBJECTS
-      const rel = THREE_TIER_DOMAIN_SUBJECTS.find((ds) => ds.subject_id === sub.id);
-      const domain = rel ? domains.find((d) => d.id === rel.domain_id) || domains[0] : domains[0];
 
       return {
         subjectId: sub.id,
@@ -240,13 +286,13 @@ export const FastDocumentScanner = {
       });
     }
 
-    // 3. Tính toán Ma Trận % Phân Bổ Ngữ Nghĩa (GitHub Language Bar Distribution)
+    // 3. Tính toán Ma Trận % Phân Bổ Ngữ Nghĩa
     const topCandidates = sorted.slice(0, 4);
     const topScore = topCandidates[0].score;
 
-    // Chỉ giữ lại các môn có tỷ lệ điểm đáng kể so với môn đứng đầu (tối thiểu 18%)
+    // Chỉ giữ lại các môn có tỷ lệ điểm thực sự đáng kể (tối thiểu 30 điểm và >= 60% top score)
     const significantCandidates = topCandidates.filter(
-      (c, idx) => idx === 0 || c.score >= topScore * 0.2
+      (c, idx) => idx === 0 || (c.score >= 30 && c.score >= topScore * 0.6)
     );
 
     const totalSignificantScore = significantCandidates.reduce((acc, c) => acc + c.score, 0);
@@ -271,7 +317,15 @@ export const FastDocumentScanner = {
       distributions[0].percentage += 100 - sumPct;
     }
 
-    const isMultiSubject = distributions.length > 1 && distributions[1].percentage >= 18;
+    // Chỉ kết luận là tài liệu đa môn / liên ngành khi:
+    // 1. Có từ 2 môn trở lên
+    // 2. Hai môn thuộc 2 NHÓM NGÀNH (Domain) KHÁC NHAU
+    // 3. Môn thứ hai phải có điểm số thực chất (>= 35 điểm và >= 25% phân bổ)
+    const isMultiSubject =
+      distributions.length > 1 &&
+      distributions[0].domainId !== distributions[1].domainId &&
+      distributions[1].percentage >= 25 &&
+      (significantCandidates[1]?.score || 0) >= 35;
 
     // 4. Bóc tách phân đoạn chương (Phương án B: Semantic Splitter)
     const detectedModules: DetectedChapterModule[] = [];
@@ -391,7 +445,7 @@ export const FastDocumentScanner = {
       fileName: file.name,
       fileSizeBytes: file.size,
       totalCharacters: fullText.length,
-      totalWords: rawTokens.length,
+      totalWords: parsed.wordCount || fullText.split(/\s+/).filter(Boolean).length,
       suggestedTitle,
       canonicalSlug,
       refLink: `https://elis.edu.vn/materials/${primarySubject.domainSlug}/${toUrlSlug(primarySubject.subjectName)}/${canonicalSlug}`,
