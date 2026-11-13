@@ -245,18 +245,18 @@ export const MaterialUploadHub: React.FC = () => {
           setSelectedSubjectId(scanRes.primarySubject.subjectId);
         }, 50);
 
-        if (scanRes.isMultiSubject) {
+        if (scanRes.isMultiSubject && scanRes.secondarySubject) {
           toast.success(
-            `Đã cập nhật bảng thông tin: Tài liệu đa môn [${scanRes.primarySubject.subjectName} ${scanRes.primarySubject.percentage}% & ${scanRes.secondarySubject?.subjectName} ${scanRes.secondarySubject?.percentage}%]`
+            `Gemini AI: Nhận diện [${scanRes.suggestedTitle}] - Đa môn: ${scanRes.primarySubject.subjectName} (${scanRes.primarySubject.percentage}%) & ${scanRes.secondarySubject.subjectName} (${scanRes.secondarySubject.percentage}%)`
           );
         } else {
           toast.success(
-            `Đã cập nhật bảng thông tin: ${scanRes.primarySubject.subjectName} (${scanRes.primarySubject.percentage}% khớp)`
+            `Gemini AI: Nhận diện [${scanRes.suggestedTitle}] - Môn: ${scanRes.primarySubject.subjectName}`
           );
         }
       }
     } catch (err: any) {
-      console.warn("Fast scan non-blocking warning:", err);
+      console.warn("Gemini agent scan warning:", err);
       setUploadedDocs((prev) =>
         prev.map((doc) => (doc.id === recordId ? { ...doc, isScanning: false } : doc))
       );
@@ -287,7 +287,6 @@ export const MaterialUploadHub: React.FC = () => {
 
       const parts = file.name.split(".");
       const ext = parts.length > 1 ? parts[parts.length - 1].toUpperCase() : "DOC";
-      const fallbackClassification = TaxonomyClassifier.classifyDocument(file.name);
       const nowStr = new Date().toLocaleString("vi-VN", {
         hour: "2-digit",
         minute: "2-digit",
@@ -305,8 +304,8 @@ export const MaterialUploadHub: React.FC = () => {
         size: file.size,
         extension: ext,
         uploadedAt: nowStr,
-        suggestedTitle: fallbackClassification?.suggestedTitle || file.name.replace(/\.[^/.]+$/, ""),
-        classification: fallbackClassification,
+        suggestedTitle: file.name.replace(/\.[^/.]+$/, ""),
+        classification: null,
         scanResult: null,
         extractedDraft: null,
         isScanning: true,
@@ -316,7 +315,7 @@ export const MaterialUploadHub: React.FC = () => {
         status: "ready",
       });
 
-      // Kích hoạt quét AI lướt siêu tốc
+      // Kích hoạt Tác nhân Gemini đọc hiểu và phân tích văn bản thực tế
       runFastScanForDoc(newId, file);
     });
 
@@ -325,13 +324,6 @@ export const MaterialUploadHub: React.FC = () => {
       const primary = newDocs[0];
       setActiveDocId(primary.id);
       activeDocIdRef.current = primary.id;
-
-      if (primary.classification) {
-        setSelectedDomainId(primary.classification.domainId);
-        setTimeout(() => {
-          setSelectedSubjectId(primary.classification!.subjectId);
-        }, 50);
-      }
     }
   };
 
@@ -826,8 +818,8 @@ export const MaterialUploadHub: React.FC = () => {
                               <span>{doc.uploadedAt}</span>
                               <span>•</span>
                               {doc.isScanning ? (
-                                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px] animate-pulse">
-                                  [ AI Đang Đọc Lướt... ]
+                                <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-900 border border-indigo-300 font-bold text-[10px] animate-pulse">
+                                  [ GEMINI AGENT ĐANG BÓC TÁCH... ]
                                 </span>
                               ) : scan?.educationalAssessment && !scan.educationalAssessment.isLearningMaterial ? (
                                 <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px] border border-amber-300">
@@ -1000,12 +992,12 @@ export const MaterialUploadHub: React.FC = () => {
                       [ ĐÃ TRÍCH XUẤT FEYNMAN ]
                     </span>
                   ) : activeDoc.isScanning ? (
-                    <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-black border border-amber-300 animate-pulse">
-                      [ ĐANG QUÉT AI... ]
+                    <span className="px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-900 text-[11px] font-black border border-indigo-300 animate-pulse">
+                      [ GEMINI ĐANG PHÂN TÍCH ]
                     </span>
                   ) : aiClassification ? (
                     <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 text-[11px] font-black border border-blue-200">
-                      {aiClassification.confidenceScore}% Khớp Tri Thức
+                      {aiClassification.confidenceScore}% Khớp Tri Thức (Gemini AI)
                     </span>
                   ) : null}
                 </div>
@@ -1034,71 +1026,105 @@ export const MaterialUploadHub: React.FC = () => {
             )}
 
             {activeDoc ? (
-              <div className="space-y-4">
-                {/* 0. KHỐI ĐÁNH GIÁ ĐỊNH DẠNG TÀI LIỆU HỌC TẬP (AI Learning Material Eligibility Assessment) */}
-                {activeScanResult?.educationalAssessment && (
-                  <div
-                    className={`p-3.5 rounded-2xl border text-xs space-y-2 transition-all ${
-                      !activeScanResult.educationalAssessment.isLearningMaterial
-                        ? "bg-amber-50/90 border-amber-300 ring-1 ring-amber-300/30"
-                        : "bg-emerald-50/70 border-emerald-200"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-2">
+              activeDoc.isScanning ? (
+                <div className="p-8 rounded-2xl bg-indigo-50/70 border border-indigo-200 text-center space-y-3.5 my-4">
+                  <div className="inline-block px-3 py-1 rounded-full bg-indigo-100 text-indigo-900 text-xs font-black uppercase tracking-wider border border-indigo-300 animate-pulse">
+                    [ TÁC NHÂN GEMINI ĐANG ĐỌC HIỂU & BÓC TÁCH ]
+                  </div>
+                  <h4 className="text-sm font-black text-slate-800">
+                    Đang gửi văn bản vào Gemini (gemini-3.1-flash-lite)...
+                  </h4>
+                  <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
+                    AI đang phân tích ngữ nghĩa, thẩm định giá trị học thuật, bóc tách khái niệm cốt lõi và đối soát Cây Tri Thức CSDL Supabase...
+                  </p>
+                  <div className="w-56 h-1.5 bg-indigo-200 rounded-full mx-auto overflow-hidden">
+                    <div className="h-full bg-indigo-600 rounded-full animate-pulse w-3/4 mx-auto" />
+                  </div>
+                  <span className="text-[11px] font-mono text-indigo-700 block">
+                    Tệp: {activeDoc.name} ({((activeDoc.size || 0) / (1024 * 1024)).toFixed(2)} MB)
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* 0. KHỐI ĐÁNH GIÁ ĐỊNH DẠNG TÀI LIỆU HỌC TẬP (AI Learning Material Eligibility Assessment) */}
+                  {activeScanResult?.educationalAssessment && (
+                    <div
+                      className={`p-3.5 rounded-2xl border text-xs space-y-2 transition-all ${
+                        !activeScanResult.educationalAssessment.isLearningMaterial
+                          ? "bg-amber-50/90 border-amber-300 ring-1 ring-amber-300/30"
+                          : "bg-emerald-50/70 border-emerald-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`px-2 py-0.5 rounded font-mono text-[10px] font-black uppercase ${
+                              !activeScanResult.educationalAssessment.isLearningMaterial
+                                ? "bg-amber-600 text-white"
+                                : "bg-emerald-700 text-white"
+                            }`}
+                          >
+                            {!activeScanResult.educationalAssessment.isLearningMaterial
+                              ? "[ CẢNH BÁO TÀI LIỆU ]"
+                              : "[ ĐẠT CHUẨN HỌC THUẬT ]"}
+                          </span>
+                          <span
+                            className={`text-xs font-black uppercase tracking-wider ${
+                              !activeScanResult.educationalAssessment.isLearningMaterial
+                                ? "text-amber-950"
+                                : "text-emerald-950"
+                            }`}
+                          >
+                            {activeScanResult.educationalAssessment.materialTypeLabel}
+                          </span>
+                        </div>
                         <span
-                          className={`px-2 py-0.5 rounded font-mono text-[10px] font-black uppercase ${
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
                             !activeScanResult.educationalAssessment.isLearningMaterial
-                              ? "bg-amber-600 text-white"
-                              : "bg-emerald-700 text-white"
+                              ? "bg-white text-amber-900 border-amber-300"
+                              : "bg-white text-emerald-800 border-emerald-300"
                           }`}
                         >
-                          {!activeScanResult.educationalAssessment.isLearningMaterial
-                            ? "[ CẢNH BÁO TÀI LIỆU ]"
-                            : "[ ĐẠT CHUẨN HỌC THUẬT ]"}
-                        </span>
-                        <span
-                          className={`text-xs font-black uppercase tracking-wider ${
-                            !activeScanResult.educationalAssessment.isLearningMaterial
-                              ? "text-amber-950"
-                              : "text-emerald-950"
-                          }`}
-                        >
-                          {activeScanResult.educationalAssessment.materialTypeLabel}
+                          Độ tin cậy: {activeScanResult.educationalAssessment.confidenceScore}%
                         </span>
                       </div>
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+
+                      <p
+                        className={`text-xs leading-relaxed ${
                           !activeScanResult.educationalAssessment.isLearningMaterial
-                            ? "bg-white text-amber-900 border-amber-300"
-                            : "bg-white text-emerald-800 border-emerald-300"
+                            ? "text-amber-900 font-medium"
+                            : "text-emerald-900"
                         }`}
                       >
-                        Độ tin cậy: {activeScanResult.educationalAssessment.confidenceScore}%
-                      </span>
-                    </div>
+                        {activeScanResult.educationalAssessment.reasoning}
+                      </p>
 
-                    <p
-                      className={`text-xs leading-relaxed ${
-                        !activeScanResult.educationalAssessment.isLearningMaterial
-                          ? "text-amber-900 font-medium"
-                          : "text-emerald-900"
-                      }`}
-                    >
-                      {activeScanResult.educationalAssessment.reasoning}
-                    </p>
+                      <div
+                        className={`pt-1 border-t text-[11px] flex items-center justify-between ${
+                          !activeScanResult.educationalAssessment.isLearningMaterial
+                            ? "border-amber-200 text-amber-800"
+                            : "border-emerald-200 text-emerald-800"
+                        }`}
+                      >
+                        <span>{activeScanResult.educationalAssessment.recommendation}</span>
+                      </div>
 
-                    <div
-                      className={`pt-1 border-t text-[11px] flex items-center justify-between ${
-                        !activeScanResult.educationalAssessment.isLearningMaterial
-                          ? "border-amber-200 text-amber-800"
-                          : "border-emerald-200 text-emerald-800"
-                      }`}
-                    >
-                      <span>{activeScanResult.educationalAssessment.recommendation}</span>
+                      {activeScanResult.geminiMetrics && (
+                        <div
+                          className={`pt-1 border-t text-[10px] font-mono flex items-center justify-between ${
+                            !activeScanResult.educationalAssessment.isLearningMaterial
+                              ? "border-amber-200/80 text-amber-800"
+                              : "border-emerald-200/80 text-emerald-800"
+                          }`}
+                        >
+                          <span>Mô hình: {activeScanResult.geminiMetrics.model}</span>
+                          <span>
+                            Thời gian: {activeScanResult.geminiMetrics.durationSeconds}s • {activeScanResult.geminiMetrics.totalTokens} tokens
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {/* 1. KHỐI PHÂN LOẠI & ĐỊNH DANH HỌC THUẬT */}
                 <div className="space-y-3 p-4 rounded-2xl bg-slate-50/70 border border-slate-200/90">
@@ -1649,7 +1675,7 @@ export const MaterialUploadHub: React.FC = () => {
                   </div>
                 )}
               </div>
-            ) : (
+            ) ) : (
               <div className="p-10 rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-center space-y-2">
                 <span className="px-3 py-1 rounded-md bg-slate-200 text-slate-600 font-mono text-[11px] font-black uppercase inline-block">
                   CHƯA CÓ DỮ LIỆU
