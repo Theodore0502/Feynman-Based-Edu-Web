@@ -88,3 +88,4 @@ CREATE TRIGGER trg_set_audit_log_gmt7_time
     BEFORE INSERT ON public.audit_logs
     FOR EACH ROW
     EXECUTE FUNCTION public.set_audit_log_gmt7_time();
+

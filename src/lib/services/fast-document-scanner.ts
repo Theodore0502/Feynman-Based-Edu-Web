@@ -92,6 +92,25 @@ function toUrlSlug(text: string): string {
     .replace(/^-|-$/g, "");
 }
 
+/**
+ * Đếm số lần xuất hiện an toàn tuyệt đối, không bao giờ bị lỗi RegExp với ký tự đặc biệt (=, +, *, (, ), [)
+ */
+function countOccurrences(haystack: string, needle: string): number {
+  if (!needle || needle.length < 2) return 0;
+  try {
+    const escaped = needle.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return (haystack.match(new RegExp(`\\b${escaped}\\b`, "g")) || []).length;
+  } catch {
+    let count = 0;
+    let pos = 0;
+    while ((pos = haystack.indexOf(needle, pos)) !== -1) {
+      count++;
+      pos += needle.length;
+    }
+    return count;
+  }
+}
+
 export const FastDocumentScanner = {
   /**
    * Đọc lướt văn bản và phân tích ma trận nhãn đa chiều hoàn toàn động từ CSDL
@@ -140,7 +159,7 @@ export const FastDocumentScanner = {
       for (const token of subTokens) {
         if (token.length >= 3) {
           const tokenUn = removeVietnameseTones(token);
-          const occurrences = (textUnaccented.match(new RegExp(`\\b${tokenUn}\\b`, "g")) || []).length;
+          const occurrences = countOccurrences(textUnaccented, tokenUn);
           if (occurrences > 0) {
             score += Math.min(occurrences * 4, 30);
             if (!matchedKeywords.includes(token) && matchedKeywords.length < 5) {
@@ -156,7 +175,7 @@ export const FastDocumentScanner = {
         for (const token of descTokens) {
           if (token.length >= 4) {
             const tokenUn = removeVietnameseTones(token);
-            const occurrences = (textUnaccented.match(new RegExp(`\\b${tokenUn}\\b`, "g")) || []).length;
+            const occurrences = countOccurrences(textUnaccented, tokenUn);
             if (occurrences > 0) {
               score += Math.min(occurrences * 2, 20);
               if (!matchedKeywords.includes(token) && matchedKeywords.length < 5) {
@@ -183,7 +202,7 @@ export const FastDocumentScanner = {
         for (const concept of topic.requiredConcepts || []) {
           if (concept.length >= 3) {
             const cUn = removeVietnameseTones(concept);
-            const occurrences = (textUnaccented.match(new RegExp(`\\b${cUn}\\b`, "g")) || []).length;
+            const occurrences = countOccurrences(textUnaccented, cUn);
             if (occurrences > 0) {
               score += Math.min(occurrences * 5, 25);
               if (!matchedKeywords.includes(concept) && matchedKeywords.length < 5) {
@@ -285,7 +304,7 @@ export const FastDocumentScanner = {
           const subTokens = extractTokens(d.subjectName);
           for (const tok of subTokens) {
             if (tok.length >= 3) {
-              const occurrences = (sectionTextUn.match(new RegExp(`\\b${removeVietnameseTones(tok)}\\b`, "g")) || []).length;
+              const occurrences = countOccurrences(sectionTextUn, removeVietnameseTones(tok));
               secScore += occurrences * 6;
             }
           }
@@ -300,7 +319,7 @@ export const FastDocumentScanner = {
             for (const c of topic.requiredConcepts || []) {
               if (c.length >= 3) {
                 const cUn = removeVietnameseTones(c);
-                const occurrences = (sectionTextUn.match(new RegExp(`\\b${cUn}\\b`, "g")) || []).length;
+                const occurrences = countOccurrences(sectionTextUn, cUn);
                 secScore += occurrences * 5;
               }
             }

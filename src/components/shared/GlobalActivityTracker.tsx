@@ -144,3 +144,4 @@ export const GlobalActivityTracker: React.FC = () => {
 };
 
 export default GlobalActivityTracker;
+

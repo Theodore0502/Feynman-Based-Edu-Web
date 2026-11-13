@@ -305,3 +305,32 @@ model AISystemPrompt {
   @@index([promptKey], name: "idx_ai_prompts_key")
   @@map("ai_system_prompts")
 }
+
+// ==============================================================================
+// PHÂN HỆ 7: HỆ THỐNG NHẬT KÝ KIỂM TOÁN & HOẠT ĐỘNG (AUDIT & ACTIVITY LOGS)
+// ==============================================================================
+
+model AuditLog {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String?  @map("user_id")
+  userEmail     String?  @map("user_email")
+  userName      String?  @map("user_name")
+  userRole      String   @default("anonymous") @map("user_role")
+  action        String
+  category      String   @default("UI_INTERACTION")
+  path          String?
+  component     String?
+  details       Json     @default("{}")
+  status        String   @default("SUCCESS")
+  ipAddress     String?  @map("ip_address")
+  userAgent     String?  @map("user_agent")
+  createdAtGmt7 String   @default("") @map("created_at_gmt7")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt(sort: Desc)], name: "idx_audit_logs_created_at_desc")
+  @@index([userId], name: "idx_audit_logs_user_id")
+  @@index([action], name: "idx_audit_logs_action")
+  @@index([category], name: "idx_audit_logs_category")
+  @@index([userRole], name: "idx_audit_logs_user_role")
+  @@map("audit_logs")
+}

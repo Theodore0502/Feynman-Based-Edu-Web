@@ -101,8 +101,10 @@ export function getDynamicAcademicVocabulary(): Array<{ unaccented: string; acce
   THREE_TIER_LECTURES.forEach((l) => {
     vocabMap.set(removeVietnameseTones(l.title), l.title);
     (l.requiredConcepts || []).forEach((c) => {
-      if (c.length >= 3) {
-        vocabMap.set(removeVietnameseTones(c), c);
+      // Chỉ nạp các thuật ngữ ngắn gọn (3 - 45 ký tự), loại bỏ các công thức/phương trình toán học chứa ký tự đặc biệt (=, +, *, /, ^)
+      if (c.length >= 3 && c.length <= 45 && !/[=+*^$<>{}()[\]\\\/%#@~`|:;]/.test(c)) {
+        const clean = c.trim();
+        vocabMap.set(removeVietnameseTones(clean), clean);
       }
     });
   });
@@ -189,6 +191,10 @@ export function toVietnameseTitleCase(str: string): string {
     .join(" ");
 }
 
+export function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
  * Phục hồi tiêu đề tiếng Việt có dấu từ tên tệp (filename)
  * Bằng cách đối soát với Kho Từ Vựng Học Thuật ĐỘNG nạp từ Supabase
@@ -204,20 +210,38 @@ export function restoreVietnameseFromFilename(rawFileName: string): string {
 
   for (const item of vocab) {
     if (item.unaccented.length < 4) continue;
-    const regex = new RegExp(`\\b${item.unaccented.replace(/\s+/g, "[-_\\s]+")}\\b`, "gi");
-    if (regex.test(workingClean)) {
-      workingClean = workingClean.replace(regex, item.accented);
+    // Bỏ qua các chuỗi chứa ký tự toán học hoặc công thức
+    if (/[=+*^$<>{}()[\]\\\/%#@~`|:;]/.test(item.unaccented)) continue;
+
+    // Phân tách các từ và escape regex từng từ tuyệt đối an toàn
+    const tokens = item.unaccented
+      .trim()
+      .split(/\s+/)
+      .map((t) => escapeRegExp(t))
+      .filter(Boolean);
+
+    if (tokens.length === 0) continue;
+    const pattern = tokens.join("[-_\\s]+");
+
+    try {
+      const regex = new RegExp(`\\b${pattern}\\b`, "gi");
+      if (regex.test(workingClean)) {
+        workingClean = workingClean.replace(regex, item.accented);
+      }
+    } catch {
+      // Bỏ qua nếu có lỗi cú pháp regex
     }
   }
 
   // Chuẩn hóa Title Case
+  const acronyms = getDynamicTechAcronyms();
   return workingClean
     .split(" ")
     .map((w) => {
       const lower = w.toLowerCase().replace(/[^a-z0-9\/]/g, "");
-      if (TECH_ACRONYMS[lower]) {
+      if (acronyms[lower]) {
         const punctuation = w.replace(/[a-zA-Z0-9\/]/g, "");
-        return TECH_ACRONYMS[lower] + punctuation;
+        return acronyms[lower] + punctuation;
       }
       if (w.length === 0) return "";
       // Nếu từ đã có dấu tiếng Việt, giữ nguyên
