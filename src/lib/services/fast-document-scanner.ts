@@ -46,6 +46,28 @@ export interface DetectedChapterModule {
   previewSnippet: string;
 }
 
+export interface EducationalAssessment {
+  isLearningMaterial: boolean;
+  materialType:
+    | "lecture"
+    | "textbook"
+    | "thesis_research"
+    | "exercise_exam"
+    | "administrative_form"
+    | "general_document";
+  materialTypeLabel: string;
+  confidenceScore: number;
+  reasoning: string;
+  recommendation: string;
+  pedagogicalIndicators: {
+    hasTheoreticalConcepts: boolean;
+    hasInstructionalStructure: boolean;
+    hasFormOrAdministrativeMarkers: boolean;
+    matchedFormKeywords: string[];
+    matchedAcademicKeywords: string[];
+  };
+}
+
 export interface FastScanResult {
   fileName: string;
   fileSizeBytes: number;
@@ -62,6 +84,7 @@ export interface FastScanResult {
   splitMode: "integrated" | "split";
   allowedConcepts: string[];
   allowedJargons: string[];
+  educationalAssessment: EducationalAssessment;
 }
 
 function removeVietnameseTones(str: string): string {
@@ -107,6 +130,182 @@ function countOccurrences(haystack: string, needle: string): number {
     if (count >= 10) break; // Giới hạn tối đa 10 lần đếm để tối ưu hiệu năng
   }
   return count;
+}
+
+/**
+ * Đánh giá tài liệu có phải là tài liệu học tập hợp lệ để trích xuất Feynman hay không
+ */
+function evaluateEducationalEligibility(
+  fullText: string,
+  fileName: string,
+  totalWords: number
+): EducationalAssessment {
+  const textLower = fullText.toLowerCase();
+  const textUnaccented = removeVietnameseTones(fullText);
+  const nameLower = fileName.toLowerCase();
+  const nameUnaccented = removeVietnameseTones(fileName);
+
+  // 1. Dấu hiệu văn bản hành chính / biểu mẫu / bảng điểm / phiếu chấm
+  const formMarkers = [
+    { pattern: "phiếu đánh giá", label: "Phiếu đánh giá" },
+    { pattern: "tiêu chí đánh giá", label: "Tiêu chí đánh giá" },
+    { pattern: "bảng điểm", label: "Bảng điểm" },
+    { pattern: "học bạ", label: "Học bạ" },
+    { pattern: "phiếu thu", label: "Phiếu thu" },
+    { pattern: "phiếu chi", label: "Phiếu chi" },
+    { pattern: "biên bản", label: "Biên bản" },
+    { pattern: "hợp đồng", label: "Hợp đồng" },
+    { pattern: "sơ yếu lý lịch", label: "Sơ yếu lý lịch" },
+    { pattern: "curriculum vitae", label: "CV" },
+    { pattern: "đơn xin", label: "Đơn xin" },
+    { pattern: "tờ trình", label: "Tờ trình" },
+    { pattern: "chứng chỉ", label: "Chứng chỉ" },
+    { pattern: "chữ ký", label: "Chữ ký" },
+    { pattern: "ký và ghi rõ họ tên", label: "Mục ký tên" },
+    { pattern: "cán bộ hướng dẫn", label: "Cán bộ hướng dẫn" },
+    { pattern: "điểm tối đa", label: "Thang điểm biểu mẫu" },
+    { pattern: "đóng dấu", label: "Đóng dấu xác nhận" },
+    { pattern: "xác nhận của đơn vị", label: "Xác nhận đơn vị" },
+    { pattern: "thực tập sinh", label: "Thực tập sinh" },
+    { pattern: "nội quy, quy chế", label: "Nội quy quy chế" },
+  ];
+
+  const matchedFormKeywords: string[] = [];
+  for (const m of formMarkers) {
+    if (
+      textLower.includes(m.pattern) ||
+      textUnaccented.includes(removeVietnameseTones(m.pattern)) ||
+      nameLower.includes(m.pattern) ||
+      nameUnaccented.includes(removeVietnameseTones(m.pattern))
+    ) {
+      matchedFormKeywords.push(m.label);
+    }
+  }
+
+  // 2. Dấu hiệu tài liệu học thuật (Giáo trình, bài giảng, đồ án, lý thuyết)
+  const academicMarkers = [
+    { pattern: "giáo trình", label: "Giáo trình" },
+    { pattern: "bài giảng", label: "Bài giảng" },
+    { pattern: "đồ án", label: "Đồ án" },
+    { pattern: "khóa luận", label: "Khóa luận" },
+    { pattern: "luận văn", label: "Luận văn" },
+    { pattern: "chuyên khảo", label: "Chuyên khảo" },
+    { pattern: "nghiên cứu khoa học", label: "Nghiên cứu khoa học" },
+    { pattern: "cơ sở lý thuyết", label: "Cơ sở lý thuyết" },
+    { pattern: "kiến trúc hệ thống", label: "Kiến trúc hệ thống" },
+    { pattern: "nguyên lý hoạt động", label: "Nguyên lý hoạt động" },
+    { pattern: "thuật toán", label: "Thuật toán" },
+    { pattern: "mô hình toán học", label: "Mô hình toán học" },
+    { pattern: "khái niệm", label: "Định nghĩa / Khái niệm" },
+    { pattern: "định lý", label: "Định lý / Nguyên lý" },
+    { pattern: "tài liệu tham khảo", label: "Tài liệu tham khảo" },
+    { pattern: "chương 1", label: "Cấu trúc chương mục" },
+    { pattern: "chương 2", label: "Cấu trúc chương mục" },
+    { pattern: "chapter", label: "Chapter" },
+    { pattern: "lecture", label: "Lecture" },
+  ];
+
+  const matchedAcademicKeywords: string[] = [];
+  for (const a of academicMarkers) {
+    if (
+      textLower.includes(a.pattern) ||
+      textUnaccented.includes(removeVietnameseTones(a.pattern)) ||
+      nameLower.includes(a.pattern) ||
+      nameUnaccented.includes(removeVietnameseTones(a.pattern))
+    ) {
+      matchedAcademicKeywords.push(a.label);
+    }
+  }
+
+  const hasTheoreticalConcepts =
+    textLower.includes("khái niệm") ||
+    textLower.includes("nguyên lý") ||
+    textLower.includes("cơ chế") ||
+    textLower.includes("thuật toán") ||
+    textLower.includes("mô hình") ||
+    textLower.includes("kiến trúc") ||
+    textLower.includes("lý thuyết");
+
+  // Quy tắc 1: Nếu có từ 3 dấu hiệu biểu mẫu hành chính trở lên VÀ thiếu cấu trúc giáo trình/đồ án:
+  if (matchedFormKeywords.length >= 3 && matchedAcademicKeywords.length <= 1) {
+    return {
+      isLearningMaterial: false,
+      materialType: "administrative_form",
+      materialTypeLabel: "Biểu Mẫu / Phiếu Đánh Giá Hành Chính",
+      confidenceScore: Math.min(98, 80 + matchedFormKeywords.length * 3),
+      reasoning: `Tài liệu được nhận diện là Biểu mẫu hành chính (${matchedFormKeywords.slice(0, 3).join(", ")}), thiếu cấu trúc chương mục và định nghĩa lý thuyết sư phạm để trích xuất bài học chuẩn Feynman.`,
+      recommendation: "Hãy tải lên Giáo trình, Bài giảng môn học, Đồ án chuyên ngành hoặc Chuyên khảo lý thuyết để AI trích xuất bài học chuẩn xác nhất.",
+      pedagogicalIndicators: {
+        hasTheoreticalConcepts,
+        hasInstructionalStructure: false,
+        hasFormOrAdministrativeMarkers: true,
+        matchedFormKeywords,
+        matchedAcademicKeywords,
+      },
+    };
+  }
+
+  // Quy tắc 2: Nếu tệp quá ngắn (< 150 từ) và không có cấu trúc học tập:
+  if (totalWords < 150 && matchedAcademicKeywords.length === 0) {
+    return {
+      isLearningMaterial: false,
+      materialType: "general_document",
+      materialTypeLabel: "Văn Bản Ngắn / Chưa Đủ Dữ Liệu Học Thuật",
+      confidenceScore: 85,
+      reasoning: "Tài liệu quá ngắn (dưới 150 từ), không đủ dung lượng kiến thức để xây dựng khung bài giảng chuẩn Feynman.",
+      recommendation: "Vui lòng tải lên tài liệu học tập đầy đủ với tối thiểu một chương hoặc một bài học hoàn chỉnh.",
+      pedagogicalIndicators: {
+        hasTheoreticalConcepts,
+        hasInstructionalStructure: false,
+        hasFormOrAdministrativeMarkers: matchedFormKeywords.length > 0,
+        matchedFormKeywords,
+        matchedAcademicKeywords,
+      },
+    };
+  }
+
+  // Quy tắc 3: Nếu là đồ án / nghiên cứu:
+  if (
+    nameLower.includes("do an") ||
+    nameLower.includes("đồ án") ||
+    nameLower.includes("khoa luan") ||
+    nameLower.includes("khóa luận") ||
+    textLower.includes("đồ án tốt nghiệp") ||
+    textLower.includes("báo cáo nghiên cứu")
+  ) {
+    return {
+      isLearningMaterial: true,
+      materialType: "thesis_research",
+      materialTypeLabel: "Đồ Án / Nghiên Cứu Chuyên Ngành",
+      confidenceScore: 94,
+      reasoning: "Tài liệu có cấu trúc đồ án kỹ thuật / nghiên cứu chuyên sâu, chứa đầy đủ tiền đề lý thuyết, kiến trúc thực nghiệm và kết luận.",
+      recommendation: "AI sẵn sàng bóc tách các Khái niệm cốt lõi, Mô hình kiến trúc và Bẫy thuật ngữ từ đồ án này.",
+      pedagogicalIndicators: {
+        hasTheoreticalConcepts: true,
+        hasInstructionalStructure: true,
+        hasFormOrAdministrativeMarkers: false,
+        matchedFormKeywords,
+        matchedAcademicKeywords,
+      },
+    };
+  }
+
+  // Mặc định: Giáo trình / Bài giảng học thuật hợp lệ:
+  return {
+    isLearningMaterial: true,
+    materialType: "textbook",
+    materialTypeLabel: "Giáo Trình / Bài Giảng Học Thuật",
+    confidenceScore: Math.min(99, 82 + matchedAcademicKeywords.length * 4),
+    reasoning: "Tài liệu đạt chuẩn tài liệu học tập với cấu trúc nội dung sư phạm, phù hợp để hệ thống hóa kiến thức theo phương pháp Feynman.",
+    recommendation: "Sẵn sàng trích xuất Khái niệm cốt lõi, Bẫy thuật ngữ và Mô hình ẩn dụ trực quan.",
+    pedagogicalIndicators: {
+      hasTheoreticalConcepts: true,
+      hasInstructionalStructure: true,
+      hasFormOrAdministrativeMarkers: false,
+      matchedFormKeywords,
+      matchedAcademicKeywords,
+    },
+  };
 }
 
 // Từ điển từ viết tắt chuyên ngành học thuật chuẩn xác
@@ -441,11 +640,18 @@ export const FastDocumentScanner = {
       );
     }
 
+    const totalWords = parsed.wordCount || fullText.split(/\s+/).filter(Boolean).length;
+    const educationalAssessment = evaluateEducationalEligibility(
+      fullText,
+      file.name,
+      totalWords
+    );
+
     return {
       fileName: file.name,
       fileSizeBytes: file.size,
       totalCharacters: fullText.length,
-      totalWords: parsed.wordCount || fullText.split(/\s+/).filter(Boolean).length,
+      totalWords,
       suggestedTitle,
       canonicalSlug,
       refLink: `https://elis.edu.vn/materials/${primarySubject.domainSlug}/${toUrlSlug(primarySubject.subjectName)}/${canonicalSlug}`,
@@ -457,6 +663,7 @@ export const FastDocumentScanner = {
       splitMode: "integrated",
       allowedConcepts: documentConcepts.slice(0, 6),
       allowedJargons: dynamicJargons.slice(0, 4),
+      educationalAssessment,
     };
   },
 };

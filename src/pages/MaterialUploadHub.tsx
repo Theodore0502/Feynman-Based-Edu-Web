@@ -829,6 +829,10 @@ export const MaterialUploadHub: React.FC = () => {
                                 <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px] animate-pulse">
                                   [ AI Đang Đọc Lướt... ]
                                 </span>
+                              ) : scan?.educationalAssessment && !scan.educationalAssessment.isLearningMaterial ? (
+                                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px] border border-amber-300">
+                                  [ {scan.educationalAssessment.materialTypeLabel} ]
+                                </span>
                               ) : doc.isMerged ? (
                                 <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 font-bold text-[10px]">
                                   [ Gộp Vào: {doc.mergeTargetTitle} ]
@@ -1031,6 +1035,71 @@ export const MaterialUploadHub: React.FC = () => {
 
             {activeDoc ? (
               <div className="space-y-4">
+                {/* 0. KHỐI ĐÁNH GIÁ ĐỊNH DẠNG TÀI LIỆU HỌC TẬP (AI Learning Material Eligibility Assessment) */}
+                {activeScanResult?.educationalAssessment && (
+                  <div
+                    className={`p-3.5 rounded-2xl border text-xs space-y-2 transition-all ${
+                      !activeScanResult.educationalAssessment.isLearningMaterial
+                        ? "bg-amber-50/90 border-amber-300 ring-1 ring-amber-300/30"
+                        : "bg-emerald-50/70 border-emerald-200"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`px-2 py-0.5 rounded font-mono text-[10px] font-black uppercase ${
+                            !activeScanResult.educationalAssessment.isLearningMaterial
+                              ? "bg-amber-600 text-white"
+                              : "bg-emerald-700 text-white"
+                          }`}
+                        >
+                          {!activeScanResult.educationalAssessment.isLearningMaterial
+                            ? "[ CẢNH BÁO TÀI LIỆU ]"
+                            : "[ ĐẠT CHUẨN HỌC THUẬT ]"}
+                        </span>
+                        <span
+                          className={`text-xs font-black uppercase tracking-wider ${
+                            !activeScanResult.educationalAssessment.isLearningMaterial
+                              ? "text-amber-950"
+                              : "text-emerald-950"
+                          }`}
+                        >
+                          {activeScanResult.educationalAssessment.materialTypeLabel}
+                        </span>
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                          !activeScanResult.educationalAssessment.isLearningMaterial
+                            ? "bg-white text-amber-900 border-amber-300"
+                            : "bg-white text-emerald-800 border-emerald-300"
+                        }`}
+                      >
+                        Độ tin cậy: {activeScanResult.educationalAssessment.confidenceScore}%
+                      </span>
+                    </div>
+
+                    <p
+                      className={`text-xs leading-relaxed ${
+                        !activeScanResult.educationalAssessment.isLearningMaterial
+                          ? "text-amber-900 font-medium"
+                          : "text-emerald-900"
+                      }`}
+                    >
+                      {activeScanResult.educationalAssessment.reasoning}
+                    </p>
+
+                    <div
+                      className={`pt-1 border-t text-[11px] flex items-center justify-between ${
+                        !activeScanResult.educationalAssessment.isLearningMaterial
+                          ? "border-amber-200 text-amber-800"
+                          : "border-emerald-200 text-emerald-800"
+                      }`}
+                    >
+                      <span>{activeScanResult.educationalAssessment.recommendation}</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* 1. KHỐI PHÂN LOẠI & ĐỊNH DANH HỌC THUẬT */}
                 <div className="space-y-3 p-4 rounded-2xl bg-slate-50/70 border border-slate-200/90">
                   <div className="flex items-center justify-between">
@@ -1545,13 +1614,37 @@ export const MaterialUploadHub: React.FC = () => {
                       </div>
                     </div>
 
+                    {activeScanResult?.educationalAssessment &&
+                      !activeScanResult.educationalAssessment.isLearningMaterial && (
+                        <div className="p-3 rounded-xl bg-amber-100/70 border border-amber-300 text-amber-950 text-xs space-y-1">
+                          <strong className="block font-bold">
+                            [LƯU Ý TRÍCH XUẤT FEYNMAN]
+                          </strong>
+                          <p className="text-[11px] leading-snug">
+                            Tài liệu này được AI nhận diện là{" "}
+                            <strong>
+                              {activeScanResult.educationalAssessment.materialTypeLabel}
+                            </strong>
+                            , thiếu các định nghĩa và tiền đề lý thuyết sư phạm. Kết quả trích xuất có thể không đạt chuẩn phương pháp Feynman.
+                          </p>
+                        </div>
+                      )}
+
                     <button
                       type="button"
                       onClick={handleStartExtraction}
                       disabled={isCurrentlyExtracting}
-                      className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                      className={`w-full py-2.5 px-4 rounded-xl text-white text-xs font-black shadow-xs transition-all cursor-pointer disabled:opacity-50 ${
+                        activeScanResult?.educationalAssessment &&
+                        !activeScanResult.educationalAssessment.isLearningMaterial
+                          ? "bg-slate-700 hover:bg-slate-800"
+                          : "bg-indigo-600 hover:bg-indigo-700"
+                      }`}
                     >
-                      [ KÍCH HOẠT TRÍCH XUẤT FEYNMAN CHO TỆP NÀY → ]
+                      {activeScanResult?.educationalAssessment &&
+                      !activeScanResult.educationalAssessment.isLearningMaterial
+                        ? "[ VẪN TIẾP TỤC TRÍCH XUẤT CHO TỆP BIỂU MẪU NÀY → ]"
+                        : "[ KÍCH HOẠT TRÍCH XUẤT FEYNMAN CHO TỆP NÀY → ]"}
                     </button>
                   </div>
                 )}
