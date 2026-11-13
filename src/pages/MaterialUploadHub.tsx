@@ -228,8 +228,8 @@ export const MaterialUploadHub: React.FC = () => {
               suggestedTitle: scanRes.suggestedTitle,
               canonicalSlug: scanRes.canonicalSlug,
               refLink: scanRes.refLink,
-              allowedConcepts: scanRes.primarySubject.matchedKeywords.slice(0, 4),
-              allowedJargons: ["Thuật ngữ chuyên ngành", "Cơ chế vận hành"],
+              allowedConcepts: scanRes.allowedConcepts,
+              allowedJargons: scanRes.allowedJargons,
             },
           };
         })

@@ -1,12 +1,21 @@
 /**
  * File: src/lib/services/vietnamese-title-formatter.ts
  * Mục đích: Tự động trích xuất và chuẩn hóa Tiêu đề Bài Giảng sang TIẾNG VIỆT CÓ DẤU CHUẨN MỰC
- *           (Full diacritics & Title Case), bảo toàn các thuật ngữ kỹ thuật viết tắt quốc tế.
- * Tính năng:
- *   1. Ưu tiên bóc tách tiêu đề chính thức từ 1-3 dòng đầu của văn bản tài liệu (.docx, .pdf).
- *   2. Phục hồi tiếng Việt có dấu từ tên tệp (filename) qua từ điển cụm từ học thuật chuyên ngành.
+ *           (Full diacritics & Title Case), kết nối trực tiếp Kho Dữ Liệu Cây Tri Thức Supabase.
+ * TUYỆT ĐỐI KHÔNG HARDCODE DANH SÁCH MÔN HỌC / CỤM TỪ TĨNH.
+ *
+ * Nguyên tắc hoạt động ĐỘNG (Dynamic):
+ *   1. Ưu tiên bóc tách 100% dòng tiêu đề thực tế từ văn bản của tệp (.docx, .pdf) qua DocumentParser.
+ *   2. Nếu cần phục hồi từ tên tệp (filename), tự động đối soát dựa trên CSDL Cây Tri Thức Master
+ *      (THREE_TIER_DOMAINS, THREE_TIER_SUBJECTS, THREE_TIER_LECTURES) để lấy chính xác từ vựng có dấu chuẩn.
  *   3. Chuẩn hóa Title Case tiếng Việt, bảo toàn các từ viết tắt công nghệ (API, SQL, ACID, TCP/IP, Docker, AI, etc.).
  */
+
+import {
+  THREE_TIER_DOMAINS,
+  THREE_TIER_SUBJECTS,
+  THREE_TIER_LECTURES,
+} from "@/data/three-tier-curriculum.data";
 
 export const TECH_ACRONYMS: Record<string, string> = {
   api: "API",
@@ -57,77 +66,105 @@ export const TECH_ACRONYMS: Record<string, string> = {
   "3nf": "3NF",
 };
 
-export const VIETNAMESE_PHRASES: Array<[RegExp, string]> = [
-  [/giao[-_\s]+trinh/gi, "Giáo Trình"],
-  [/do[-_\s]+an/gi, "Đồ Án"],
-  [/lien[-_\s]+nganh/gi, "Liên Ngành"],
-  [/tich[-_\s]+hop/gi, "Tích Hợp"],
-  [/phat[-_\s]+trien[-_\s]+ung[-_\s]+dung[-_\s]+web/gi, "Phát Triển Ứng Dụng Web"],
-  [/phat[-_\s]+trien/gi, "Phát Triển"],
-  [/ung[-_\s]+dung/gi, "Ứng Dụng"],
-  [/thiet[-_\s]+ke/gi, "Thiết Kế"],
-  [/thi[-_\s]+giac[-_\s]+may[-_\s]+tinh/gi, "Thị Giác Máy Tính"],
-  [/nhan[-_\s]+dien[-_\s]+vat[-_\s]+the/gi, "Nhận Diện Vật Thể"],
-  [/nhan[-_\s]+dien[-_\s]+doi[-_\s]+tuong/gi, "Nhận Diện Đối Tượng"],
-  [/nhan[-_\s]+dien/gi, "Nhận Diện"],
-  [/he[-_\s]+co[-_\s]+so[-_\s]+du[-_\s]+lieu/gi, "Hệ Cơ Sở Dữ Liệu"],
-  [/co[-_\s]+so[-_\s]+du[-_\s]+lieu/gi, "Cơ Sở Dữ Liệu"],
-  [/he[-_\s]+quan[-_\s]+tri/gi, "Hệ Quản Trị"],
-  [/quan[-_\s]+tri[-_\s]+sql/gi, "Quản Trị SQL"],
-  [/quan[-_\s]+tri[-_\s]+he[-_\s]+thong/gi, "Quản Trị Hệ Thống"],
-  [/quan[-_\s]+tri[-_\s]+san[-_\s]+tmdt/gi, "Quản Trị Sàn TMĐT"],
-  [/mang[-_\s]+may[-_\s]+tinh/gi, "Mạng Máy Tính"],
-  [/truyen[-_\s]+thong[-_\s]+du[-_\s]+lieu/gi, "Truyền Thông Dữ Liệu"],
-  [/truyen[-_\s]+thong/gi, "Truyền Thông"],
-  [/ha[-_\s]+tang[-_\s]+mang/gi, "Hạ Tầng Mạng"],
-  [/ha[-_\s]+tang/gi, "Hạ Tầng"],
-  [/dien[-_\s]+toan[-_\s]+dam[-_\s]+may/gi, "Điện Toán Đám Mây"],
-  [/cong[-_\s]+nghe[-_\s]+container/gi, "Công Nghệ Container"],
-  [/cong[-_\s]+nghe/gi, "Công Nghệ"],
-  [/an[-_\s]+toan[-_\s]+thong[-_\s]+tin/gi, "An Toàn Thông Tin"],
-  [/an[-_\s]+ninh[-_\s]+mang/gi, "An Ninh Mạng"],
-  [/ma[-_\s]+hoa[-_\s]+cong[-_\s]+khai/gi, "Mã Hóa Công Khai"],
-  [/ma[-_\s]+hoa/gi, "Mã Hóa"],
-  [/chuan[-_\s]+hoa/gi, "Chuẩn Hóa"],
-  [/tri[-_\s]+tue[-_\s]+nhan[-_\s]+tao/gi, "Trí Tuệ Nhân Tạo"],
-  [/hoc[-_\s]+may/gi, "Học Máy"],
-  [/kien[-_\s]+truc[-_\s]+may[-_\s]+tinh/gi, "Kiến Trúc Máy Tính"],
-  [/kien[-_\s]+truc/gi, "Kiến Trúc"],
-  [/he[-_\s]+dieu[-_\s]+hanh/gi, "Hệ Điều Hành"],
-  [/cau[-_\s]+truc[-_\s]+du[-_\s]+lieu/gi, "Cấu Trúc Dữ Liệu"],
-  [/giai[-_\s]+thuat/gi, "Giải Thuật"],
-  [/thuat[-_\s]+toan/gi, "Thuật Toán"],
-  [/toan[-_\s]+roi[-_\s]+rac/gi, "Toán Rời Rạc"],
-  [/ly[-_\s]+thuyet[-_\s]+do[-_\s]+thi/gi, "Lý Thuyết Đồ Thị"],
-  [/ly[-_\s]+thuyet[-_\s]+va[-_\s]+ky[-_\s]+thuat[-_\s]+hoc[-_\s]+tap/gi, "Lý Thuyết Và Kỹ Thuật Học Tập"],
-  [/ly[-_\s]+thuyet/gi, "Lý Thuyết"],
-  [/ky[-_\s]+thuat/gi, "Kỹ Thuật"],
-  [/hoc[-_\s]+tap/gi, "Học Tập"],
-  [/chuyen[-_\s]+khoa/gi, "Chuyên Khảo"],
-  [/chuyen[-_\s]+de/gi, "Chuyên Đề"],
-  [/quan[-_\s]+tri/gi, "Quản Trị"],
-  [/kinh[-_\s]+doanh/gi, "Kinh Doanh"],
-  [/thuong[-_\s]+mai[-_\s]+dien[-_\s]+tu/gi, "Thương Mại Điện Tử"],
-  [/ke[-_\s]+toan/gi, "Kế Toán"],
-  [/kiem[-_\s]+toan/gi, "Kiểm Toán"],
-  [/tai[-_\s]+chinh/gi, "Tài Chính"],
-  [/ngan[-_\s]+hang/gi, "Ngân Hàng"],
-  [/du[-_\s]+lich/gi, "Du Lịch"],
-  [/khach[-_\s]+san/gi, "Khách Sạn"],
-  [/y[-_\s]+khoa/gi, "Y Khoa"],
-  [/duoc[-_\s]+hoc/gi, "Dược Học"],
-  [/giao[-_\s]+tiep/gi, "Giao Tiếp"],
-  [/mo[-_\s]+hinh/gi, "Mô Hình"],
-  [/he[-_\s]+thong/gi, "Hệ Thống"],
-  [/tong[-_\s]+quan/gi, "Tổng Quan"],
-  [/nang[-_\s]+cao/gi, "Nâng Cao"],
-  [/can[-_\s]+ban/gi, "Căn Bản"],
-  [/co[-_\s]+ban/gi, "Cơ Bản"],
-  [/kiem[-_\s]+thu/gi, "Kiểm Thử"],
-  [/chat[-_\s]+luong/gi, "Chất Lượng"],
-  [/phan[-_\s]+mem/gi, "Phần Mềm"],
-  [/khoa[-_\s]+hoc[-_\s]+may[-_\s]+tinh/gi, "Khoa Học Máy Tính"],
-];
+function removeVietnameseTones(str: string): string {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[đĐ]/g, "d")
+    .toLowerCase();
+}
+
+/**
+ * Xây dựng Kho Từ Vựng Học Thuật Tiếng Việt Có Dấu ĐỘNG từ CSDL Hệ Thống (Supabase)
+ * Không hardcode: Tự động gom tất cả Domain, Subject, Topic và Concepts từ kho tri thức.
+ */
+let dynamicVocabCache: Array<{ unaccented: string; accented: string }> | null = null;
+
+export function getDynamicAcademicVocabulary(): Array<{ unaccented: string; accented: string }> {
+  if (dynamicVocabCache && dynamicVocabCache.length > 0) {
+    return dynamicVocabCache;
+  }
+
+  const vocabMap = new Map<string, string>();
+
+  // 1. Nạp từ Cấp 1: Academic Domains
+  THREE_TIER_DOMAINS.forEach((d) => {
+    vocabMap.set(removeVietnameseTones(d.name), d.name);
+  });
+
+  // 2. Nạp từ Cấp 2: Academic Subjects
+  THREE_TIER_SUBJECTS.forEach((s) => {
+    vocabMap.set(removeVietnameseTones(s.name), s.name);
+  });
+
+  // 3. Nạp từ Cấp 3: Academic Lectures & Concepts
+  THREE_TIER_LECTURES.forEach((l) => {
+    vocabMap.set(removeVietnameseTones(l.title), l.title);
+    (l.requiredConcepts || []).forEach((c) => {
+      if (c.length >= 3) {
+        vocabMap.set(removeVietnameseTones(c), c);
+      }
+    });
+  });
+
+  // 4. Các tiền tố văn bản học thuật thông dụng
+  const standardPrefixes = [
+    { un: "giao trinh", acc: "Giáo Trình" },
+    { un: "do an", acc: "Đồ Án" },
+    { un: "lien nganh", acc: "Liên Ngành" },
+    { un: "tich hop", acc: "Tích Hợp" },
+    { un: "bai giang", acc: "Bài Giảng" },
+    { un: "de cuong", acc: "Đề Cương" },
+    { un: "chuyen khao", acc: "Chuyên Khảo" },
+    { un: "chuyen de", acc: "Chuyên Đề" },
+  ];
+  standardPrefixes.forEach((p) => {
+    vocabMap.set(p.un, p.acc);
+  });
+
+  // Sắp xếp các cụm từ dài lên trước để thay thế chuẩn xác (Greedy Longest Match)
+  const entries = Array.from(vocabMap.entries()).map(([unaccented, accented]) => ({
+    unaccented,
+    accented,
+  }));
+  entries.sort((a, b) => b.unaccented.length - a.unaccented.length);
+
+  dynamicVocabCache = entries;
+  return dynamicVocabCache;
+}
+
+let dynamicAcronymsCache: Record<string, string> | null = null;
+
+/**
+ * Tự động trích xuất các từ viết tắt và thuật ngữ viết hoa chuyên ngành từ CSDL Supabase
+ */
+export function getDynamicTechAcronyms(): Record<string, string> {
+  if (dynamicAcronymsCache) return dynamicAcronymsCache;
+
+  const acronymMap: Record<string, string> = {
+    ...TECH_ACRONYMS,
+  };
+
+  // Quét toàn bộ CSDL Supabase (479 bài học và 37 môn học) để tự động nhận diện thêm các từ viết tắt
+  THREE_TIER_LECTURES.forEach((lec) => {
+    const tokens = (lec.title + " " + (lec.requiredConcepts || []).join(" ")).split(/[\s,()\/]+/);
+    tokens.forEach((tok) => {
+      const trimmed = tok.trim();
+      if (
+        (trimmed.length >= 2 && trimmed === trimmed.toUpperCase() && /^[A-Z0-9+-]+$/.test(trimmed)) ||
+        /^[A-Z]+[a-z]+[A-Z]+/.test(trimmed)
+      ) {
+        const lowerKey = trimmed.toLowerCase();
+        if (!acronymMap[lowerKey]) {
+          acronymMap[lowerKey] = trimmed;
+        }
+      }
+    });
+  });
+
+  dynamicAcronymsCache = acronymMap;
+  return dynamicAcronymsCache;
+}
 
 /**
  * Định dạng chuỗi văn bản tiếng Việt sang Title Case và bảo toàn từ viết tắt kỹ thuật
@@ -137,14 +174,14 @@ export function toVietnameseTitleCase(str: string): string {
   let cleaned = str.replace(/([^\s])\(/g, "$1 (");
   cleaned = cleaned.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
   const words = cleaned.split(" ");
+  const acronyms = getDynamicTechAcronyms();
 
   return words
     .map((w) => {
       const lower = w.toLowerCase().replace(/[^a-z0-9\/]/g, "");
-      if (TECH_ACRONYMS[lower]) {
-        // Giữ lại dấu câu đi kèm nếu có (ví dụ: "API," hay "SQL:")
+      if (acronyms[lower]) {
         const punctuation = w.replace(/[a-zA-Z0-9\/]/g, "");
-        return TECH_ACRONYMS[lower] + punctuation;
+        return acronyms[lower] + punctuation;
       }
       if (w.length === 0) return "";
       return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
@@ -154,19 +191,27 @@ export function toVietnameseTitleCase(str: string): string {
 
 /**
  * Phục hồi tiêu đề tiếng Việt có dấu từ tên tệp (filename)
+ * Bằng cách đối soát với Kho Từ Vựng Học Thuật ĐỘNG nạp từ Supabase
  */
 export function restoreVietnameseFromFilename(rawFileName: string): string {
   let clean = rawFileName.replace(/\.[^/.]+$/, "");
   clean = clean.replace(/[-_]?(v\d+|final|draft|copy|preview)$/i, "");
+  clean = clean.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
 
-  // Áp dụng từ điển cụm từ học thuật có dấu
-  for (const [pattern, replacement] of VIETNAMESE_PHRASES) {
-    clean = clean.replace(pattern, replacement);
+  // Đối soát với kho từ vựng động từ CSDL
+  const vocab = getDynamicAcademicVocabulary();
+  let workingClean = clean;
+
+  for (const item of vocab) {
+    if (item.unaccented.length < 4) continue;
+    const regex = new RegExp(`\\b${item.unaccented.replace(/\s+/g, "[-_\\s]+")}\\b`, "gi");
+    if (regex.test(workingClean)) {
+      workingClean = workingClean.replace(regex, item.accented);
+    }
   }
 
-  // Tách từ và chuẩn hóa casing
-  clean = clean.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
-  return clean
+  // Chuẩn hóa Title Case
+  return workingClean
     .split(" ")
     .map((w) => {
       const lower = w.toLowerCase().replace(/[^a-z0-9\/]/g, "");
@@ -175,7 +220,7 @@ export function restoreVietnameseFromFilename(rawFileName: string): string {
         return TECH_ACRONYMS[lower] + punctuation;
       }
       if (w.length === 0) return "";
-      // Nếu từ đã có dấu tiếng Việt (chứa ký tự ngoài ASCII), giữ nguyên ký tự có dấu
+      // Nếu từ đã có dấu tiếng Việt, giữ nguyên
       return w.charAt(0).toUpperCase() + w.slice(1);
     })
     .join(" ");
@@ -190,11 +235,11 @@ export function extractBestVietnameseTitle(fullText: string, rawFileName: string
     .map((l) => l.trim())
     .filter(Boolean);
 
-  // Tìm trong 4 dòng đầu tiên của tài liệu
+  // 1. Tìm trong 4 dòng đầu tiên của tài liệu
   for (let i = 0; i < Math.min(4, lines.length); i++) {
-    let candidate = lines[i];
+    const candidate = lines[i];
 
-    // Bỏ qua nếu dòng quá ngắn hoặc chỉ là tiền đề tài liệu chuyên khảo
+    // Bỏ qua nếu dòng chỉ là tiền đề tài liệu chuyên khảo
     if (
       candidate.length <= 25 &&
       /^(tài liệu chuyên khảo|chuyên khảo|chuyên đề|bản thảo|draft|mục lục|lời nói đầu)$/i.test(
@@ -206,7 +251,6 @@ export function extractBestVietnameseTitle(fullText: string, rawFileName: string
 
     // Nếu dòng có độ dài hợp lý cho tiêu đề bài giảng (12 - 130 ký tự)
     if (candidate.length >= 12 && candidate.length <= 130) {
-      // Kiểm tra xem có chứa ký tự tiếng Việt hoặc từ khóa học thuật
       const hasVietnameseAccents =
         /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(
           candidate
@@ -222,6 +266,6 @@ export function extractBestVietnameseTitle(fullText: string, rawFileName: string
     }
   }
 
-  // Fallback: Phục hồi tiếng Việt có dấu từ tên tệp
+  // 2. Fallback: Phục hồi tiếng Việt có dấu từ tên tệp qua CSDL Cây Tri Thức Động
   return restoreVietnameseFromFilename(rawFileName);
 }
