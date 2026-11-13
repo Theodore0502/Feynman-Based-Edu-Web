@@ -76,6 +76,8 @@ export const MaterialUploadHub: React.FC = () => {
   // Quản lý danh sách tài liệu đã tải lên
   const [uploadedDocs, setUploadedDocs] = useState<UploadedDocRecord[]>([]);
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
+  const activeDocIdRef = useRef<string | null>(null);
+  activeDocIdRef.current = activeDocId;
 
   // Chế độ xem: Từng tệp hoặc Gom theo Bộ chuyên ngành
   const [viewMode, setViewMode] = useState<"list" | "bundles">("list");
@@ -236,8 +238,8 @@ export const MaterialUploadHub: React.FC = () => {
         })
       );
 
-      // Nếu đây là tài liệu đang chọn hoặc tệp đầu tiên, cập nhật ngay lên bảng thông tin bên phải
-      if (activeDocId === recordId || (!activeDocId && uploadedDocs[0]?.id === recordId)) {
+      // Nếu đây là tài liệu đang chọn hoặc chưa có tài liệu nào khác được chọn chủ động
+      if (activeDocIdRef.current === recordId || !activeDocIdRef.current) {
         setSelectedDomainId(scanRes.primarySubject.domainId);
         setTimeout(() => {
           setSelectedSubjectId(scanRes.primarySubject.subjectId);
@@ -322,6 +324,7 @@ export const MaterialUploadHub: React.FC = () => {
       setUploadedDocs((prev) => [...newDocs, ...prev]);
       const primary = newDocs[0];
       setActiveDocId(primary.id);
+      activeDocIdRef.current = primary.id;
 
       if (primary.classification) {
         setSelectedDomainId(primary.classification.domainId);
@@ -353,6 +356,7 @@ export const MaterialUploadHub: React.FC = () => {
 
   const handleSelectActiveDoc = (doc: UploadedDocRecord) => {
     setActiveDocId(doc.id);
+    activeDocIdRef.current = doc.id;
     const domainId = doc.scanResult?.primarySubject.domainId || doc.classification?.domainId;
     const subjectId = doc.scanResult?.primarySubject.subjectId || doc.classification?.subjectId;
 

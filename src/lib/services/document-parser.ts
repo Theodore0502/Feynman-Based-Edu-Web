@@ -78,20 +78,8 @@ export const DocumentParser = {
         const decoder = new TextDecoder("utf-8");
         extractedText = decoder.decode(arrayBuffer).trim();
       } else if (lowerName.endsWith(".pdf") || lowerName.endsWith(".pdfa")) {
-        // Tạm thời bóc tách stream thô nếu chưa nạp pdf.js
-        const decoder = new TextDecoder("latin1");
-        const raw = decoder.decode(arrayBuffer);
-        // Lọc các đoạn text trong stream PDF
-        const textMatches = raw.match(/\(([^()]+)\)[\s]*Tj/g);
-        if (textMatches && textMatches.length > 0) {
-          extractedText = textMatches
-            .map((m) => m.replace(/^\(/, "").replace(/\)[\s]*Tj$/, ""))
-            .join(" ")
-            .trim();
-        } else {
-          // Thử lấy chuỗi text thông dụng
-          extractedText = raw.replace(/[^\x20-\x7E\xA0-\xFF\n\r\t]/g, " ").replace(/\s+/g, " ").trim();
-        }
+        // Bóc tách PDF chuẩn xác bằng pdfjs-dist (hỗ trợ cả font có dấu và cấu trúc trang)
+        extractedText = await this.extractPdfText(arrayBuffer);
       } else {
         // Định dạng khác, thử đọc UTF-8
         const decoder = new TextDecoder("utf-8");
@@ -129,6 +117,52 @@ export const DocumentParser = {
         err
       );
       throw err;
+    }
+  },
+
+  async extractPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
+    try {
+      const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.js");
+      if (typeof window !== "undefined" && pdfjsLib.GlobalWorkerOptions) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
+      }
+      const data = new Uint8Array(arrayBuffer);
+      const loadingTask = pdfjsLib.getDocument({
+        data,
+        useSystemFonts: true,
+        disableFontFace: true,
+      });
+      const pdfDoc = await loadingTask.promise;
+
+      let fullText = "";
+      for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+        const page = await pdfDoc.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        for (const item of textContent.items) {
+          if ("str" in item) {
+            fullText += (item as any).str + ((item as any).hasEOL ? "\n" : " ");
+          }
+        }
+        fullText += "\n";
+      }
+      return fullText.trim();
+    } catch (err: any) {
+      SystemLogger.warn("FILE_PARSER", "PDF_PARSER_ERROR", `Lỗi bóc tách PDF: ${err.message}`);
+      // Fallback an toàn: Chỉ lấy chuỗi văn bản UTF-8 trong Tj blocks, tuyệt đối không dump binary stream
+      try {
+        const decoder = new TextDecoder("utf-8", { fatal: false });
+        const raw = decoder.decode(arrayBuffer);
+        const matches = raw.match(/\(([^()]+)\)[\s]*Tj/g);
+        if (matches && matches.length > 0) {
+          return matches
+            .map((m) => m.replace(/^\(/, "").replace(/\)[\s]*Tj$/, ""))
+            .join(" ")
+            .trim();
+        }
+      } catch {
+        // bỏ qua
+      }
+      return "";
     }
   },
 

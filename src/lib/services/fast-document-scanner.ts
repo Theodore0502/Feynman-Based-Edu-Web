@@ -93,22 +93,20 @@ function toUrlSlug(text: string): string {
 }
 
 /**
- * Đếm số lần xuất hiện an toàn tuyệt đối, không bao giờ bị lỗi RegExp với ký tự đặc biệt (=, +, *, (, ), [)
+ * Đếm số lần xuất hiện siêu tốc bằng indexOf thuần, an toàn tuyệt đối, không biên dịch RegExp lặp lại
  */
 function countOccurrences(haystack: string, needle: string): number {
   if (!needle || needle.length < 2) return 0;
-  try {
-    const escaped = needle.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return (haystack.match(new RegExp(`\\b${escaped}\\b`, "g")) || []).length;
-  } catch {
-    let count = 0;
-    let pos = 0;
-    while ((pos = haystack.indexOf(needle, pos)) !== -1) {
-      count++;
-      pos += needle.length;
-    }
-    return count;
+  const n = needle.toLowerCase();
+  let count = 0;
+  let pos = 0;
+  const nLen = n.length;
+  while ((pos = haystack.indexOf(n, pos)) !== -1) {
+    count++;
+    pos += nLen;
+    if (count >= 10) break; // Giới hạn tối đa 10 lần đếm để tối ưu hiệu năng
   }
+  return count;
 }
 
 export const FastDocumentScanner = {

@@ -259,28 +259,36 @@ export function extractBestVietnameseTitle(fullText: string, rawFileName: string
     .map((l) => l.trim())
     .filter(Boolean);
 
-  // 1. Tìm trong 4 dòng đầu tiên của tài liệu
-  for (let i = 0; i < Math.min(4, lines.length); i++) {
-    const candidate = lines[i];
+  // 1. Tìm trong 6 dòng đầu tiên của tài liệu
+  for (let i = 0; i < Math.min(6, lines.length); i++) {
+    let candidate = lines[i];
 
-    // Bỏ qua nếu dòng chỉ là tiền đề tài liệu chuyên khảo
+    // Cắt bỏ phần mở rộng trong ngoặc đơn nếu có (ví dụ: "(Dành cho cán bộ hướng dẫn...)")
+    if (candidate.includes("(") && candidate.indexOf("(") > 8) {
+      const beforeParen = candidate.substring(0, candidate.indexOf("(")).trim();
+      if (beforeParen.length >= 8) {
+        candidate = beforeParen;
+      }
+    }
+
+    // Bỏ qua nếu dòng chỉ là tiền đề văn bản hành chính hoặc chuyên khảo
     if (
-      candidate.length <= 25 &&
-      /^(tài liệu chuyên khảo|chuyên khảo|chuyên đề|bản thảo|draft|mục lục|lời nói đầu)$/i.test(
+      candidate.length <= 30 &&
+      /^(tài liệu chuyên khảo|chuyên khảo|chuyên đề|bản thảo|draft|mục lục|lời nói đầu|cộng hòa xã hội|độc lập - tự do)$/i.test(
         candidate
       )
     ) {
       continue;
     }
 
-    // Nếu dòng có độ dài hợp lý cho tiêu đề bài giảng (12 - 130 ký tự)
-    if (candidate.length >= 12 && candidate.length <= 130) {
+    // Nếu dòng có độ dài hợp lý cho tiêu đề bài giảng / tài liệu (8 - 150 ký tự)
+    if (candidate.length >= 8 && candidate.length <= 150) {
       const hasVietnameseAccents =
         /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(
           candidate
         );
       const hasAcademicKeywords =
-        /giáo trình|đồ án|bài giảng|hệ thống|kiến trúc|mô hình|phát triển|cơ sở dữ liệu|mạng|an toàn|an ninh|điện toán|lý thuyết|kỹ thuật/i.test(
+        /phiếu|đánh giá|thực tập|báo cáo|nghiên cứu|giáo trình|đồ án|bài giảng|hệ thống|kiến trúc|mô hình|phát triển|cơ sở dữ liệu|mạng|an toàn|an ninh|điện toán|lý thuyết|kỹ thuật|khóa luận/i.test(
           candidate
         );
 

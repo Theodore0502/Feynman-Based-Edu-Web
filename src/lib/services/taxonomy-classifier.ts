@@ -8,6 +8,12 @@
 import { CurriculumService } from "@/lib/services/curriculum-service";
 import { SystemLogger } from "@/lib/services/system-logger";
 import { restoreVietnameseFromFilename } from "@/lib/services/vietnamese-title-formatter";
+import {
+  THREE_TIER_DOMAINS,
+  THREE_TIER_SUBJECTS,
+  THREE_TIER_DOMAIN_SUBJECTS,
+  THREE_TIER_LECTURES,
+} from "@/data/three-tier-curriculum.data";
 import type { DomainCategory, AcademicSubject, CatalogTopic } from "@/types/catalog.types";
 
 export interface TaxonomyClassificationResult {
@@ -34,12 +40,12 @@ export interface LiveTaxonomyCache {
   lastFetched: number;
 }
 
-// In-memory Cache nạp từ Supabase
+// In-memory Cache nạp từ CSDL Cây Tri Thức (khởi tạo với cấu trúc 3 tầng chuẩn)
 let liveCache: LiveTaxonomyCache = {
-  domains: [],
-  subjects: [],
-  domainSubjects: [],
-  topics: [],
+  domains: THREE_TIER_DOMAINS,
+  subjects: THREE_TIER_SUBJECTS,
+  domainSubjects: THREE_TIER_DOMAIN_SUBJECTS,
+  topics: THREE_TIER_LECTURES,
   lastFetched: 0,
 };
 
@@ -146,30 +152,8 @@ export const TaxonomyClassifier = {
     const combinedText = `${fileName} ${suggestedTitle} ${textSnippet}`.toLowerCase();
     const combinedUnaccented = removeVietnameseTones(combinedText);
 
-    let bestDomain: DomainCategory = liveCache.domains[0] || {
-      id: "dom-edu",
-      slug: "khoa-hoc-giao-duc-phuong-phap-hoc",
-      name: "Khoa Học Giáo Dục & Kỹ Năng Học Thuật",
-      description: "Phương pháp học tập",
-      iconName: "GraduationCap",
-      color: "#8B5CF6",
-      colorHex: "#8B5CF6",
-      accentBg: "bg-purple-500/10",
-      orderIndex: 1,
-      subjectCount: 1,
-      totalLectures: 1,
-      completedLectures: 0,
-      completionRate: 0,
-      topicCount: 1,
-    };
-    let bestSubject: AcademicSubject = liveCache.subjects[0] || {
-      id: "sub-feynman-technique",
-      slug: "phuong-phap-hoc-tap-feynman",
-      name: "Phương Pháp Học Tập & Kỹ Thuật Feynman",
-      description: "Kỹ thuật Feynman",
-      difficultyLevel: 1,
-      orderIndex: 1,
-    };
+    let bestDomain: DomainCategory = liveCache.domains[0] || THREE_TIER_DOMAINS[0];
+    let bestSubject: AcademicSubject = liveCache.subjects[0] || THREE_TIER_SUBJECTS[0];
     let highestScore = -1;
     let matchedKeywordsList: string[] = [];
 
