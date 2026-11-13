@@ -152,7 +152,9 @@ export const FastDocumentScanner = {
       // A. Kiểm tra khớp tên môn học trong tên file và thân bài
       if (file.name.toLowerCase().includes(sNameLower) || removeVietnameseTones(file.name).includes(sNameUnaccented)) {
         score += 45;
-        matchedKeywords.push(sub.name);
+        if (!matchedKeywords.includes(sub.name)) {
+          matchedKeywords.push(sub.name);
+        }
       }
 
       const subTokens = extractTokens(sub.name);
@@ -162,9 +164,6 @@ export const FastDocumentScanner = {
           const occurrences = countOccurrences(textUnaccented, tokenUn);
           if (occurrences > 0) {
             score += Math.min(occurrences * 4, 30);
-            if (!matchedKeywords.includes(token) && matchedKeywords.length < 5) {
-              matchedKeywords.push(token);
-            }
           }
         }
       }
@@ -178,9 +177,6 @@ export const FastDocumentScanner = {
             const occurrences = countOccurrences(textUnaccented, tokenUn);
             if (occurrences > 0) {
               score += Math.min(occurrences * 2, 20);
-              if (!matchedKeywords.includes(token) && matchedKeywords.length < 5) {
-                matchedKeywords.push(token);
-              }
             }
           }
         }
