@@ -46,6 +46,9 @@ export interface EducationalAssessment {
   confidenceScore: number;
   reasoning: string;
   recommendation: string;
+  conciseReview: string;          // Đoạn review nội dung tổng quát súc tích, tối đa 30 từ
+  keyKnowledgePoints: string[];   // Các gạch đầu dòng liệt kê kiến thức trong tệp
+  suggestedLearningGoal: string;  // Mục tiêu cần đạt được AI đề xuất sẵn (nắm bắt trọn bộ kiến thức)
   pedagogicalIndicators: {
     hasTheoreticalConcepts: boolean;
     hasInstructionalStructure: boolean;
@@ -111,6 +114,13 @@ function toUrlSlug(text: string): string {
     .replace(/\s+/g, "-");
 }
 
+function truncateToMaxWords(str: string, maxWords: number = 30): string {
+  if (!str) return "";
+  const words = str.trim().split(/\s+/);
+  if (words.length <= maxWords) return str;
+  return words.slice(0, maxWords).join(" ") + "...";
+}
+
 function getDomainColor(domainId: string): string {
   const colors: Record<string, string> = {
     "dom-it": "bg-blue-600 text-blue-700",
@@ -172,13 +182,19 @@ QUY TẮC THẨM ĐỊNH BẮT BUỘC (TUYỆT ĐỐI TUÂN THỦ):
    - Chỉ đánh giá isLearningMaterial: false nếu tài liệu là biểu mẫu hành chính thuần túy, phiếu chấm điểm trống, biên bản họp, không chứa kiến thức kỹ thuật/khoa học.
 2. Tiêu đề chuẩn hóa (suggestedTitle):
    - Trích xuất tiêu đề chính xác của đề tài/bài học có dấu tiếng Việt chuẩn (ví dụ: "Nghiên cứu và Xây dựng Hệ thống Chatbot Hỏi Đáp Đa Tài Liệu Dựa Trên RAG"). Không dùng tên file chung chung.
-3. Phân loại Đa Nhãn Ngành và Môn học (Multi-label):
+3. Đoạn review súc tích (conciseReview):
+   - BẮT BUỘC TỐI ĐA 30 TỪ: Viết một đoạn ngắn gọn tổng quát về nội dung tài liệu, đầy đủ ý chính nhưng không lan man (ví dụ: "Báo cáo nghiên cứu kiến trúc RAG, phương pháp hybrid retrieval và kỹ thuật tích hợp LLM nhằm xây dựng chatbot hỏi đáp văn bản chính xác.").
+4. Danh sách kiến thức cốt lõi (keyKnowledgePoints):
+   - Mảng 4-6 chuỗi liệt kê các kiến thức cốt lõi có trong tệp, ngắn gọn (ví dụ: ["Kiến trúc RAG (Retrieval-Augmented Generation)", "Vector Database & Kỹ thuật Embedding", "Hybrid Search (Keyword + Semantic)", "Mô hình ngôn ngữ lớn (LLM)"]). KHÔNG viết dấu '-' ở đầu chuỗi.
+5. Mục tiêu cần đạt AI đề xuất (suggestedLearningGoal):
+   - Một câu súc tích xác định mục tiêu nắm bắt trọn bộ kiến thức cốt lõi của tài liệu (ví dụ: "Nắm vững toàn diện kiến trúc RAG, cơ chế truy vấn dữ liệu ngữ nghĩa và quy trình triển khai chatbot thông minh.").
+6. Phân loại Đa Nhãn Ngành và Môn học (Multi-label):
    - relatedDomains: Liệt kê các Nhóm Ngành liên quan (1 - 3 ngành), chỉ định isPrimary cho ngành chính và tỷ lệ phần trăm % (tổng = 100%).
    - relatedSubjects: Liệt kê các Môn Học liên quan (1 - 4 môn), chỉ định isPrimary cho môn học cốt lõi nhất và tỷ lệ phần trăm % tương ứng (ví dụ: 65% Trí Tuệ Nhân Tạo & Học Máy, 20% Kiến Trúc Phần Mềm, 15% Phát Triển Web & API).
-4. Khái niệm cốt lõi (allowedConcepts) & Bẫy thuật ngữ (allowedJargons):
+7. Khái niệm cốt lõi (allowedConcepts) & Bẫy thuật ngữ (allowedJargons):
    - Bóc tách 5-8 khái niệm cốt lõi thực tế xuất hiện trong văn bản.
    - Bóc tách 4-6 thuật ngữ chuyên sâu cần giải thích.
-5. Cấu trúc chương mục (detectedChapters):
+8. Cấu trúc chương mục (detectedChapters):
    - Trích xuất 3-6 chương mục chính có trong văn bản kèm subjectId của môn học phụ trách chương đó (ví dụ: Chương lý thuyết thuộc AI, Chương triển khai thuộc Phần mềm/Web).
 
 HÃY TRẢ VỀ DUY NHẤT ĐỊNH DẠNG JSON NHƯ SAU (không bọc markdown \`\`\`json hoặc text phụ):
@@ -187,6 +203,9 @@ HÃY TRẢ VỀ DUY NHẤT ĐỊNH DẠNG JSON NHƯ SAU (không bọc markdown \
   "materialType": "thesis_research" | "lecture" | "textbook" | "exercise_exam" | "administrative_form" | "general_document",
   "materialTypeLabel": string,
   "confidenceScore": number,
+  "conciseReview": string,
+  "keyKnowledgePoints": string[],
+  "suggestedLearningGoal": string,
   "reasoning": string,
   "recommendation": string,
   "suggestedTitle": string,
@@ -374,6 +393,19 @@ ${textSnippet}`;
       const rawScore = Number(aiData.confidenceScore) || 95;
       const confidenceScore = rawScore <= 1 ? Math.round(rawScore * 100) : Math.round(rawScore);
 
+      const conciseReview = truncateToMaxWords(
+        aiData.conciseReview || aiData.reasoning || "Tài liệu học thuật cung cấp nội dung nghiên cứu và triển khai chuyên sâu.",
+        30
+      );
+
+      const keyKnowledgePoints = Array.isArray(aiData.keyKnowledgePoints) && aiData.keyKnowledgePoints.length > 0
+        ? aiData.keyKnowledgePoints.map((p: any) => String(p).replace(/^[-*•\s]+/, "").trim()).filter(Boolean)
+        : (aiData.allowedConcepts && aiData.allowedConcepts.length > 0
+            ? aiData.allowedConcepts.slice(0, 5)
+            : ["Kiến thức chuyên môn"]);
+
+      const suggestedLearningGoal = aiData.suggestedLearningGoal?.trim() || "Nắm bắt trọn bộ kiến thức cốt lõi, phương pháp luận và kỹ thuật triển khai thực tế của tài liệu.";
+
       const educationalAssessment: EducationalAssessment = {
         isLearningMaterial: Boolean(aiData.isLearningMaterial),
         materialType: aiData.materialType || (aiData.isLearningMaterial ? "thesis_research" : "administrative_form"),
@@ -381,6 +413,9 @@ ${textSnippet}`;
         confidenceScore,
         reasoning: aiData.reasoning || (aiData.isLearningMaterial ? "Tài liệu đạt chuẩn học thuật." : "Tài liệu biểu mẫu hành chính."),
         recommendation: aiData.recommendation || "Sẵn sàng trích xuất bài giảng chuẩn Feynman.",
+        conciseReview,
+        keyKnowledgePoints,
+        suggestedLearningGoal,
         pedagogicalIndicators: {
           hasTheoreticalConcepts: (aiData.allowedConcepts?.length || 0) > 0,
           hasInstructionalStructure: rawChapters.length > 0,
@@ -498,6 +533,13 @@ ${textSnippet}`;
           confidenceScore: 70,
           reasoning: "Tài liệu được phân tích theo chế độ kết nối dự phòng.",
           recommendation: "Kiểm tra kết nối mạng và tài khoản Gemini để đạt độ chính xác tối ưu.",
+          conciseReview: "Tài liệu học thuật tổng hợp được phân tích tự động theo chế độ dự phòng an toàn.",
+          keyKnowledgePoints: [
+            "Kiến thức cốt lõi chuyên ngành",
+            "Mô hình và phương pháp luận kỹ thuật",
+            "Kỹ năng thực hành và triển khai thực nghiệm",
+          ],
+          suggestedLearningGoal: "Nắm bắt trọn bộ kiến thức cốt lõi và các kỹ năng kỹ thuật chính trong tài liệu.",
           pedagogicalIndicators: {
             hasTheoreticalConcepts: true,
             hasInstructionalStructure: true,

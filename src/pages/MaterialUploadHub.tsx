@@ -47,6 +47,7 @@ export interface UploadedDocRecord {
   extension: string;
   uploadedAt: string;
   suggestedTitle: string;
+  learningGoal?: string;
   classification: TaxonomyClassificationResult | null;
   scanResult: FastScanResult | null;
   extractedDraft: ExtractedLessonDraft | null;
@@ -216,6 +217,10 @@ export const MaterialUploadHub: React.FC = () => {
           return {
             ...doc,
             suggestedTitle: scanRes.suggestedTitle,
+            learningGoal:
+              doc.learningGoal ||
+              scanRes.educationalAssessment?.suggestedLearningGoal ||
+              "Nắm bắt trọn bộ kiến thức cốt lõi, phương pháp luận và kỹ thuật triển khai thực tế của tài liệu.",
             scanResult: scanRes,
             isScanning: false,
             selectedSplitMode: scanRes.splitMode,
@@ -394,6 +399,13 @@ export const MaterialUploadHub: React.FC = () => {
             : null,
         };
       })
+    );
+  };
+
+  const handleUpdateLearningGoal = (goal: string) => {
+    if (!activeDoc) return;
+    setUploadedDocs((prev) =>
+      prev.map((d) => (d.id === activeDoc.id ? { ...d, learningGoal: goal } : d))
     );
   };
 
@@ -1087,37 +1099,135 @@ export const MaterialUploadHub: React.FC = () => {
                         </span>
                       </div>
 
+                      {/* 1. Đoạn review tổng quát súc tích (Tối đa 30 từ) */}
                       <p
-                        className={`text-xs leading-relaxed ${
+                        className={`text-xs leading-relaxed font-medium ${
                           !activeScanResult.educationalAssessment.isLearningMaterial
-                            ? "text-amber-900 font-medium"
-                            : "text-emerald-900"
+                            ? "text-amber-950"
+                            : "text-emerald-950"
                         }`}
                       >
-                        {activeScanResult.educationalAssessment.reasoning}
+                        {activeScanResult.educationalAssessment.conciseReview ||
+                          activeScanResult.educationalAssessment.reasoning}
                       </p>
 
+                      {/* 2. Danh sách kiến thức có trong tệp (Gạch đầu dòng "-") */}
+                      {activeScanResult.educationalAssessment.keyKnowledgePoints &&
+                        activeScanResult.educationalAssessment.keyKnowledgePoints.length > 0 && (
+                          <div
+                            className={`space-y-1 pt-2 border-t ${
+                              !activeScanResult.educationalAssessment.isLearningMaterial
+                                ? "border-amber-200/80"
+                                : "border-emerald-200/80"
+                            }`}
+                          >
+                            <div
+                              className={`text-[10px] font-bold uppercase tracking-wider ${
+                                !activeScanResult.educationalAssessment.isLearningMaterial
+                                  ? "text-amber-900"
+                                  : "text-emerald-900"
+                              }`}
+                            >
+                              Kiến thức có trong tài liệu:
+                            </div>
+                            <div className="space-y-1 pl-0.5">
+                              {activeScanResult.educationalAssessment.keyKnowledgePoints.map(
+                                (point, pIdx) => (
+                                  <div
+                                    key={pIdx}
+                                    className={`flex items-start gap-1.5 text-xs leading-snug ${
+                                      !activeScanResult.educationalAssessment.isLearningMaterial
+                                        ? "text-amber-900"
+                                        : "text-emerald-900"
+                                    }`}
+                                  >
+                                    <span
+                                      className={`font-black select-none ${
+                                        !activeScanResult.educationalAssessment.isLearningMaterial
+                                          ? "text-amber-700"
+                                          : "text-emerald-700"
+                                      }`}
+                                    >
+                                      -
+                                    </span>
+                                    <span>{point}</span>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                      {/* 3. Box mục tiêu cần đạt (AI điền sẵn, người dùng có thể xóa đi điền lại) */}
                       <div
-                        className={`pt-1 border-t text-[11px] flex items-center justify-between ${
+                        className={`pt-2 border-t space-y-1.5 ${
                           !activeScanResult.educationalAssessment.isLearningMaterial
-                            ? "border-amber-200 text-amber-800"
-                            : "border-emerald-200 text-emerald-800"
+                            ? "border-amber-200/80"
+                            : "border-emerald-200/80"
                         }`}
                       >
-                        <span>{activeScanResult.educationalAssessment.recommendation}</span>
+                        <div className="flex items-center justify-between">
+                          <label
+                            className={`text-[10px] font-black uppercase tracking-wider block ${
+                              !activeScanResult.educationalAssessment.isLearningMaterial
+                                ? "text-amber-900"
+                                : "text-emerald-900"
+                            }`}
+                          >
+                            Mục tiêu cần đạt:
+                          </label>
+                          <span
+                            className={`text-[10px] ${
+                              !activeScanResult.educationalAssessment.isLearningMaterial
+                                ? "text-amber-700/80"
+                                : "text-emerald-700/80"
+                            }`}
+                          >
+                            AI đề xuất • Có thể chỉnh sửa
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <textarea
+                            value={
+                              activeDoc?.learningGoal !== undefined
+                                ? activeDoc.learningGoal
+                                : activeScanResult.educationalAssessment.suggestedLearningGoal || ""
+                            }
+                            onChange={(e) => handleUpdateLearningGoal(e.target.value)}
+                            rows={2}
+                            placeholder="Nhập mục tiêu học tập (ví dụ: Nắm bắt trọn bộ kiến thức cốt lõi, phương pháp luận và kỹ thuật triển khai...)"
+                            className={`w-full text-xs rounded-lg p-2.5 bg-white/95 border focus:outline-none transition-colors resize-none placeholder:text-slate-400 font-sans leading-relaxed ${
+                              !activeScanResult.educationalAssessment.isLearningMaterial
+                                ? "border-amber-300 text-amber-950 focus:ring-1 focus:ring-amber-500"
+                                : "border-emerald-300 text-emerald-950 focus:ring-1 focus:ring-emerald-500"
+                            }`}
+                          />
+                          {(activeDoc?.learningGoal ||
+                            activeScanResult.educationalAssessment.suggestedLearningGoal) && (
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateLearningGoal("")}
+                              className="absolute right-2 top-2 px-1.5 py-0.5 text-[9px] font-mono font-bold text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors"
+                              title="Xóa để nhập mục tiêu mới"
+                            >
+                              [XÓA]
+                            </button>
+                          )}
+                        </div>
                       </div>
 
+                      {/* 4. Footer metrics (Đã bỏ tên mô hình theo yêu cầu, chỉ hiển thị thời gian & tokens) */}
                       {activeScanResult.geminiMetrics && (
                         <div
-                          className={`pt-1 border-t text-[10px] font-mono flex items-center justify-between ${
+                          className={`pt-1 border-t text-[10px] font-mono flex items-center justify-end ${
                             !activeScanResult.educationalAssessment.isLearningMaterial
                               ? "border-amber-200/80 text-amber-800"
                               : "border-emerald-200/80 text-emerald-800"
                           }`}
                         >
-                          <span>Mô hình: {activeScanResult.geminiMetrics.model}</span>
                           <span>
-                            Thời gian: {activeScanResult.geminiMetrics.durationSeconds}s • {activeScanResult.geminiMetrics.totalTokens} tokens
+                            Thời gian: {activeScanResult.geminiMetrics.durationSeconds}s •{" "}
+                            {activeScanResult.geminiMetrics.totalTokens} tokens
                           </span>
                         </div>
                       )}
